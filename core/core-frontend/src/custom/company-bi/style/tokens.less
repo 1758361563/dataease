@@ -1,0 +1,44 @@
+/**
+ * Company BI design tokens (A1).
+ *
+ * Loaded AFTER the official `@/style/index.less` (see pages/index/main.ts).
+ * The official file pins several `--ed-*` variables with `!important` inside
+ * a `:root:root` block, so overrides here must keep the same selector
+ * specificity and `!important` to win by source order.
+ *
+ * Rules:
+ * - Only design tokens here. Structural / scoped styles belong to other files.
+ * - Never hardcode colors or radii elsewhere; reference these variables.
+ */
+
+:root:root {
+  /* ---- Company token palette (referenced by company components) ---- */
+  --bi-radius-sm: 6px;
+  --bi-radius-md: 10px;
+  --bi-radius-lg: 14px;
+  --bi-border: #e5e7eb;
+  --bi-border-strong: #d8dce3;
+  --bi-bg-page: #f5f6f8;
+  --bi-bg-surface: #ffffff;
+  --bi-text-primary: #1f2329;
+  --bi-text-secondary: #646a73;
+  --bi-shadow-card: 0 1px 3px rgba(31, 35, 41, 0.08);
+  --bi-shadow-overlay: 0 8px 24px rgba(31, 35, 41, 0.12);
+
+  /* ---- Global radius: buttons, inputs, selects, tags, etc. ---- */
+  --ed-border-radius-base: 8px !important;
+  --ed-border-radius-small: 6px !important;
+
+  /* ---- Overlays ---- */
+  --ed-popover-border-radius: var(--bi-radius-md) !important;
+  --ed-dialog-border-radius: var(--bi-radius-lg) !important;
+  --ed-messagebox-border-radius: var(--bi-radius-lg) !important;
+  --ed-card-border-radius: var(--bi-radius-md) !important;
+  --ed-dialog-box-shadow: var(--bi-shadow-overlay) !important;
+
+  /* ---- Softer borders ---- */
+  --ed-border-color: var(--bi-border-strong) !important;
+  --ed-disabled-border-color: var(--bi-border-strong) !important;
+  --ed-border-color-light: var(--bi-border) !important;
+  --ed-border-color-lighter: var(--bi-border) !important;
+}
