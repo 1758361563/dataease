@@ -1,0 +1,41 @@
+/**
+ * Feishu-style component ⋯ menu + hover reveal.
+ * Complements ComponentEditBar.vue `.bar-main-feishu`.
+ */
+
+.dashboard-editor {
+  .shape:not(.shape-group-area) > .shape-outer {
+    > .edit-bar {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.06s ease;
+    }
+
+    &:hover > .edit-bar,
+    &.active > .edit-bar,
+    &.shape-selected > .edit-bar {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* keep menu visible while dropdown is open (hover leaves the shape) */
+    > .edit-bar:has(.ed-tooltip__trigger[aria-expanded='true']),
+    > .edit-bar:focus-within {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  .bar-main-feishu {
+    top: 8px !important;
+    right: 8px !important;
+    z-index: 20;
+
+    &:hover {
+      background: #fff;
+      border-color: var(--bi-border-strong, #d8dce3);
+    }
+  }
+}
+
+/* while dragging, hide ⋯ (already covered by dashboard-drag.less edit-bar hide) */

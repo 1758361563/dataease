@@ -1,0 +1,77 @@
+/**
+ * Folder-style tabs for dashboard DeTabs.
+ *
+ * Official DeTabs renders an el-tabs (line type) with an underline active bar.
+ * This layer restyles the chrome into modern folder tabs: a muted strip with
+ * the active tab as a white rounded "tongue" merging into the content below.
+ * Colors are intentionally fixed to company tokens (design-system default
+ * beats per-component font color config here).
+ *
+ * DOM (see custom-component/de-tabs/Component.vue + DeCustomTab.vue):
+ *   .custom-tabs-head > .de-tabs > .ed-tabs__header > ... > .ed-tabs__item
+ * Header must stay 46px tall: content height is hardcoded calc(100% - 46px).
+ */
+
+.company-folder-tabs() {
+  .custom-tabs-head .de-tabs {
+    > .ed-tabs__header {
+      height: 46px !important;
+      margin: 0;
+      padding: 6px 8px 0;
+      box-sizing: border-box;
+      background: var(--bi-bg-page);
+      border-radius: 8px 8px 0 0;
+    }
+
+    // kill the line-type underline & separator
+    .ed-tabs__nav-wrap::after {
+      display: none;
+    }
+    .ed-tabs__active-bar {
+      display: none;
+    }
+    .ed-tabs__nav {
+      border: none;
+    }
+
+    .ed-tabs__item {
+      height: 40px;
+      padding: 0 16px !important;
+      margin-right: 2px;
+      border-radius: 8px 8px 0 0;
+      background: transparent;
+      color: var(--bi-text-secondary);
+      transition: background-color 0.15s ease, color 0.15s ease;
+
+      &:hover {
+        background: rgba(31, 35, 41, 0.06);
+        color: var(--bi-text-primary);
+      }
+
+      &.is-active {
+        background: var(--bi-bg-surface);
+        color: var(--bi-text-primary);
+      }
+    }
+
+    .ed-tabs__new-tab {
+      margin-right: 8px;
+      border: none;
+      border-radius: 6px;
+      color: var(--bi-text-secondary);
+
+      &:hover {
+        background: rgba(31, 35, 41, 0.06);
+        color: var(--bi-text-primary);
+      }
+    }
+  }
+}
+
+.dashboard-editor {
+  .company-folder-tabs();
+}
+
+.canvas-container:not(.datav-preview) {
+  .company-folder-tabs();
+}

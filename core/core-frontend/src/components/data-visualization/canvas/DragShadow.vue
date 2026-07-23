@@ -41,12 +41,15 @@ const { element, baseWidth, baseHeight, curGap } = toRefs(props)
 
 const shadowStyle = computed(() => {
   const { x, y, sizeX, sizeY } = element.value
+  // Snap placeholder: must update instantly (no CSS transition).
+  // Use transform for compositor-friendly moves (Metabase / RGL pattern).
+  const left = (x - 1) * baseWidth.value
+  const top = (y - 1) * baseHeight.value
   return {
     padding: curGap.value + 'px',
     width: sizeX * baseWidth.value + 'px',
     height: sizeY * baseHeight.value + 'px',
-    left: (x - 1) * baseWidth.value + 'px',
-    top: (y - 1) * baseHeight.value - 3 + 'px'
+    transform: `translate3d(${left}px, ${top}px, 0)`
   }
 })
 </script>
@@ -54,11 +57,21 @@ const shadowStyle = computed(() => {
 <style lang="less" scoped>
 .shadow-main {
   position: absolute;
-  transition: all 0.1s;
+  left: 0;
+  top: 0;
+  /* company: NEVER transition during drag — transition = intentional mouse lag */
+  transition: none !important;
+  pointer-events: none;
+  z-index: 1;
+  box-sizing: border-box;
+  will-change: transform, width, height;
 }
 .shadow-background {
   width: 100%;
   height: 100%;
-  background-color: #b8d3f9;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1.5px dashed rgba(37, 99, 235, 0.55);
 }
 </style>

@@ -22,7 +22,6 @@ import { contextmenuStoreWithOut } from '@/store/modules/data-visualization/cont
 import { storeToRefs } from 'pinia'
 import findComponent from '@/utils/components'
 import _ from 'lodash'
-import DragShadow from '@/components/data-visualization/canvas/DragShadow.vue'
 import {
   canvasSave,
   componentPreSort,
@@ -44,6 +43,9 @@ import PointShadow from '@/components/data-visualization/canvas/PointShadow.vue'
 import DragInfo from '@/components/visualization/common/DragInfo.vue'
 import { activeWatermarkCheckUser } from '@/components/watermark/watermark'
 import PopArea from '@/custom-component/pop-area/Component.vue'
+import DashboardDragOverlay from '@/custom/company-bi/components/DashboardDragOverlay.vue'
+import DashboardGridPlaceholder from '@/custom/company-bi/components/DashboardGridPlaceholder.vue'
+import { dashboardDragSession } from '@/custom/company-bi/composables/useDashboardDragSession'
 import DatasetParamsComponent from '@/components/visualization/DatasetParamsComponent.vue'
 import DeGrid from '@/components/data-visualization/DeGrid.vue'
 import DeGridScreen from '@/components/data-visualization/DeGridScreen.vue'
@@ -1126,6 +1128,9 @@ const handleMouseUp = (e, item, index) => {
 }
 
 const clearInfoBox = e => {
+  // company: restore collision animation budget after drag/resize
+  moveTime = 200
+  document.body.classList.remove('bi-dashboard-dragging')
   if (_.isEmpty(infoBox.value)) return
   if (infoBox.value.cloneItem) {
     infoBox.value.cloneItem.remove()
@@ -1235,6 +1240,9 @@ const addItemBox = item => {
 }
 
 const onStartResize = (e, item, index) => {
+  // company: kill collision-queue lock during resize so snap ghost tracks pointer
+  moveTime = 0
+  document.body.classList.add('bi-dashboard-dragging')
   // 移动时 换算矩阵和悬浮位置大小
   syncShapeItemStyle(item, cellWidth.value, cellHeight.value)
   if (!resizable.value) return
@@ -1260,6 +1268,9 @@ const onStartResize = (e, item, index) => {
 }
 
 const onStartMove = (e, item, index) => {
+  // company: kill collision-queue lock during drag so snap ghost tracks pointer
+  moveTime = 0
+  document.body.classList.add('bi-dashboard-dragging')
   // 移动时 换算矩阵和悬浮位置大小
   syncShapeItemStyle(item, cellWidth.value, cellHeight.value)
   if (!infoBox.value) {
@@ -1281,14 +1292,19 @@ const onStartMove = (e, item, index) => {
 }
 
 const onDragging = (e, item) => {
+  // company P0: session owns follow+placeholder; skip live matrix writes
+  if (dashboardDragSession.rawView.active && dashboardDragSession.rawView.mode === 'drag') {
+    scrollScreen(e)
+    return
+  }
   // item 中的 style 为当前实时的位置
   const infoBoxTemp = infoBox.value
   let moveItem = _.get(infoBoxTemp, 'moveItem')
   scrollScreen(e)
   if (!draggable.value) return
   dragging.value(e, moveItem, moveItem._dragId)
-  //problem
-  moveItem['isPlayer'] = true
+  // company: direct grid snap — no isPlayer free-float, no ghost preview
+  moveItem['isPlayer'] = false
   let oldX = infoBoxTemp.oldX
   let oldY = infoBoxTemp.oldY
 
@@ -1297,32 +1313,30 @@ const onDragging = (e, item) => {
   newX = newX > 0 ? newX : 1
   newY = newY > 0 ? newY : 1
 
-  debounce(
-    (function (newX, oldX, newY, oldY) {
-      return function () {
-        if (newX != oldX || oldY != newY) {
-          movePlayer(moveItem, {
-            x: newX,
-            y: newY
-          })
-
-          infoBoxTemp.oldX = newX
-          infoBoxTemp.oldY = newY
-        }
-      }
-    })(newX, oldX, newY, oldY),
-    10
-  )
+  if (newX != oldX || oldY != newY) {
+    movePlayer(moveItem, {
+      x: newX,
+      y: newY
+    })
+    syncShapeItemStyle(moveItem, cellWidth.value, cellHeight.value)
+    infoBoxTemp.oldX = newX
+    infoBoxTemp.oldY = newY
+  }
 }
 
 const onResizing = (e, item) => {
+  // company P0: session owns resize shell + hysteretic size preview
+  if (dashboardDragSession.rawView.active && dashboardDragSession.rawView.mode === 'resize') {
+    return
+  }
   const { width, height } = item.style
   // item 中的 style 为当前实时的位置
   const infoBoxTemp = infoBox.value
   let resizeItem = _.get(infoBoxTemp, 'resizeItem')
   //调整大小时
   resizing.value(e, resizeItem, resizeItem._dragId)
-  resizeItem['isPlayer'] = true
+  // company: direct grid snap — no isPlayer free-float
+  resizeItem['isPlayer'] = false
   let nowSizeX =
     width % cellWidth.value > (cellWidth.value / 4) * 3
       ? Math.floor(width / cellWidth.value + 1)
@@ -1331,6 +1345,8 @@ const onResizing = (e, item) => {
     height % cellHeight.value > (cellHeight.value / 4) * 3
       ? Math.floor(height / cellHeight.value + 1)
       : Math.floor(height / cellHeight.value)
+  nowSizeX = Math.max(1, nowSizeX)
+  nowSizeY = Math.max(1, nowSizeY)
 
   // 增加5px偏移量 防止resize时向下取整 组件向右偏移
   let newX = Math.floor((item.style.left + 5) / cellWidth.value + 1)
@@ -1338,33 +1354,50 @@ const onResizing = (e, item) => {
   newX = newX > 0 ? newX : 1
   newY = newY > 0 ? newY : 1
 
-  // 调整大小
-  debounce(
-    (function (newX, newY) {
-      return function () {
-        // 调整大小
-        resizePlayer(resizeItem, {
-          sizeX: nowSizeX,
-          sizeY: nowSizeY
-        })
+  if (
+    nowSizeX !== infoBoxTemp.oldSizeX ||
+    nowSizeY !== infoBoxTemp.oldSizeY ||
+    newX !== infoBoxTemp.oldX ||
+    newY !== infoBoxTemp.oldY
+  ) {
+    resizePlayer(resizeItem, {
+      sizeX: nowSizeX,
+      sizeY: nowSizeY
+    })
+    infoBoxTemp.oldSizeX = nowSizeX
+    infoBoxTemp.oldSizeY = nowSizeY
+    movePlayer(resizeItem, {
+      x: newX,
+      y: newY
+    })
+    syncShapeItemStyle(resizeItem, cellWidth.value, cellHeight.value)
+    infoBoxTemp.oldX = newX
+    infoBoxTemp.oldY = newY
+  }
+}
 
-        infoBoxTemp.oldSizeX = nowSizeX
-        infoBoxTemp.oldSizeY = nowSizeY
-        // 调整位置
-        movePlayer(resizeItem, {
-          x: newX,
-          y: newY
-        })
-        infoBoxTemp.oldX = newX
-        infoBoxTemp.oldY = newY
-      }
-    })(newX, newY),
-    10
-  )
+/** company P0: apply session commit once on pointerup */
+const onCommitLayout = (patch, item) => {
+  if (!patch || !item) return
+  resizePlayer(item, { sizeX: patch.sizeX, sizeY: patch.sizeY })
+  movePlayer(item, { x: patch.x, y: patch.y })
+  syncShapeItemStyle(item, cellWidth.value, cellHeight.value)
+  if (infoBox.value) {
+    infoBox.value.oldX = patch.x
+    infoBox.value.oldY = patch.y
+    infoBox.value.oldSizeX = patch.sizeX
+    infoBox.value.oldSizeY = patch.sizeY
+  }
 }
 
 const onMouseUp = e => {
   // startMove 中组织冒泡会导致移动事件无法传播，在这里设置（鼠标抬起）效果一致
+  // company: restore collision animation budget after drag/resize
+  moveTime = 200
+  document.body.classList.remove('bi-dashboard-dragging')
+  if (dashboardDragSession.rawView.active) {
+    dashboardDragSession.cancel()
+  }
   if (_.isEmpty(infoBox.value)) return
   if (infoBox.value.cloneItem) {
     infoBox.value.cloneItem.remove()
@@ -1634,6 +1667,8 @@ defineExpose({
       :matrix-style="matrixStyle"
       :themes="themes"
     ></de-grid-screen>
+    <!-- company: snap preview ghost removed — components snap directly -->
+    <!--
     <drag-shadow
       v-if="infoBox && infoBox.moveItem && editMode !== 'preview'"
       :base-height="dashboardScaleWithWidth ? baseWidth * 1.6 : baseHeight"
@@ -1641,6 +1676,7 @@ defineExpose({
       :cur-gap="curGap"
       :element="infoBox.moveItem"
     ></drag-shadow>
+    -->
 
     <!--切换canvas 拖拽阴影部分-->
     <point-shadow v-if="pointShadowShow" :canvas-id="canvasId" />
@@ -1648,6 +1684,15 @@ defineExpose({
       v-if="groupAreaShadowShow"
       :style="getShapeItemShowStyle(componentData[componentData.length - 1])"
     ></GroupAreaShadow>
+
+    <!-- company P0: grid drop placeholder + follow overlay -->
+    <DashboardGridPlaceholder
+      v-if="dashboardActive"
+      :cell-width="cellWidth"
+      :cell-height="cellHeight"
+      :gap="curGap"
+    />
+    <DashboardDragOverlay v-if="dashboardActive" />
 
     <!--页面组件列表展示-->
     <Shape
@@ -1669,6 +1714,7 @@ defineExpose({
       @onMouseUp="onMouseUp($event)"
       @onDragging="onDragging($event, item)"
       @onResizing="onResizing($event, item)"
+      @onCommitLayout="onCommitLayout($event, item)"
       @userViewEnlargeOpen="userViewEnlargeOpen($event, item)"
       @datasetParamsInit="datasetParamsInit(item)"
       @linkJumpSetOpen="linkJumpSetOpen(item)"

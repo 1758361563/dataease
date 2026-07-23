@@ -197,16 +197,34 @@ export const COMMON_COMPONENT_BACKGROUND_BASE: CommonBackground = {
   backdropFilter: 4
 }
 
+// company: dashboard components default to a finished card look
+// (opaque surface, 8px radius, 12px padding). dataV keeps BASE via SCREEN_DARK.
 export const COMMON_COMPONENT_BACKGROUND_LIGHT = {
   ...COMMON_COMPONENT_BACKGROUND_BASE,
-  backgroundColor: 'rgba(255,255,255,0.1)',
-  innerImageColor: 'rgba(16, 148, 229,1)'
+  backgroundColor: 'rgba(255,255,255,1)',
+  innerImageColor: 'rgba(16, 148, 229,1)',
+  innerPadding: {
+    mode: ShorthandMode.Uniform,
+    top: 12
+  },
+  borderRadius: {
+    mode: ShorthandMode.Uniform,
+    topLeft: 8
+  }
 }
 
 export const COMMON_COMPONENT_BACKGROUND_DARK = {
   ...COMMON_COMPONENT_BACKGROUND_BASE,
-  backgroundColor: 'rgba(19,28,66,0.1)',
-  innerImageColor: '#1094E5'
+  backgroundColor: 'rgba(19,28,66,1)',
+  innerImageColor: '#1094E5',
+  innerPadding: {
+    mode: ShorthandMode.Uniform,
+    top: 12
+  },
+  borderRadius: {
+    mode: ShorthandMode.Uniform,
+    topLeft: 8
+  }
 }
 
 export const COMMON_COMPONENT_BACKGROUND_SCREEN_DARK = {
@@ -308,8 +326,8 @@ const list = [
     freeze: false, // 是否冻结再顶部 主画布生效
     x: 1,
     y: 1,
-    sizeX: 72,
-    sizeY: 4,
+    sizeX: 36,
+    sizeY: 1,
     style: {
       width: 400,
       height: 100
@@ -337,8 +355,8 @@ const list = [
     actionSelection: ACTION_SELECTION,
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     style: {
       adaptation: 'adaptation',
       width: 600,
@@ -356,8 +374,8 @@ const list = [
     icon: 'icon-video',
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     style: {
       width: 600,
       height: 300
@@ -375,8 +393,8 @@ const list = [
     icon: 'icon-stream',
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     style: {
       width: 600,
       height: 300
@@ -396,8 +414,8 @@ const list = [
     frameLinks: FRAMELINKS,
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     style: {
       width: 600,
       height: 300
@@ -414,8 +432,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 12,
+    sizeX: 18,
+    sizeY: 6,
     propValue: {},
     style: {
       width: 300,
@@ -445,8 +463,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     propValue: {
       url: '',
       flip: {
@@ -472,8 +490,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 10,
-    sizeY: 10,
+    sizeX: 5,
+    sizeY: 5,
     style: {
       width: 40,
       height: 40,
@@ -492,8 +510,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 30,
-    sizeY: 30,
+    sizeX: 15,
+    sizeY: 15,
     style: {
       width: 600,
       height: 300,
@@ -598,13 +616,14 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     style: {
       width: 600,
       height: 300,
-      fontSize: 16,
-      activeFontSize: 18,
+      // company: modern folder tabs use one size, no active size jump
+      fontSize: 14,
+      activeFontSize: 14,
       headHorizontalPosition: 'left',
       headFontColor: '#000000',
       headFontActiveColor: '#000000',
@@ -625,8 +644,8 @@ const list = [
     icon: 'scroll-text',
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     style: {
       width: 400,
       height: 80,
@@ -657,8 +676,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 36,
-    sizeY: 14,
+    sizeX: 18,
+    sizeY: 7,
     style: {
       width: 600,
       height: 300,

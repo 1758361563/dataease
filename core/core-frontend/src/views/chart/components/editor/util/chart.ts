@@ -41,17 +41,17 @@ export const DEFAULT_COLOR_CASE: DeepPartial<ChartAttr> = {
     valueFontColor: '#5470c6'
   },
   tableHeader: {
-    tableHeaderBgColor: '#1E90FF',
-    tableHeaderCornerBgColor: '#1E90FF',
-    tableHeaderColBgColor: '#1E90FF',
-    tableHeaderFontColor: '#000000',
-    tableHeaderCornerFontColor: '#000000',
-    tableHeaderColFontColor: '#000000'
+    tableHeaderBgColor: '#F5F6F8',
+    tableHeaderCornerBgColor: '#F5F6F8',
+    tableHeaderColBgColor: '#F5F6F8',
+    tableHeaderFontColor: '#1F2329',
+    tableHeaderCornerFontColor: '#1F2329',
+    tableHeaderColFontColor: '#1F2329'
   },
   tableCell: {
     tableItemBgColor: '#FFFFFF',
-    tableFontColor: '#000000',
-    tableItemSubBgColor: '#EEEEEE'
+    tableFontColor: '#1F2329',
+    tableItemSubBgColor: '#FAFBFC'
   },
   label: {
     color: '#000000',
@@ -103,17 +103,17 @@ export const DEFAULT_COLOR_CASE_LIGHT: DeepPartial<ChartAttr> = {
     valueFontColor: '#5470c6'
   },
   tableHeader: {
-    tableHeaderBgColor: '#1E90FF',
-    tableHeaderCornerBgColor: '#1E90FF',
-    tableHeaderColBgColor: '#1E90FF',
-    tableHeaderFontColor: '#000000',
-    tableHeaderCornerFontColor: '#000000',
-    tableHeaderColFontColor: '#000000'
+    tableHeaderBgColor: '#F5F6F8',
+    tableHeaderCornerBgColor: '#F5F6F8',
+    tableHeaderColBgColor: '#F5F6F8',
+    tableHeaderFontColor: '#1F2329',
+    tableHeaderCornerFontColor: '#1F2329',
+    tableHeaderColFontColor: '#1F2329'
   },
   tableCell: {
     tableItemBgColor: '#FFFFFF',
-    tableFontColor: '#000000',
-    tableItemSubBgColor: '#1E90FF'
+    tableFontColor: '#1F2329',
+    tableItemSubBgColor: '#FAFBFC'
   },
   label: {
     color: '#000000',
@@ -164,9 +164,9 @@ export const DEFAULT_COLOR_CASE_DARK: DeepPartial<ChartAttr> = {
     valueFontColor: '#5470c6'
   },
   tableHeader: {
-    tableHeaderBgColor: '#1E90FF',
-    tableHeaderCornerBgColor: '#1E90FF',
-    tableHeaderColBgColor: '#1E90FF',
+    tableHeaderBgColor: '#2A3142',
+    tableHeaderCornerBgColor: '#2A3142',
+    tableHeaderColBgColor: '#2A3142',
     tableHeaderFontColor: '#FFFFFF',
     tableHeaderCornerFontColor: '#FFFFFF',
     tableHeaderColFontColor: '#FFFFFF'
@@ -174,7 +174,7 @@ export const DEFAULT_COLOR_CASE_DARK: DeepPartial<ChartAttr> = {
   tableCell: {
     tableItemBgColor: '#131E42',
     tableFontColor: '#ffffff',
-    tableItemSubBgColor: '#1E90FF'
+    tableItemSubBgColor: '#1A2438'
   },
   label: {
     color: '#FFFFFF',
@@ -488,15 +488,15 @@ export const DEFAULT_TABLE_HEADER: ChartTableHeaderAttr = {
   tableHeaderAlign: 'left',
   tableHeaderCornerAlign: 'left',
   tableHeaderColAlign: 'left',
-  tableHeaderBgColor: '#1E90FF',
-  tableHeaderCornerBgColor: '#1E90FF',
-  tableHeaderColBgColor: '#1E90FF',
-  tableHeaderFontColor: '#000000',
-  tableHeaderCornerFontColor: '#000000',
-  tableHeaderColFontColor: '#000000',
-  tableTitleFontSize: 12,
-  tableTitleCornerFontSize: 12,
-  tableTitleColFontSize: 12,
+  tableHeaderBgColor: '#F5F6F8',
+  tableHeaderCornerBgColor: '#F5F6F8',
+  tableHeaderColBgColor: '#F5F6F8',
+  tableHeaderFontColor: '#1F2329',
+  tableHeaderCornerFontColor: '#1F2329',
+  tableHeaderColFontColor: '#1F2329',
+  tableTitleFontSize: 13,
+  tableTitleCornerFontSize: 13,
+  tableTitleColFontSize: 13,
   tableTitleHeight: 36,
   tableHeaderSort: false,
   showColTooltip: false,
@@ -519,13 +519,13 @@ export const DEFAULT_TABLE_HEADER: ChartTableHeaderAttr = {
   alignConfig: []
 }
 export const DEFAULT_TABLE_CELL: ChartTableCellAttr = {
-  tableFontColor: '#000000',
+  tableFontColor: '#1F2329',
   tableItemAlign: 'right',
   tableItemBgColor: '#FFFFFF',
-  tableItemFontSize: 12,
-  tableItemHeight: 36,
-  enableTableCrossBG: false,
-  tableItemSubBgColor: '#EEEEEE',
+  tableItemFontSize: 13,
+  tableItemHeight: 34,
+  enableTableCrossBG: true,
+  tableItemSubBgColor: '#FAFBFC',
   showTooltip: false,
   showHorizonBorder: true,
   showVerticalBorder: true,
@@ -555,8 +555,8 @@ export const DEFAULT_TITLE_STYLE: ChartTextStyle = {
 
 export const DEFAULT_INDICATOR_STYLE: ChartIndicatorStyle = {
   show: true,
-  fontSize: 20,
-  color: '#5470C6ff',
+  fontSize: 28,
+  color: '#1F2329ff',
   hPosition: 'center',
   vPosition: 'center',
   isItalic: false,
@@ -569,7 +569,7 @@ export const DEFAULT_INDICATOR_STYLE: ChartIndicatorStyle = {
   suffixEnable: true,
   suffix: '',
   suffixFontSize: 14,
-  suffixColor: '#5470C6ff',
+  suffixColor: '#646A73ff',
   suffixIsItalic: false,
   suffixIsBolder: true,
   suffixFontFamily: 'Microsoft YaHei',
@@ -578,14 +578,14 @@ export const DEFAULT_INDICATOR_STYLE: ChartIndicatorStyle = {
 }
 export const DEFAULT_INDICATOR_NAME_STYLE: ChartIndicatorNameStyle = {
   show: true,
-  fontSize: 18,
-  color: '#ffffffff',
+  fontSize: 13,
+  color: '#646A73ff',
   isItalic: false,
-  isBolder: true,
+  isBolder: false,
   fontFamily: 'Microsoft YaHei',
   letterSpace: 0,
   fontShadow: false,
-  nameValueSpacing: 0,
+  nameValueSpacing: 4,
   namePosition: 'bottom'
 }
 

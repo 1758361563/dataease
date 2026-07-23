@@ -1,0 +1,62 @@
+/**
+ * Selection chrome for dashboard edit mode.
+ *
+ * Official Shape.vue uses `outline` for .active / .shape-selected / hover.
+ * CSS outline never follows border-radius, so the ring stays square while
+ * the card (shape-inner) is 8px rounded — visible corner gaps.
+ *
+ * Fix: kill outline on shape-outer; draw the ring on shape-inner via inset
+ * box-shadow so it inherits the card's inline border-radius.
+ */
+
+.dashboard-editor {
+  .shape:not(.shape-group-area) > .shape-outer {
+    &.active,
+    &.shape-selected,
+    &.shape-edit:hover {
+      outline: none !important;
+      outline-width: 0 !important;
+      outline-style: none !important;
+      outline-color: transparent !important;
+    }
+
+    &.active > .shape-inner,
+    &.shape-selected > .shape-inner {
+      box-shadow:
+        var(--bi-shadow-card),
+        0 0 0 1.5px var(--ed-color-primary) !important;
+      transition: none !important;
+    }
+
+    &.shape-edit:hover:not(.active):not(.shape-selected) > .shape-inner {
+      box-shadow:
+        var(--bi-shadow-card),
+        0 0 0 1px var(--ed-color-primary-99, rgba(37, 99, 235, 0.45)) !important;
+    }
+  }
+
+  /* P0: source card stays put while Overlay follows pointer */
+  .shape.bi-drag-source-ghost {
+    opacity: 0.35;
+  }
+
+  .shape-point {
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border: 1.5px solid var(--ed-color-primary);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    transition: none !important;
+  }
+
+  /* do not restyle Feishu ⋯ as primary pill */
+  .bar-main:not(.bar-main-feishu) {
+    border-radius: 8px !important;
+    overflow: hidden;
+  }
+
+  .bar-main-background:not(.bar-main-feishu) {
+    background-color: var(--ed-color-primary) !important;
+  }
+}

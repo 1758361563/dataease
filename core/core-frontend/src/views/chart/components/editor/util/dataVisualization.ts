@@ -64,9 +64,9 @@ export const MOBILE_SETTING_DARK = {
 
 export const DEFAULT_DASHBOARD_STYLE_BASE = {
   gap: 'yes',
-  gapSize: 5,
-  gapMode: 'middle',
-  showGrid: false,
+  gapSize: 8,
+  gapMode: 'custom',
+  showGrid: true,
   matrixBase: 4, // 当前matrix的基数 （是pcMatrixCount的几倍）
   resultMode: 'all', // 图表结果显示模式 all 图表 custom 仪表板自定义
   resultCount: 1000 // 图表结果显示条数
@@ -119,7 +119,7 @@ export const DEFAULT_CANVAS_STYLE_DATA_LIGHT = {
   // 页面全局数据
   themeId: '10001',
   color: '#000000',
-  backgroundColor: '#f5f6f7',
+  backgroundColor: '#f5f6f8',
   dashboard: DEFAULT_DASHBOARD_STYLE_LIGHT,
   component: PANEL_CHART_INFO_LIGHT
 }

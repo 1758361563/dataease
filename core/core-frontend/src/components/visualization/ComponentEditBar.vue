@@ -5,71 +5,97 @@
     :class="[
       showEditPosition,
       {
-        'bar-main-background': mainBackgroundShow
+        'bar-main-background': mainBackgroundShow,
+        'bar-main-feishu': showPosition === 'canvas'
       }
     ]"
     @mousedown="fieldsAreaDown"
   >
-    <el-tooltip
-      effect="dark"
-      placement="top"
-      :content="t('visualization.sort')"
-      v-if="element.component === 'DeTabs' && showPosition === 'canvas'"
-    >
-      <el-icon class="bar-base-icon" @click="tabSort">
-        <Sort />
-      </el-icon>
-    </el-tooltip>
-    <template v-if="element.component === 'VQuery' && showPosition === 'canvas'">
-      <span :title="t('visualization.add_query_filter')">
-        <el-icon class="bar-base-icon" @click="addQueryCriteria">
-          <Icon name="icon_add_outlined"><icon_add_outlined class="svg-icon" /></Icon
-        ></el-icon>
-      </span>
-      <span :title="t('visualization.edit_query_filter')">
-        <el-icon class="bar-base-icon" @click="editQueryCriteria">
-          <Icon name="icon_edit_outlined"><icon_edit_outlined class="svg-icon" /></Icon
-        ></el-icon>
-      </span>
-    </template>
-    <el-tooltip
-      effect="dark"
-      placement="top"
-      :content="t('visualization.enlarge')"
-      v-if="element.innerType !== 'rich-text' && barShowCheck('enlarge')"
-    >
-      <span>
-        <el-icon class="bar-base-icon" @click="userViewEnlargeOpen($event, 'enlarge')">
-          <Icon name="dv-bar-enlarge"><dvBarEnlarge class="svg-icon" /></Icon>
+    <!-- company canvas: Feishu-style — only ⋯ menu; other icons live inside dropdown -->
+    <template v-if="showPosition !== 'canvas'">
+      <el-tooltip
+        effect="dark"
+        placement="top"
+        :content="t('visualization.sort')"
+        v-if="element.component === 'DeTabs'"
+      >
+        <el-icon class="bar-base-icon" @click="tabSort">
+          <Sort />
         </el-icon>
-      </span>
-    </el-tooltip>
-    <el-tooltip
-      effect="dark"
-      :placement="showBarTooltipPosition"
-      :content="t('visualization.show_data_info')"
-      v-if="!['picture-group', 'rich-text'].includes(element.innerType) && barShowCheck('details')"
-    >
-      <span>
-        <el-icon class="bar-base-icon" @click="userViewEnlargeOpen($event, 'details')">
-          <Icon name="dv-details"><dvDetails class="svg-icon" /></Icon>
-        </el-icon>
-      </span>
-    </el-tooltip>
-    <el-tooltip
-      effect="dark"
-      placement="top"
-      :content="t('visualization.input_calc_data')"
-      v-if="barShowCheck('datasetParams') && datasetParamsSetShow"
-    >
-      <span>
-        <el-icon class="bar-base-icon" @click="datasetParamsInit">
-          <Icon name="icon_params_setting"><icon_params_setting class="svg-icon" /></Icon>
-        </el-icon>
-      </span>
-    </el-tooltip>
+      </el-tooltip>
+      <template v-if="element.component === 'VQuery'">
+        <span :title="t('visualization.add_query_filter')">
+          <el-icon class="bar-base-icon" @click="addQueryCriteria">
+            <Icon name="icon_add_outlined"><icon_add_outlined class="svg-icon" /></Icon
+          ></el-icon>
+        </span>
+        <span :title="t('visualization.edit_query_filter')">
+          <el-icon class="bar-base-icon" @click="editQueryCriteria">
+            <Icon name="icon_edit_outlined"><icon_edit_outlined class="svg-icon" /></Icon
+          ></el-icon>
+        </span>
+      </template>
+      <el-tooltip
+        effect="dark"
+        placement="top"
+        :content="t('visualization.enlarge')"
+        v-if="element.innerType !== 'rich-text' && barShowCheck('enlarge')"
+      >
+        <span>
+          <el-icon class="bar-base-icon" @click="userViewEnlargeOpen($event, 'enlarge')">
+            <Icon name="dv-bar-enlarge"><dvBarEnlarge class="svg-icon" /></Icon>
+          </el-icon>
+        </span>
+      </el-tooltip>
+      <el-tooltip
+        effect="dark"
+        :placement="showBarTooltipPosition"
+        :content="t('visualization.show_data_info')"
+        v-if="
+          !['picture-group', 'rich-text'].includes(element.innerType) && barShowCheck('details')
+        "
+      >
+        <span>
+          <el-icon class="bar-base-icon" @click="userViewEnlargeOpen($event, 'details')">
+            <Icon name="dv-details"><dvDetails class="svg-icon" /></Icon>
+          </el-icon>
+        </span>
+      </el-tooltip>
+      <el-tooltip
+        effect="dark"
+        placement="top"
+        :content="t('visualization.input_calc_data')"
+        v-if="barShowCheck('datasetParams') && datasetParamsSetShow"
+      >
+        <span>
+          <el-icon class="bar-base-icon" @click="datasetParamsInit">
+            <Icon name="icon_params_setting"><icon_params_setting class="svg-icon" /></Icon>
+          </el-icon>
+        </span>
+      </el-tooltip>
 
-    <div v-if="barShowCheck('multiplexing')" class="bar-checkbox-area">
+      <div v-if="barShowCheck('multiplexing')" class="bar-checkbox-area">
+        <el-checkbox
+          @click.stop
+          style="height: 26px; padding: 5px"
+          v-model="state.multiplexingCheckModel"
+          @change="multiplexingCheck"
+        />
+      </div>
+      <span
+        :title="t('visualization.cancel_linkage')"
+        v-if="barShowCheck('unLinkage') && existLinkage"
+      >
+        <el-icon class="bar-base-icon" @click="clearLinkage">
+          <Icon name="dv-bar-unLinkage"><dvBarUnLinkage class="svg-icon" /></Icon>
+        </el-icon>
+      </span>
+      <div v-if="barShowCheck('batchOpt')" class="bar-checkbox-area">
+        <el-checkbox v-model="state.batchOptCheckModel" @change="batchOptChange" />
+      </div>
+    </template>
+
+    <div v-if="barShowCheck('multiplexing') && showPosition === 'canvas'" class="bar-checkbox-area">
       <el-checkbox
         @click.stop
         style="height: 26px; padding: 5px"
@@ -77,32 +103,43 @@
         @change="multiplexingCheck"
       />
     </div>
-    <span
-      :title="t('visualization.cancel_linkage')"
-      v-if="barShowCheck('unLinkage') && existLinkage"
-    >
-      <el-icon class="bar-base-icon" @click="clearLinkage">
-        <Icon name="dv-bar-unLinkage"><dvBarUnLinkage class="svg-icon" /></Icon>
-      </el-icon>
-    </span>
-    <div v-if="barShowCheck('batchOpt')" class="bar-checkbox-area">
+    <div v-if="barShowCheck('batchOpt') && showPosition === 'canvas'" class="bar-checkbox-area">
       <el-checkbox v-model="state.batchOptCheckModel" @change="batchOptChange" />
     </div>
 
     <el-dropdown
       trigger="click"
-      placement="right-start"
-      v-if="barShowCheck('setting')"
+      placement="bottom-end"
+      v-if="barShowCheck('setting') || showPosition === 'canvas'"
       ref="curDropdown"
-      popper-class="hide-focus_bg"
+      popper-class="hide-focus_bg bi-component-more-menu"
+      @command="() => {}"
     >
-      <el-icon class="bar-base-icon">
+      <el-icon class="bar-base-icon" @click.stop @mousedown.stop>
         <el-tooltip :content="t('visualization.more')" effect="dark" placement="bottom">
           <icon name="icon_more_outlined"><icon_more_outlined class="svg-icon" /></icon>
         </el-tooltip>
       </el-icon>
       <template #dropdown>
         <el-dropdown-menu>
+          <el-dropdown-item v-if="showPosition === 'canvas'" @click="openComponentEditor">
+            配置
+          </el-dropdown-item>
+          <el-dropdown-item
+            v-if="showPosition === 'canvas' && element.component === 'DeTabs'"
+            @click="tabSort"
+            >{{ t('visualization.sort') }}</el-dropdown-item
+          >
+          <el-dropdown-item
+            v-if="showPosition === 'canvas' && element.component === 'VQuery'"
+            @click="addQueryCriteria"
+            >{{ t('visualization.add_query_filter') }}</el-dropdown-item
+          >
+          <el-dropdown-item
+            v-if="showPosition === 'canvas' && element.component === 'VQuery'"
+            @click="editQueryCriteria"
+            >{{ t('visualization.edit_query_filter') }}</el-dropdown-item
+          >
           <el-dropdown-item @click="copyComponent" v-if="barShowCheck('copy')">{{
             t('visualization.copy')
           }}</el-dropdown-item>
@@ -160,6 +197,18 @@
             </el-dropdown-item>
           </template>
           <el-dropdown-item
+            @click="datasetParamsInit"
+            v-if="
+              showPosition === 'canvas' && barShowCheck('datasetParams') && datasetParamsSetShow
+            "
+            >{{ t('visualization.input_calc_data') }}</el-dropdown-item
+          >
+          <el-dropdown-item
+            @click="clearLinkage"
+            v-if="showPosition === 'canvas' && barShowCheck('unLinkage') && existLinkage"
+            >{{ t('visualization.cancel_linkage') }}</el-dropdown-item
+          >
+          <el-dropdown-item
             @click="hiddenComponent"
             v-if="barShowCheck('hidden') && isMainCanvas(canvasId)"
             >{{ t('visualization.hidden') }}</el-dropdown-item
@@ -181,6 +230,7 @@
       trigger="click"
       placement="right-start"
       v-if="
+        showPosition !== 'canvas' &&
         !['picture-group', 'rich-text'].includes(element.innerType) &&
         barShowCheck('previewDownload') &&
         showDownload &&
@@ -322,6 +372,8 @@ const barShowCheck = barName => {
 }
 
 const mainBackgroundShow = computed(() => {
+  // company: Feishu ⋯ has no primary blue pill background
+  if (showPosition.value === 'canvas') return false
   return !['batchOpt', 'multiplexing'].includes(showPosition.value)
 })
 const props = defineProps({
@@ -353,14 +405,12 @@ const props = defineProps({
 const { element, index, showPosition, canvasId } = toRefs(props)
 const {
   batchOptStatus,
-  pcMatrixCount,
   curComponent,
   componentData,
   canvasViewInfo,
   mobileInPc,
   dvInfo,
-  isPopWindow,
-  hiddenListStatus
+  isPopWindow
 } = storeToRefs(dvMainStore)
 
 const state = reactive({
@@ -381,8 +431,6 @@ const state = reactive({
   viewXArray: [],
   batchOptCheckModel: false
 })
-const showHiddenIcon = computed(() => hiddenListStatus.value && isMainCanvas(canvasId.value))
-
 const tabSort = () => {
   customTabsSortRef.value.sortInit(element.value)
 }
@@ -401,19 +449,8 @@ const editQueryCriteria = () => {
 
 const showEditPosition = computed(() => {
   if (showPosition.value === 'canvas') {
-    const baseLeft = element.value.x - 1
-    const baseRight = pcMatrixCount.value.x - (element.value.x + element.value.sizeX - 1)
-    if ((baseLeft === 0 && baseRight === 0) || baseRight < 0) {
-      if (showHiddenIcon.value) {
-        return 'bar-main-left-inner'
-      } else {
-        return 'bar-main-right-inner'
-      }
-    } else if (baseRight === 0) {
-      return 'bar-main-left-outer'
-    } else {
-      return 'bar-main-right'
-    }
+    // company: always embed ⋯ inside the card top-right
+    return 'bar-main-right-inner'
   } else if (showPosition.value === 'preview') {
     return 'bar-main-right-inner'
   } else if (showPosition.value === 'canvasDataV') {
@@ -423,6 +460,10 @@ const showEditPosition = computed(() => {
   }
 })
 
+const openComponentEditor = () => {
+  dvMainStore.setCurComponent({ component: element.value, index: index.value })
+  dvMainStore.setComponentEditorVisible(true)
+}
 const showBarTooltipPosition = computed(() => {
   if (showEditPosition.value.indexOf('right') >= 0) {
     return 'right'
@@ -703,6 +744,30 @@ watch(
 .bar-main-left-outer {
   width: 24px;
   left: -26px;
+}
+
+/* company: Feishu-style embedded ⋯ */
+.bar-main-feishu {
+  top: 6px;
+  right: 6px !important;
+  left: auto !important;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--bi-border, #e5e7eb);
+  box-shadow: 0 1px 2px rgba(31, 35, 41, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  .bar-base-icon {
+    height: 28px;
+    width: 28px;
+    color: #646a73;
+    &:hover {
+      color: #1f2329;
+    }
+  }
 }
 
 .bar-base-icon {

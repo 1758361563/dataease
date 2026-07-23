@@ -22,7 +22,8 @@ export function getShapeItemStyle(
   { dvModel, cellWidth, cellHeight, curGap, showPosition = 'preview' }
 ) {
   let result = {}
-  if (dvModel === 'dashboard' && !item['isPlayer']) {
+  // company: dashboard always snaps to grid visually (no free-pixel "player" float)
+  if (dvModel === 'dashboard') {
     result = {
       padding: curGap + 'px!important',
       width: cellWidth * item.sizeX + 'px',

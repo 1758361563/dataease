@@ -4,7 +4,11 @@
     :class="{
       'shape-group-area': isGroupArea,
       'freeze-component': freezeFlag,
-      'freeze-component-fullscreen': freezeFlag && fullscreenFlag
+      'freeze-component-fullscreen': freezeFlag && fullscreenFlag,
+      'shape-dragging': element.dragging,
+      'shape-resizing': element.resizing,
+      'bi-tab-insert-source': tabInsertSource,
+      'bi-drag-source-ghost': biSourceGhost
     }"
     ref="shapeInnerRef"
     :id="domId"
@@ -122,6 +126,14 @@
       </template>
     </div>
     <compose-show :element="element"></compose-show>
+    <!-- keep inside single root so parent :style fallthrough still lands on .shape -->
+    <TabDragOverlay
+      :visible="tabOverlay.visible"
+      :x="tabOverlay.x"
+      :y="tabOverlay.y"
+      :title="tabOverlay.title"
+      :subtitle="tabOverlay.subtitle"
+    />
   </div>
 </template>
 
@@ -141,7 +153,7 @@ import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapsho
 import { contextmenuStoreWithOut } from '@/store/modules/data-visualization/contextmenu'
 import { composeStoreWithOut } from '@/store/modules/data-visualization/compose'
 import { storeToRefs } from 'pinia'
-import { downloadCanvas2, imgUrlTrans } from '@/utils/imgUtils'
+import { downloadCanvas2 } from '@/utils/imgUtils'
 import Icon from '@/components/icon-custom/src/Icon.vue'
 import ComponentEditBar from '@/components/visualization/ComponentEditBar.vue'
 import { useEmitt } from '@/hooks/web/useEmitt'
@@ -164,6 +176,16 @@ import {
   getBlurBgStyle,
   getComponentBackgroundStyle
 } from '@/utils/backgroundStyleUtils'
+import TabDragOverlay from '@/custom/company-bi/components/TabDragOverlay.vue'
+import { dashboardDragSession } from '@/custom/company-bi/composables/useDashboardDragSession'
+import {
+  TAB_CANDIDATE_MS,
+  TAB_EXIT_MS,
+  TAB_EXIT_PAD_PX,
+  canMoveIntoTab,
+  getTabContentRect,
+  hitTabZone
+} from '@/custom/company-bi/composables/tabDropZone'
 const { t } = useI18n()
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
@@ -187,10 +209,12 @@ const {
   tabCollisionActiveId,
   tabMoveInActiveId,
   tabMoveOutComponentId,
+  tabDragIntent,
   mobileInPc,
   mainScrollTop,
   hiddenListStatus,
-  fullscreenFlag
+  fullscreenFlag,
+  pcMatrixCount
 } = storeToRefs(dvMainStore)
 const { editorMap, areaData, isCtrlOrCmdDown } = storeToRefs(composeStore)
 const emit = defineEmits([
@@ -201,24 +225,123 @@ const emit = defineEmits([
   'onDragging',
   'onResizing',
   'onMouseUp',
+  'onCommitLayout',
   'linkJumpSetOpen',
   'linkageSetOpen'
 ])
 
 const isEditMode = computed(() => editMode.value === 'edit')
-const state = reactive({
-  seriesIdMap: {
-    id: ''
-  },
-  // 禁止移入Tab中的组件
-  ignoreTabMoveComponent: ['de-button', 'de-reset-button', 'DeTabs', 'GroupArea'],
-  // 当画布在tab中是 宽度左右拓展的余量
-  parentWidthTabOffset: 40,
-  canvasChangeTips: 'none',
-  tabMoveInYOffset: 70,
-  tabMoveInXOffset: 40,
-  collisionGap: 10 // 碰撞深度有效区域,
+
+/** company P0: main-canvas single card uses follow overlay session */
+const biBoardSessionOk = () => {
+  return (
+    dvInfo.value.type === 'dashboard' &&
+    isMainCanvas(canvasId.value) &&
+    element.value.component !== 'GroupArea' &&
+    !['DeTabs', 'Group'].includes(element.value.component) &&
+    !(areaData.value.components?.length > 0)
+  )
+}
+
+const biSourceGhost = computed(
+  () =>
+    dashboardDragSession.rawView.active &&
+    dashboardDragSession.rawView.componentId === element.value.id &&
+    dashboardDragSession.rawView.sourceDisplay === 'ghost'
+)
+
+const startBiBoardSession = (
+  mode: 'drag' | 'resize',
+  e: MouseEvent,
+  resizeHandle?: string,
+  pointerOffsetOverride?: { x: number; y: number }
+) => {
+  const shapeRect = shapeInnerRef.value?.getBoundingClientRect?.() || {
+    left: e.clientX,
+    top: e.clientY,
+    width: element.value.style.width,
+    height: element.value.style.height
+  }
+  const editorEl = parentNode.value as HTMLElement
+  const contentRect = editorEl?.getBoundingClientRect?.() || shapeRect
+  const cellW = baseCellInfo.value.baseWidth || 1
+  const cellH = baseCellInfo.value.baseHeight || 1
+  const pointerOffset = pointerOffsetOverride || {
+    x: e.clientX - shapeRect.left,
+    y: e.clientY - shapeRect.top
+  }
+  dashboardDragSession.start({
+    mode,
+    componentId: element.value.id,
+    canvasId: canvasId.value,
+    label: element.value.label || element.value.name || '',
+    pointerOffset,
+    resizeHandle,
+    origin: {
+      x: element.value.x,
+      y: element.value.y,
+      sizeX: element.value.sizeX,
+      sizeY: element.value.sizeY,
+      pixel: {
+        left: cellW * (element.value.x - 1),
+        top: cellH * (element.value.y - 1),
+        width: shapeRect.width,
+        height: shapeRect.height
+      }
+    },
+    matrix: {
+      cellWidth: cellW,
+      cellHeight: cellH,
+      gap: baseCellInfo.value.curGap || 0,
+      cols: pcMatrixCount.value.x,
+      contentClientRect: {
+        left: contentRect.left,
+        top: contentRect.top,
+        width: contentRect.width,
+        height: contentRect.height
+      },
+      scrollTop: 0,
+      scrollLeft: 0
+    }
+  })
+  if (mode === 'drag') {
+    dashboardDragSession.move(e.clientX, e.clientY)
+  }
+}
+
+// company: local tab-drop intent timers / overlay (pointer coords stay local)
+let tabCandidateTimer: ReturnType<typeof setTimeout> | null = null
+let tabExitTimer: ReturnType<typeof setTimeout> | null = null
+let tabCandidateTargetId: string | null = null
+const tabOverlay = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  title: '',
+  subtitle: '放入当前页签'
 })
+const tabInsertSource = computed(
+  () =>
+    active.value && tabDragIntent.value === 'insert' && tabMoveInActiveId.value && element.value?.id
+)
+
+const clearTabIntentTimers = () => {
+  if (tabCandidateTimer) {
+    clearTimeout(tabCandidateTimer)
+    tabCandidateTimer = null
+  }
+  if (tabExitTimer) {
+    clearTimeout(tabExitTimer)
+    tabExitTimer = null
+  }
+  tabCandidateTargetId = null
+}
+
+const resetTabDragUi = () => {
+  clearTabIntentTimers()
+  tabOverlay.visible = false
+  dvMainStore.clearTabDragState()
+}
 const hiddenComponent = event => {
   event.preventDefault()
   event.stopPropagation()
@@ -384,6 +507,12 @@ const active = computed(() => {
 })
 
 const boardMoveActive = computed(() => {
+  // Official: tables/maps only drag from thin edge strips so inner scroll/pan works.
+  // company: dashboard tables use whole-card drag (Metabase-like); maps stay edge-only.
+  if (dvInfo.value.type === 'dashboard') {
+    const EDGE_ONLY = ['flow-map', 'map', 'bubble-map', 'symbolic-map', 'heat-map', 't-heatmap']
+    return EDGE_ONLY.includes(element.value.innerType)
+  }
   const CHARTS = [
     'flow-map',
     'map',
@@ -565,6 +694,13 @@ const handleMouseDownOnShape = e => {
 
   cursors.value = getCursor() // 根据旋转角度获取光标位置
 
+  const useBiSession = biBoardSessionOk()
+  let biSessionStarted = false
+  const shapeRectDown = shapeInnerRef.value?.getBoundingClientRect?.()
+  const biGrabOffset = shapeRectDown
+    ? { x: e.clientX - shapeRectDown.left, y: e.clientY - shapeRectDown.top }
+    : { x: 0, y: 0 }
+
   const pos = { ...defaultStyle.value }
   const startY = e.clientY
   const startX = e.clientX
@@ -592,18 +728,10 @@ const handleMouseDownOnShape = e => {
 
   // 添加节流变量
   let rafId = null
-  let lastTime = 0
-  const throttleInterval = 25 // 约30FPS，可以根据需要调整
 
   const move = moveEvent => {
-    const now = Date.now()
-
-    // 节流处理
-    if (now - lastTime < throttleInterval && rafId !== null) {
-      return
-    }
-
-    // 使用 requestAnimationFrame 来优化性能
+    // company: absolute clientX/Y + rAF only (no 25ms throttle).
+    // Throttling dropped pointer frames and made the drag feel behind the hand.
     if (rafId) {
       cancelAnimationFrame(rafId)
     }
@@ -612,6 +740,22 @@ const handleMouseDownOnShape = e => {
       hasMove = true
       const curX = moveEvent.clientX
       const curY = moveEvent.clientY
+
+      if (useBiSession) {
+        if (!biSessionStarted) {
+          startBiBoardSession('drag', moveEvent, undefined, biGrabOffset)
+          biSessionStarted = true
+        }
+        dashboardDragSession.move(curX, curY)
+        tabMoveInCheck(curX, curY)
+        if (isFirst) {
+          isFirst = false
+        }
+        element.value['dragging'] = true
+        rafId = null
+        return
+      }
+
       const top = curY - startY + startTop
       const left = curX - startX + startLeft
       pos['top'] = top
@@ -647,15 +791,13 @@ const handleMouseDownOnShape = e => {
         dvMainStore.setTabMoveOutComponentId(null)
         contentDisplay.value = true
       }
-      // 仪表板进行Tab碰撞检查
-      tabMoveInCheck()
-      // 仪表板模式 会造成移动现象 当检测组件正在碰撞有效区内或者移入有效区内 则周边组件不进行移动
-      if (
-        dashboardActive.value &&
-        (isFirst || (!tabMoveInActiveId.value && !tabCollisionActiveId.value))
-      ) {
+      // 仪表板进行Tab投放区检查（指针中心区 / 边缘区）
+      tabMoveInCheck(curX, curY)
+      // company: only confirmed tab-insert pauses matrix reorder; candidate keeps grid drag
+      if (dashboardActive.value && (isFirst || !tabMoveInActiveId.value)) {
         element.value['dragging'] = true
-        emit('onDragging', e)
+        // company: pass moveEvent, not the stale mousedown `e`
+        emit('onDragging', moveEvent)
       }
 
       //如果当前组件是Group分组 则要进行内部组件深度计算
@@ -688,7 +830,6 @@ const handleMouseDownOnShape = e => {
         })
       }
 
-      lastTime = now
       rafId = null
     })
   }
@@ -698,6 +839,17 @@ const handleMouseDownOnShape = e => {
     if (rafId) {
       cancelAnimationFrame(rafId)
       rafId = null
+    }
+
+    if (useBiSession) {
+      if (tabMoveInActiveId.value) {
+        dashboardDragSession.cancel()
+      } else if (biSessionStarted) {
+        const commit = dashboardDragSession.end()
+        if (commit) {
+          emit('onCommitLayout', commit)
+        }
+      }
     }
 
     dashboardActive.value && emit('onMouseUp')
@@ -712,8 +864,9 @@ const handleMouseDownOnShape = e => {
     //如果当前存在移入的Tab 则将该组件加入到tab中 同时将该组件在主画布中进行删除
     if (tabMoveInActiveId.value) {
       eventBus.emit('onTabMoveIn-' + tabMoveInActiveId.value, element.value)
-      dvMainStore.setTabMoveInActiveId(null)
-      dvMainStore.setTabCollisionActiveId(null)
+      resetTabDragUi()
+    } else {
+      resetTabDragUi()
     }
 
     //如果当前存在移出的Tab 则将该组件加入到主画布中 同时将该组件在tab画布中进行删除
@@ -802,6 +955,10 @@ const handleMouseDownOnPoint = (point, e) => {
   // 是否需要保存快照
   let needSave = false
   let isFirst = true
+  const useBiSession = biBoardSessionOk()
+  if (useBiSession) {
+    startBiBoardSession('resize', e, point)
+  }
 
   const needLockProportion = isNeedLockProportion()
   const originRadio = curComponent.value.aspectRatio
@@ -858,6 +1015,17 @@ const handleMouseDownOnPoint = (point, e) => {
     }
     calculateRadioComponentPositionAndSize(point, style, symmetricPoint)
 
+    if (useBiSession) {
+      dashboardDragSession.move(moveEvent.clientX, moveEvent.clientY, {
+        left: style.left,
+        top: style.top,
+        width: style.width,
+        height: style.height
+      })
+      element.value['resizing'] = true
+      return
+    }
+
     dvMainStore.setShapeStyle(style, areaData.value.components, 'resize', baseGroupComponentsRadio)
     // 矩阵逻辑 如果当前是仪表板（矩阵模式）则要进行矩阵重排
     dashboardActive.value && emit('onResizing', moveEvent)
@@ -883,6 +1051,14 @@ const handleMouseDownOnPoint = (point, e) => {
     // 如果内部组件保持尺寸时，这里在鼠标抬起时，重新计算一下内部组件占比
     if (['DeTabs'].includes(element.value.component) && element.value.resizeInnerKeep) {
       tabInnerStyleRevert(element.value)
+    }
+
+    if (useBiSession) {
+      const commit = dashboardDragSession.end()
+      if (commit) {
+        emit('onCommitLayout', commit)
+        needSave = true
+      }
     }
 
     dashboardActive.value && emit('onMouseUp')
@@ -973,9 +1149,11 @@ const componentBackgroundStyle = computed(() => {
 })
 
 const editBarShowFlag = computed(() => {
+  // company: canvas edit always mounts ⋯ (CSS fades it until hover/selected)
   return (
+    (isEditMode.value && showPosition.value === 'canvas') ||
     ((active.value || batchOptFlag.value) &&
-      ['canvas', 'canvasDataV', 'batchOpt'].includes(showPosition.value)) ||
+      ['canvasDataV', 'batchOpt'].includes(showPosition.value)) ||
     linkageSettingStatus.value
   )
 })
@@ -1001,82 +1179,126 @@ const settingAttribute = () => {
   shapeInnerRef.value.setAttribute('component-id', `${element.value.id}`)
 }
 
-const tabMoveInCheck = async () => {
-  const curNode = document.querySelector('#' + domId.value)
-  const width = curNode.offsetWidth
-  const height = curNode.offsetHeight
-  const left = curNode.offsetLeft
-  const top = curNode.offsetTop
-  // tab 移入检测开启 tab组件不能相互移入另一个tab组件
-  // 如当前是分组且分组中含有Tab 不允许移入 pJoinTab = false
+const tabMoveInCheck = async (clientX?: number, clientY?: number) => {
+  // company: pointer-based Tab drop zones (center insert / edge reorder)
   if (
-    pJoinTab &&
-    isTabMoveCheck.value &&
-    !state.ignoreTabMoveComponent.includes(element.value.component)
+    !dashboardActive.value ||
+    !pJoinTab ||
+    !isTabMoveCheck.value ||
+    !canMoveIntoTab(element.value) ||
+    !parentNode.value ||
+    clientX == null ||
+    clientY == null
   ) {
-    const nodes = Array.from(parentNode.value.childNodes) // 获取当前父节点下所有子节点
-    for (const item of nodes) {
-      if (
-        item.className !== undefined &&
-        typeof item.className === 'string' &&
-        item.className.split(' ').includes('shape') &&
-        item.getAttribute('component-id') !== domId.value && // 去掉当前
-        item.getAttribute('tab-is-check') !== null &&
-        item.getAttribute('tab-is-check') !== 'false' &&
-        item.getAttribute('component-type') === 'DeTabs'
-      ) {
-        const componentId = item.getAttribute('component-id')
+    return
+  }
 
-        const tw = item.offsetWidth
-        const th = item.offsetHeight
-        const tl = item.offsetLeft
-        const tt = item.offsetTop
+  const px = clientX
+  const py = clientY
 
-        // 碰撞有效区域检查
-        const collisionT = tt + state.tabMoveInYOffset
-        const collisionL = tl + state.collisionGap - width
-        const collisionW = tw + 2 * width - state.collisionGap
-        const collisionH = th + height - state.tabMoveInYOffset
+  if (tabDragIntent.value === 'insert' && tabOverlay.visible) {
+    tabOverlay.x = px
+    tabOverlay.y = py
+  }
 
-        // 左上角靠近左上角区域
-        const tfAndTf = collisionT <= top && collisionL <= left
-        // 左下角靠近左下角区域
-        const bfAndBf = collisionT + collisionH >= top + height && collisionL <= left
-        // 右上角靠近右上角区域
-        const trAndTr = collisionT <= top && collisionL + collisionW >= left + width
-        // 右下角靠近右下角区域
-        const brAndBr =
-          collisionT + collisionH >= top + height && collisionL + collisionW >= left + width
-        if (tfAndTf && bfAndBf && trAndTr && brAndBr) {
-          dvMainStore.setTabCollisionActiveId(componentId)
-        } else if (tabCollisionActiveId.value === componentId) {
-          dvMainStore.setTabCollisionActiveId(null)
-        }
+  const nodes = Array.from(parentNode.value.childNodes) as HTMLElement[]
+  let hitTabId: string | null = null
+  let hitZone: 'center' | 'edge-top' | 'edge-bottom' | 'outside' = 'outside'
+  let hitTabLabel = '当前页签'
 
-        // 移入有效区域检查
-        // 碰撞有效区域检查
-        const activeT = tt + state.tabMoveInYOffset
-        const activeL = tl + state.collisionGap * 10 - width
-        const activeW = tw + 2 * width - state.collisionGap * 20
-        const activeH = th + height - 2 * state.tabMoveInYOffset
-
-        // 左上角靠近左上角区域
-        const activeTfAndTf = activeT <= top && activeL <= left
-        // 左下角靠近左下角区域
-        const activeBfAndBf = activeT + activeH >= top + height && activeL <= left
-        // 右上角靠近右上角区域
-        const activeTrAndTr = activeT <= top && activeL + activeW >= left + width
-        // 右下角靠近右下角区域
-        const activeBrAndBr = activeT + activeH >= top + height && activeL + activeW >= left + width
-        if (activeTfAndTf && activeBfAndBf && activeTrAndTr && activeBrAndBr) {
-          dvMainStore.setTabMoveInActiveId(componentId)
-        } else if (tabMoveInActiveId.value === componentId) {
-          dvMainStore.setTabMoveInActiveId(null)
-        }
-      }
+  for (const item of nodes) {
+    if (
+      !item?.className ||
+      typeof item.className !== 'string' ||
+      !item.className.split(' ').includes('shape') ||
+      item.getAttribute('component-type') !== 'DeTabs' ||
+      item.getAttribute('tab-is-check') === 'false'
+    ) {
+      continue
     }
+    const componentId = item.getAttribute('component-id')
+    if (!componentId || componentId === element.value.id) continue
+
+    const contentRect = getTabContentRect(item)
+    if (!contentRect) continue
+
+    const engaged =
+      tabCollisionActiveId.value === componentId || tabMoveInActiveId.value === componentId
+    const strictZone = hitTabZone(px, py, contentRect, { exitPad: 0 })
+    const paddedZone = engaged
+      ? hitTabZone(px, py, contentRect, { exitPad: TAB_EXIT_PAD_PX })
+      : strictZone
+
+    if (paddedZone === 'outside') continue
+
+    hitTabId = componentId
+    if (engaged && strictZone === 'outside' && paddedZone !== 'outside') {
+      hitZone = 'center'
+    } else {
+      hitZone = strictZone === 'outside' ? paddedZone : strictZone
+    }
+
+    const tabComp = dvMainStore.componentData.find(c => c.id === componentId)
+    const activePage = tabComp?.propValue?.find(p => p.name === tabComp?.editableTabsValue)
+    hitTabLabel = activePage?.title || tabComp?.label || '当前页签'
+    break
+  }
+
+  if (hitZone === 'center' && hitTabId) {
+    if (tabExitTimer) {
+      clearTimeout(tabExitTimer)
+      tabExitTimer = null
+    }
+
+    if (tabMoveInActiveId.value === hitTabId) {
+      tabOverlay.visible = true
+      tabOverlay.x = px
+      tabOverlay.y = py
+      tabOverlay.title = element.value.label || element.value.name || '组件'
+      tabOverlay.subtitle = `放入「${hitTabLabel}」`
+      return
+    }
+
+    if (tabCollisionActiveId.value !== hitTabId) {
+      dvMainStore.setTabCollisionActiveId(hitTabId)
+      dvMainStore.setTabDragIntent('candidate')
+    }
+
+    if (tabCandidateTargetId !== hitTabId) {
+      if (tabCandidateTimer) clearTimeout(tabCandidateTimer)
+      tabCandidateTargetId = hitTabId
+      const confirmId = hitTabId
+      const confirmLabel = hitTabLabel
+      tabCandidateTimer = setTimeout(() => {
+        dvMainStore.setTabMoveInActiveId(confirmId)
+        dvMainStore.setTabCollisionActiveId(confirmId)
+        dvMainStore.setTabDragIntent('insert')
+        tabOverlay.visible = true
+        tabOverlay.title = element.value.label || element.value.name || '组件'
+        tabOverlay.subtitle = `放入「${confirmLabel}」`
+        tabCandidateTimer = null
+      }, TAB_CANDIDATE_MS)
+    }
+    return
+  }
+
+  if (tabCollisionActiveId.value || tabMoveInActiveId.value) {
+    if (tabCandidateTimer) {
+      clearTimeout(tabCandidateTimer)
+      tabCandidateTimer = null
+      tabCandidateTargetId = null
+    }
+    if (!tabExitTimer) {
+      tabExitTimer = setTimeout(() => {
+        resetTabDragUi()
+        tabExitTimer = null
+      }, TAB_EXIT_MS)
+    }
+  } else {
+    clearTabIntentTimers()
   }
 }
+
 const slotStyle = computed(() => {
   // 3d效果支持
   if (element.value['multiDimensional'] && element.value['multiDimensional']?.enable) {

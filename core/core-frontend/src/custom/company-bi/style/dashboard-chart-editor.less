@@ -1,0 +1,89 @@
+/**
+ * Chart editor — dataset field column scroll containment.
+ *
+ * Root cause (official, since ~2023):
+ *   `.view-panel-row { overflow-y: auto }` is shared by the chart config
+ *   column and the dataset column. Wheel over a non-overflowing 指标 list
+ *   (or chrome / empty padding) chains to that parent → title + search slide.
+ *
+ * Worsened by our dimension-pane height fix (~65% px + CSS quota 50%):
+ *   dimension + quota can exceed elDrag → outer column must scroll.
+ *
+ * Goal: pin 数据集 / 字段搜索 / chrome; only `.drag-list` scrollbars move.
+ * Quota takes remaining flex space (not fixed 50%).
+ */
+
+.chart-edit .de-chart-editor {
+  .dataset-area.view-panel-row {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dataset-area {
+    .ed-header.editor-title,
+    .el-header.editor-title {
+      flex-shrink: 0;
+    }
+
+    .ed-main.dataset-main-top,
+    .el-main.dataset-main-top,
+    .dataset-main-top {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden !important;
+      overscroll-behavior: none;
+      display: flex !important;
+      flex-direction: column;
+      padding: 0;
+
+      .dataset-select,
+      .dataset-search {
+        flex-shrink: 0;
+      }
+
+      /* elDrag: dimension + quota split host */
+      > div:last-child {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto !important;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    .field-height {
+      overflow: hidden;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+
+      /* dimension keeps inline pixel height from split handle */
+      &.first {
+        flex: 0 0 auto;
+      }
+
+      /* quota: fill remainder instead of CSS height:50% (avoids 65%+50% overflow) */
+      &:not(.first) {
+        height: auto !important;
+        flex: 1 1 auto;
+        min-height: 50px;
+      }
+
+      .drag-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto !important;
+        overscroll-behavior: contain;
+
+        .ed-scrollbar__wrap,
+        .el-scrollbar__wrap {
+          overscroll-behavior: contain;
+        }
+      }
+    }
+  }
+}

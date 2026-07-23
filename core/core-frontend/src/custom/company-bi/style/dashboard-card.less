@@ -1,0 +1,25 @@
+/**
+ * Dashboard card layer.
+ *
+ * Data-side card defaults (opaque surface, 8px radius, 16px padding) live in
+ * `custom-component/component-list.ts` (COMMON_COMPONENT_BACKGROUND_*).
+ * The component shell data model has no border/shadow fields, so this file
+ * adds them via CSS. Scoped to dashboards only:
+ * - edit canvas root gets `.dashboard-editor` (CanvasCore, dashboard type only)
+ * - preview root is `.canvas-container`; dataV preview adds `.datav-preview`
+ * GroupArea is the marquee-selection helper, not a real component.
+ */
+
+.dashboard-editor {
+  .shape:not(.shape-group-area) > .shape-outer > .shape-inner {
+    border: 1px solid var(--bi-border);
+    box-shadow: var(--bi-shadow-card);
+  }
+}
+
+.canvas-container:not(.datav-preview) {
+  .wrapper-outer:not([class*='-GroupArea']) > .wrapper-inner {
+    border: 1px solid var(--bi-border);
+    box-shadow: var(--bi-shadow-card);
+  }
+}

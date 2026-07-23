@@ -1,0 +1,53 @@
+/**
+ * Tab insert drop feedback (candidate / confirmed).
+ */
+
+.dashboard-editor {
+  /* candidate: soft tint on tab content */
+  .custom-tabs-head.bi-tab-drop-candidate {
+    .tab-content-custom:not(.switch-hidden) {
+      outline: 1.5px dashed rgba(37, 99, 235, 0.35);
+      outline-offset: -4px;
+      background: rgba(37, 99, 235, 0.04);
+    }
+  }
+
+  /* confirmed insert: strong highlight + hint */
+  .custom-tabs-head.bi-tab-drop-insert {
+    .tab-content-custom:not(.switch-hidden) {
+      position: relative;
+      outline: 2px solid var(--ed-color-primary, #2563eb);
+      outline-offset: -3px;
+      background: rgba(37, 99, 235, 0.08);
+
+      &::after {
+        content: '放入当前页签';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 20;
+        padding: 8px 14px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid var(--ed-color-primary, #2563eb);
+        color: var(--ed-color-primary, #2563eb);
+        font-size: 13px;
+        font-weight: 600;
+        pointer-events: none;
+        box-shadow: 0 4px 16px rgba(31, 35, 41, 0.12);
+      }
+    }
+  }
+
+  /* placeholder look while insert: source card fades */
+  .shape.bi-tab-insert-source {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+}
+
+/* kill legacy purple dotted border noise */
+.canvas-move-in {
+  border-color: transparent !important;
+}

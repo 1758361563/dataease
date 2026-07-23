@@ -127,7 +127,7 @@ export class TableNormal extends S2ChartView<TableSheet> {
             return value
           }
           if (value === null || value === undefined) {
-            return value
+            return '-'
           }
           if (![2, 3, 4].includes(f.deType) || !isNumeric(value)) {
             return value

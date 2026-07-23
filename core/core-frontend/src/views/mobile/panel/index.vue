@@ -12,11 +12,11 @@ const dvMainStore = dvMainStoreWithOut()
 
 const checkItemPosition = component => {
   component.x = 1
-  component.sizeX = 72
+  component.sizeX = dvMainStore.pcMatrixCount.x
   component.y = dvMainStore.componentData.reduce((pre, next) => {
     return Math.max(pre, next.y + next.sizeY)
   }, 1)
-  component.sizeY = 20
+  component.sizeY = 10
 }
 
 const apdataQuery = ele => {

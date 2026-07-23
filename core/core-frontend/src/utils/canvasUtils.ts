@@ -313,7 +313,8 @@ export function historyAdaptor(
   canvasStyleResult.component['seniorStyleSetting']['pagerSize'] =
     canvasStyleResult.component['seniorStyleSetting']['pagerSize'] || 14
   canvasStyleResult['fontFamily'] = canvasStyleResult['fontFamily'] || 'PingFang'
-  canvasStyleResult.dashboard['showGrid'] = canvasStyleResult.dashboard['showGrid'] || false
+  // company: default grid to visible for boards saved without the field
+  canvasStyleResult.dashboard['showGrid'] = canvasStyleResult.dashboard['showGrid'] ?? true
   canvasStyleResult.dashboard['matrixBase'] = canvasStyleResult.dashboard['matrixBase'] || 4
   canvasStyleResult.dashboard['gapMode'] = canvasStyleResult.dashboard['gapMode'] || 'middle'
   canvasStyleResult.component['seniorStyleSetting'] =

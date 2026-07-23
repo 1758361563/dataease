@@ -69,6 +69,8 @@ export const dvMainStore = defineStore('dataVisualization', {
       curComponent: null,
       curTabName: null, // 当前选中的tabName 大屏图层区域使用
       curComponentIndex: null,
+      // company: right config panel is explicit-open only (⋯ → 配置), not on click-select
+      componentEditorVisible: false,
       curCanvasScaleMap: {},
       // 预览仪表板缩放信息
       previewCanvasScale: {
@@ -140,9 +142,10 @@ export const dvMainStore = defineStore('dataVisualization', {
         width: 1920,
         height: 1080
       },
+      // company: 36x18 coarse grid (was 72x36) for Metabase-like snapping
       pcMatrixCount: {
-        x: 72,
-        y: 36
+        x: 36,
+        y: 18
       },
       mobileMatrixCount: {
         x: 6,
@@ -182,10 +185,12 @@ export const dvMainStore = defineStore('dataVisualization', {
         customAttr: {}
       },
       allViewRender: [],
-      tabCollisionActiveId: null, // 当前在碰撞的Tab组件ID
-      tabMoveInActiveId: null, // 当前在移入的Tab ID
+      tabCollisionActiveId: null, // 当前在碰撞的Tab组件ID（candidate 浅高亮也复用）
+      tabMoveInActiveId: null, // 当前在移入的Tab ID（确认 insert 后才设置）
       tabMoveOutActiveId: null, // 当前在移出的Tab ID
       tabMoveOutComponentId: null, // 当前在移出Tab de组件ID
+      // company: tab drop intent — none | candidate | insert
+      tabDragIntent: 'none' as 'none' | 'candidate' | 'insert',
       tabActiveTabNameMap: {}, // 编辑器中 tab组件中的活动tab页,
       // 鼠标处于drag状态的坐标点
       mousePointShadowMap: {
@@ -332,6 +337,12 @@ export const dvMainStore = defineStore('dataVisualization', {
         } else if (component.id !== this.curComponent.id) {
           component['editing'] = false
         }
+        // company: switching selection closes the explicit editor panel
+        if (!this.curComponent || component.id !== this.curComponent.id) {
+          this.componentEditorVisible = false
+        }
+      } else {
+        this.componentEditorVisible = false
       }
       this.curComponent = component
       this.curComponentIndex = index
@@ -354,6 +365,9 @@ export const dvMainStore = defineStore('dataVisualization', {
           value: this.curComponent ? JSON.parse(JSON.stringify(this.curComponent)) : null
         })
       }
+    },
+    setComponentEditorVisible(visible: boolean) {
+      this.componentEditorVisible = !!visible
     },
     setBashMatrixInfo(bashMatrixInfo) {
       this.bashMatrixInfo = bashMatrixInfo
@@ -1604,6 +1618,14 @@ export const dvMainStore = defineStore('dataVisualization', {
     },
     setTabMoveInActiveId(tabId) {
       this.tabMoveInActiveId = tabId
+    },
+    setTabDragIntent(intent: 'none' | 'candidate' | 'insert') {
+      this.tabDragIntent = intent || 'none'
+    },
+    clearTabDragState() {
+      this.tabCollisionActiveId = null
+      this.tabMoveInActiveId = null
+      this.tabDragIntent = 'none'
     },
     setMousePointShadowMap(mousePoint) {
       this.mousePointShadowMap.mouseX = mousePoint.mouseX

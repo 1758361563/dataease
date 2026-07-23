@@ -56,7 +56,7 @@ export const copyStore = defineStore('copy', {
           const xPositionOffset = index % 2
           if (!(copyFrom === 'multiplexing' && !multiplexingStyleAdapt.value)) {
             newComponent.sizeX = pcMatrixCount.value.x / 2
-            newComponent.sizeY = 14
+            newComponent.sizeY = 7
             // dataV 数据大屏
             newComponent.style.width = ((canvasStyleData.value.width / 3) * scale) / 100
             newComponent.style.height = ((canvasStyleData.value.height / 3) * scale) / 100

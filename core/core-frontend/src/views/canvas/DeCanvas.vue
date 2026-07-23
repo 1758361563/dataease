@@ -206,8 +206,9 @@ const scaleInit = () => {
 
 const dashboardCanvasSizeInit = () => {
   //div容器获取tableBox.value.clientWidth
-  state.screenWidth = canvasOut.value.clientWidth - 4
-  state.screenHeight = canvasOut.value.clientHeight
+  // company: .db-canvas padding 16px × 2 sides = 32
+  state.screenWidth = canvasOut.value.clientWidth - 32
+  state.screenHeight = canvasOut.value.clientHeight - 32
   baseWidth.value = state.screenWidth / pcMatrixCount.value.x
   baseHeight.value = state.screenHeight / pcMatrixCount.value.y
   baseMarginLeft.value = 0
@@ -348,7 +349,7 @@ defineExpose({
   width: 100%;
   height: 100%;
   .db-canvas {
-    padding: 2px;
+    padding: 16px;
     background-size: 100% 100% !important;
     overflow-y: auto;
     width: 100%;

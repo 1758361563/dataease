@@ -6,7 +6,9 @@
       headClass,
       `ed-tabs-${curThemes}`,
       { 'title-hidde-tab': !showTabTitleFlag },
-      { 'title-show-tab': showTabTitleFlag }
+      { 'title-show-tab': showTabTitleFlag },
+      { 'bi-tab-drop-candidate': dropCandidate },
+      { 'bi-tab-drop-insert': dropInsert }
     ]"
     class="custom-tabs-head"
     ref="tabComponentRef"
@@ -182,7 +184,14 @@ import { ShorthandMode } from '@/Types'
 import { checkFilterRemove } from '@/custom-component/v-query/QueryUtils'
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
-const { tabMoveInActiveId, bashMatrixInfo, editMode, mobileInPc } = storeToRefs(dvMainStore)
+const {
+  tabMoveInActiveId,
+  tabCollisionActiveId,
+  tabDragIntent,
+  bashMatrixInfo,
+  editMode,
+  mobileInPc
+} = storeToRefs(dvMainStore)
 const tabComponentRef = ref(null)
 let carouselTimer = null
 const { t } = useI18n()
@@ -526,6 +535,14 @@ const addToMain = component => {
 
 const moveActive = computed(() => {
   return tabMoveInActiveId.value && tabMoveInActiveId.value === element.value.id
+})
+
+const dropCandidate = computed(() => {
+  return tabDragIntent.value === 'candidate' && tabCollisionActiveId.value === element.value.id
+})
+
+const dropInsert = computed(() => {
+  return tabDragIntent.value === 'insert' && tabMoveInActiveId.value === element.value.id
 })
 
 const headClass = computed(() => {

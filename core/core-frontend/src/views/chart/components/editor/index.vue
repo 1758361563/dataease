@@ -86,7 +86,8 @@ const {
   editMode,
   mobileInPc,
   fullscreenFlag,
-  dvInfo
+  dvInfo,
+  componentEditorVisible
 } = storeToRefs(dvMainStore)
 const router = useRouter()
 let componentNameEdit = ref(false)
@@ -1784,12 +1785,22 @@ const { y, isDragging } = useDraggable(el, {
   draggingElement: elDrag
 })
 const previewHeight = ref(0)
+const fieldSplitReady = ref(false)
+// company: dimension/quota split — do not lock height while editor is v-show:hidden
 const calcEle = debounce(() => {
   nextTick(() => {
-    previewHeight.value = (elDrag.value as HTMLDivElement).offsetHeight
-    y.value = previewHeight.value / 2 + 200
+    if (!elDrag.value) return
+    const h = (elDrag.value as HTMLDivElement).offsetHeight
+    if (h < 80) return
+    const broken = !fieldSplitReady.value || y.value - 200 <= 60
+    previewHeight.value = h
+    if (broken) {
+      // dimension pane ~65% of the field column
+      y.value = h * 0.65 + 200
+      fieldSplitReady.value = true
+    }
   })
-}, 500)
+}, 200)
 
 const setCacheId = debounce(() => {
   nextTick(() => {
@@ -1807,10 +1818,46 @@ const setCacheId = debounce(() => {
 watch(
   () => curComponent.value,
   val => {
-    if (!val || !!previewHeight.value) return
+    if (!val) {
+      fieldSplitReady.value = false
+      previewHeight.value = 0
+      return
+    }
     calcEle()
   }
 )
+
+watch(
+  () => componentEditorVisible.value,
+  visible => {
+    if (visible) {
+      calcEle()
+    }
+  }
+)
+
+let fieldSplitRo: ResizeObserver | null = null
+onMounted(() => {
+  fieldSplitRo = new ResizeObserver(() => {
+    calcEle()
+  })
+  watch(
+    elDrag,
+    (elNode, prev) => {
+      if (prev && fieldSplitRo) {
+        fieldSplitRo.unobserve(prev)
+      }
+      if (elNode && fieldSplitRo) {
+        fieldSplitRo.observe(elNode)
+      }
+    },
+    { immediate: true }
+  )
+})
+onBeforeUnmount(() => {
+  fieldSplitRo?.disconnect()
+  fieldSplitRo = null
+})
 
 watch(
   () => curComponent.value,

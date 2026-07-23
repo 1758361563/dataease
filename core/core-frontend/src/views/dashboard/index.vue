@@ -64,7 +64,8 @@ const {
   batchOptStatus,
   hiddenListStatus,
   lastHiddenComponent,
-  dvInfo
+  dvInfo,
+  componentEditorVisible
 } = storeToRefs(dvMainStore)
 const dataInitState = ref(false)
 const appStore = useAppStoreWithOut()
@@ -87,7 +88,8 @@ const initDataset = () => {
 
 const otherEditorShow = computed(() => {
   return Boolean(
-    curComponent.value &&
+    componentEditorVisible.value &&
+      curComponent.value &&
       (!['UserView', 'VQuery'].includes(curComponent.value?.component) ||
         (curComponent.value?.component === 'UserView' &&
           curComponent.value?.innerType === 'picture-group')) &&
@@ -104,13 +106,20 @@ const otherEditorTitle = computed(() => {
 
 const viewEditorShow = computed(() => {
   return Boolean(
-    curComponent.value &&
+    componentEditorVisible.value &&
+      curComponent.value &&
       ['UserView', 'VQuery'].includes(curComponent.value.component) &&
       curComponent.value.innerType !== 'picture-group' &&
       !batchOptStatus.value &&
       !hiddenListStatus.value
   )
 })
+
+const canvasAttrShow = computed(() => {
+  // company: keep canvas settings when a component is selected but not opened for config
+  return Boolean(!componentEditorVisible.value && !batchOptStatus.value && !hiddenListStatus.value)
+})
+
 const checkPer = async resourceId => {
   if (!window.DataEaseBi || !resourceId) {
     return true
@@ -372,7 +381,7 @@ onUnmounted(() => {
         <component :is="findComponentAttr(curComponent)" :themes="'light'" />
       </dv-sidebar>
       <dv-sidebar
-        v-show="!curComponent && !batchOptStatus && !hiddenListStatus"
+        v-show="canvasAttrShow"
         :theme-info="'light'"
         :title="t('visualization.dashboard_configuration')"
         :width="420"
@@ -446,7 +455,7 @@ onUnmounted(() => {
         flex: 1;
         width: 100%;
         .db-canvas {
-          padding: 2px;
+          padding: 16px;
           background-size: 100% 100% !important;
           overflow-y: auto;
           width: 100%;
