@@ -12,6 +12,21 @@ export default {
       ext: '.gz' // 生成的压缩包后缀
     })
   ],
+  // company: vite preview has no Docker nginx; mirror production /de2api → local backend
+  preview: {
+    port: 4173,
+    proxy: {
+      '/de2api': {
+        target: 'http://localhost:8100',
+        changeOrigin: true
+      },
+      '/api/f': {
+        target: 'http://localhost:8100',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/api\/f/, '')
+      }
+    }
+  },
   build: {
     rollupOptions: {
       output: {

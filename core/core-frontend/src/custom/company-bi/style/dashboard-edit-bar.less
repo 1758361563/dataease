@@ -1,10 +1,11 @@
 /**
  * Feishu-style component ⋯ menu + hover reveal.
  * Complements ComponentEditBar.vue `.bar-main-feishu`.
+ * When BiCardChrome hosts the bar, visibility is handled by the chrome header.
  */
 
 .dashboard-editor {
-  .shape:not(.shape-group-area) > .shape-outer {
+  .shape:not(.shape-group-area):not(.bi-card-chrome-on) > .shape-outer {
     > .edit-bar {
       opacity: 0;
       pointer-events: none;
@@ -26,7 +27,7 @@
     }
   }
 
-  .bar-main-feishu {
+  .shape:not(.bi-card-chrome-on) .bar-main-feishu {
     top: 8px !important;
     right: 8px !important;
     z-index: 20;
@@ -36,6 +37,8 @@
       border-color: var(--bi-border-strong, #d8dce3);
     }
   }
-}
 
-/* while dragging, hide ⋯ (already covered by dashboard-drag.less edit-bar hide) */
+  .bar-main-feishu {
+    border-radius: 8px !important;
+  }
+}

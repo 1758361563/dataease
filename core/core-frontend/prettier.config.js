@@ -15,6 +15,8 @@ module.exports = {
      // 单个参数的箭头函数不加括号 x => x
     arrowParens: 'avoid',     
     // 对象大括号内两边是否加空格 { a:0 }
-    bracketSpacing: true,      
+    bracketSpacing: true,
+    // company: Windows 开发机上编辑器可能写入 CRLF，不让行尾差异炸掉 dev server（git 层由 .gitattributes 归一化）
+    endOfLine: 'auto'
   }
   

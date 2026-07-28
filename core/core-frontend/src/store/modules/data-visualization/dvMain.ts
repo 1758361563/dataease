@@ -71,6 +71,9 @@ export const dvMainStore = defineStore('dataVisualization', {
       curComponentIndex: null,
       // company: right config panel is explicit-open only (⋯ → 配置), not on click-select
       componentEditorVisible: false,
+      // company: layout vs configure — sidebar visibility alone is not the interaction mode
+      dashboardEditorMode: 'layout' as 'layout' | 'configure',
+      configuringComponentId: null as string | null,
       curCanvasScaleMap: {},
       // 预览仪表板缩放信息
       previewCanvasScale: {
@@ -304,6 +307,12 @@ export const dvMainStore = defineStore('dataVisualization', {
       this.curTabName = val
     },
     setCurComponent({ component, index }) {
+      // company: configure locks layout selection / blank deselect
+      if (this.dashboardEditorMode === 'configure' && this.configuringComponentId) {
+        if (!component || component.id !== this.configuringComponentId) {
+          return
+        }
+      }
       this.setCurTabName(null)
       this.setHiddenListStatus(false)
       if (!component && this.curComponent) {
@@ -337,7 +346,7 @@ export const dvMainStore = defineStore('dataVisualization', {
         } else if (component.id !== this.curComponent.id) {
           component['editing'] = false
         }
-        // company: switching selection closes the explicit editor panel
+        // company: switching selection in layout closes the explicit editor panel
         if (!this.curComponent || component.id !== this.curComponent.id) {
           this.componentEditorVisible = false
         }
@@ -368,6 +377,23 @@ export const dvMainStore = defineStore('dataVisualization', {
     },
     setComponentEditorVisible(visible: boolean) {
       this.componentEditorVisible = !!visible
+      if (!visible && this.dashboardEditorMode === 'configure') {
+        this.dashboardEditorMode = 'layout'
+        this.configuringComponentId = null
+      }
+    },
+    /** company: ⋯ → 配置 — enter configure mode for one component */
+    enterConfigure(componentId: string) {
+      if (!componentId) return
+      this.dashboardEditorMode = 'configure'
+      this.configuringComponentId = componentId
+      this.componentEditorVisible = true
+    },
+    /** company: ✓完成 / Esc — back to layout; keep selection */
+    exitConfigure() {
+      this.dashboardEditorMode = 'layout'
+      this.configuringComponentId = null
+      this.componentEditorVisible = false
     },
     setBashMatrixInfo(bashMatrixInfo) {
       this.bashMatrixInfo = bashMatrixInfo

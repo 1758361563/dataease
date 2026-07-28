@@ -462,7 +462,7 @@ const showEditPosition = computed(() => {
 
 const openComponentEditor = () => {
   dvMainStore.setCurComponent({ component: element.value, index: index.value })
-  dvMainStore.setComponentEditorVisible(true)
+  dvMainStore.enterConfigure(element.value.id)
 }
 const showBarTooltipPosition = computed(() => {
   if (showEditPosition.value.indexOf('right') >= 0) {

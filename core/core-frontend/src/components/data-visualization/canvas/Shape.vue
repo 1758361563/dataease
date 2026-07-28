@@ -8,7 +8,8 @@
       'shape-dragging': element.dragging,
       'shape-resizing': element.resizing,
       'bi-tab-insert-source': tabInsertSource,
-      'bi-drag-source-ghost': biSourceGhost
+      'bi-drag-source-ghost': biSourceGhost,
+      'bi-card-chrome-on': biChromeEnabled
     }"
     ref="shapeInnerRef"
     :id="domId"
@@ -49,13 +50,42 @@
       :class="{
         active,
         'shape-lock': shapeLock,
-        'shape-edit': isEditMode && !boardMoveActive,
+        'shape-edit': isEditMode && !boardMoveActive && !biChromeEnabled,
         'linkage-setting': linkageActive,
         'drag-on-tab-collision': dragCollision,
         'shape-selected': curBatchOptComponents?.includes(element.id)
       }"
+      @mouseenter="chromeHovered = true"
+      @mouseleave="chromeHovered = false"
     >
+      <BiCardChrome
+        v-if="biChromeEnabled"
+        :is-configure="isConfiguringThis"
+        :active="active"
+        :hovered="chromeHovered"
+        :show-handles="active || chromeHovered"
+        :dragging="!!element.dragging"
+        @dragstart="onChromeDragStart"
+        @finish="onChromeFinish"
+      >
+        <template #more>
+          <component-edit-bar
+            ref="componentEditBarRef"
+            class="edit-bar edit-bar-active"
+            :index="index"
+            :element="element"
+            :show-position="showPosition"
+            :canvas-id="canvasId"
+            @componentImageDownload="htmlToImage"
+            @userViewEnlargeOpen="userViewEnlargeOpen"
+            @datasetParamsInit="datasetParamsInit"
+            @linkJumpSetOpen="linkJumpSetOpen"
+            @linkageSetOpen="linkageSetOpen"
+          ></component-edit-bar>
+        </template>
+      </BiCardChrome>
       <component-edit-bar
+        v-else
         ref="componentEditBarRef"
         class="edit-bar"
         :class="{ 'edit-bar-active': editBarShowFlag }"
@@ -80,7 +110,11 @@
         <!-- 背景模糊层 由于父层的backdrop-filter是作用于背后内容，无法模糊自身背景图 -->
         <div v-if="blurBgEnable" class="blur-bg" :style="blurBgStyle"></div>
         <Icon v-if="shapeLock" name="dv-lock"><dvLock class="svg-icon iconfont icon-suo" /></Icon>
-        <div class="component-slot" :style="slotStyle">
+        <div
+          class="component-slot"
+          :class="{ 'with-bi-chrome': biChromeEnabled }"
+          :style="slotStyle"
+        >
           <slot></slot>
         </div>
         <!--边框背景-->
@@ -90,8 +124,11 @@
           :name="commonBackgroundSvgInner"
         ></Board>
       </div>
+      <div v-if="biChromeEnabled && !canvasLayoutLocked && isActive()" class="bi-card-controls">
+        <BiCardResizeHandle :resizing="!!element.resizing" @resizestart="onChromeResizeStart" />
+      </div>
       <div
-        v-for="item in isActive() ? getPointList() : []"
+        v-for="item in !biChromeEnabled && isActive() ? getPointList() : []"
         :key="item"
         class="shape-point"
         :style="getPointStyle(item)"
@@ -102,7 +139,7 @@
         v-show="batchOptFlag && element.component !== 'DeTabs'"
         @mousedown="batchSelected"
       ></div>
-      <template v-if="boardMoveActive">
+      <template v-if="!biChromeEnabled && boardMoveActive">
         <div
           v-show="!element.editing"
           class="de-drag-area de-drag-top"
@@ -147,7 +184,7 @@ import calculateComponentPositionAndSize, {
 } from '@/utils/calculateComponentPositionAndSize'
 import { mod360 } from '@/utils/translate'
 import { deepCopy } from '@/utils/utils'
-import { computed, nextTick, onMounted, ref, toRefs, reactive } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, toRefs, reactive } from 'vue'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
 import { contextmenuStoreWithOut } from '@/store/modules/data-visualization/contextmenu'
@@ -177,6 +214,8 @@ import {
   getComponentBackgroundStyle
 } from '@/utils/backgroundStyleUtils'
 import TabDragOverlay from '@/custom/company-bi/components/TabDragOverlay.vue'
+import BiCardChrome from '@/custom/company-bi/components/BiCardChrome.vue'
+import BiCardResizeHandle from '@/custom/company-bi/components/BiCardResizeHandle.vue'
 import { dashboardDragSession } from '@/custom/company-bi/composables/useDashboardDragSession'
 import {
   TAB_CANDIDATE_MS,
@@ -214,7 +253,9 @@ const {
   mainScrollTop,
   hiddenListStatus,
   fullscreenFlag,
-  pcMatrixCount
+  pcMatrixCount,
+  dashboardEditorMode,
+  configuringComponentId
 } = storeToRefs(dvMainStore)
 const { editorMap, areaData, isCtrlOrCmdDown } = storeToRefs(composeStore)
 const emit = defineEmits([
@@ -232,6 +273,59 @@ const emit = defineEmits([
 
 const isEditMode = computed(() => editMode.value === 'edit')
 
+const chromeHovered = ref(false)
+const DRAG_START_DISTANCE = 4
+
+/** company: dashboard edit uses title-bar drag + SE resize grip (not whole-card / 8 nodes) */
+const biChromeEnabled = computed(() => {
+  return (
+    dvInfo.value.type === 'dashboard' &&
+    isEditMode.value &&
+    !batchOptStatus.value &&
+    element.value.component !== 'GroupArea' &&
+    !mobileInPc.value
+  )
+})
+
+const canvasLayoutLocked = computed(() => dashboardEditorMode.value === 'configure')
+
+const isConfiguringThis = computed(
+  () =>
+    dashboardEditorMode.value === 'configure' && configuringComponentId.value === element.value.id
+)
+
+const onChromeDragStart = (e: MouseEvent) => {
+  if (canvasLayoutLocked.value || element.value['isLock'] || freezeFlag.value) return
+  if ((e.target as HTMLElement)?.closest?.('[data-no-drag]')) return
+  dvMainStore.setCurComponent({ component: element.value, index: index.value })
+  handleMouseDownOnShape(e)
+}
+
+const onChromeResizeStart = (e: MouseEvent) => {
+  if (canvasLayoutLocked.value || element.value['isLock'] || freezeFlag.value) return
+  e.stopPropagation()
+  e.preventDefault()
+  dvMainStore.setCurComponent({ component: element.value, index: index.value })
+  handleMouseDownOnPoint('rb', e)
+}
+
+const onChromeFinish = () => {
+  dvMainStore.exitConfigure()
+}
+
+const onConfigureEsc = (e: KeyboardEvent) => {
+  if (e.key !== 'Escape') return
+  if (!isConfiguringThis.value) return
+  const t = e.target as HTMLElement | null
+  if (
+    t?.closest?.('.ed-popper, .ed-select-dropdown, .ed-dialog, .ed-message-box, .ed-color-picker')
+  ) {
+    return
+  }
+  e.stopPropagation()
+  dvMainStore.exitConfigure()
+}
+
 /** company P0: main-canvas single card uses follow overlay session */
 const biBoardSessionOk = () => {
   return (
@@ -247,6 +341,7 @@ const biSourceGhost = computed(
   () =>
     dashboardDragSession.rawView.active &&
     dashboardDragSession.rawView.componentId === element.value.id &&
+    dashboardDragSession.rawView.mode === 'drag' &&
     dashboardDragSession.rawView.sourceDisplay === 'ghost'
 )
 
@@ -508,7 +603,8 @@ const active = computed(() => {
 
 const boardMoveActive = computed(() => {
   // Official: tables/maps only drag from thin edge strips so inner scroll/pan works.
-  // company: dashboard tables use whole-card drag (Metabase-like); maps stay edge-only.
+  // company dashboard: BiCardChrome owns drag — edge strips unused (see biChromeEnabled).
+  // dataV / non-chrome still use edge strips for tables & maps.
   if (dvInfo.value.type === 'dashboard') {
     const EDGE_ONLY = ['flow-map', 'map', 'bubble-map', 'symbolic-map', 'heat-map', 't-heatmap']
     return EDGE_ONLY.includes(element.value.innerType)
@@ -652,6 +748,11 @@ const handleInnerMouseDownOnShape = e => {
   if (!canvasActive.value) {
     return
   }
+  // company: configure locks layout — ignore presses on other cards
+  if (canvasLayoutLocked.value && !isConfiguringThis.value) {
+    e.stopPropagation()
+    return
+  }
   batchSelected(e)
   // ctrl or command 按下时 鼠标点击为选择需要组合的组件(取消需要组合的组件在ComposeShow组件中)
   if (isCtrlOrCmdDown.value && !areaData.value.components.includes(element)) {
@@ -663,6 +764,13 @@ const handleInnerMouseDownOnShape = e => {
     return
   }
   dvMainStore.setCurComponent({ component: element.value, index: index.value })
+  // company: content never starts card drag when chrome is on (scrollbars stay usable)
+  if (biChromeEnabled.value) {
+    dvMainStore.setInEditorStatus(true)
+    dvMainStore.setClickComponentStatus(true)
+    e.stopPropagation()
+    return
+  }
   // 边界区域拖拽 返回
   if (boardMoveActive.value) {
     dvMainStore.setInEditorStatus(true)
@@ -674,6 +782,10 @@ const handleInnerMouseDownOnShape = e => {
 }
 
 const handleMouseDownOnShape = e => {
+  if (canvasLayoutLocked.value) {
+    e.stopPropagation()
+    return
+  }
   if (element.value['editing']) {
     // e.preventDefault()
     e.stopPropagation()
@@ -715,6 +827,7 @@ const handleMouseDownOnShape = e => {
   // 如果元素没有移动，则不保存快照
   let hasMove = false
   let isFirst = true
+  let passedDragThreshold = false
 
   // 画布宽高
   const canvasWidth = parentNode.value.offsetWidth
@@ -737,9 +850,16 @@ const handleMouseDownOnShape = e => {
     }
 
     rafId = requestAnimationFrame(() => {
-      hasMove = true
       const curX = moveEvent.clientX
       const curY = moveEvent.clientY
+      // company: 4px threshold before starting drag session
+      if (!passedDragThreshold) {
+        if (Math.hypot(curX - startX, curY - startY) < DRAG_START_DISTANCE) {
+          return
+        }
+        passedDragThreshold = true
+      }
+      hasMove = true
 
       if (useBiSession) {
         if (!biSessionStarted) {
@@ -906,6 +1026,10 @@ const handleMouseDownOnPoint = (point, e) => {
   if (!canvasActive.value) {
     return
   }
+  if (canvasLayoutLocked.value) {
+    e.stopPropagation()
+    return
+  }
   dashboardActive.value && emit('onStartResize', e)
   dvMainStore.setInEditorStatus(true)
   dvMainStore.setClickComponentStatus(true)
@@ -928,21 +1052,29 @@ const handleMouseDownOnPoint = (point, e) => {
   if (!editorRectInfo) {
     return
   }
-  // 获取 point 与实际拖动基准点的差值
-  const pointRect = e.target.getBoundingClientRect()
+  // company: chrome grip may mousedown on SVG path (0×0) — anchor to shape SE corner
+  const shapeRect = shapeInnerRef.value?.getBoundingClientRect?.()
+  const useShapeCorner = biChromeEnabled.value && point === 'rb' && shapeRect
+  const pointRect = useShapeCorner
+    ? shapeRect
+    : ((e.currentTarget as HTMLElement) || (e.target as HTMLElement)).getBoundingClientRect()
+  const anchorW = useShapeCorner
+    ? 0
+    : (e.currentTarget as HTMLElement)?.offsetWidth || pointRect.width || 0
+  const anchorH = useShapeCorner
+    ? 0
+    : (e.currentTarget as HTMLElement)?.offsetHeight || pointRect.height || 0
   // 当前点击圆点相对于画布的中心坐标
   const curPoint = {
     x: Math.round(
-      pointRect.left -
-        editorRectInfo.left +
-        e.target.offsetWidth / 2 +
-        offsetGapAdaptor('x', point) / 2
+      useShapeCorner
+        ? pointRect.right - editorRectInfo.left + offsetGapAdaptor('x', point) / 2
+        : pointRect.left - editorRectInfo.left + anchorW / 2 + offsetGapAdaptor('x', point) / 2
     ),
     y: Math.round(
-      pointRect.top -
-        editorRectInfo.top +
-        e.target.offsetHeight / 2 +
-        offsetGapAdaptor('y', point) / 2
+      useShapeCorner
+        ? pointRect.bottom - editorRectInfo.top + offsetGapAdaptor('y', point) / 2
+        : pointRect.top - editorRectInfo.top + anchorH / 2 + offsetGapAdaptor('y', point) / 2
     )
   }
 
@@ -984,6 +1116,15 @@ const handleMouseDownOnPoint = (point, e) => {
     }
 
     needSave = true
+
+    // company: SE resize — pin top-left, size from pointer; skip official symmetricPoint path
+    // (that path rewrites style.top and makes the card / placeholder jump upward onto neighbors)
+    if (useBiSession && (point === 'rb' || point === 'r' || point === 'b')) {
+      dashboardDragSession.move(moveEvent.clientX, moveEvent.clientY)
+      element.value['resizing'] = true
+      return
+    }
+
     const curPosition = {
       x: moveEvent.clientX - Math.round(editorRectInfo.left) + offsetGapAdaptor('x', point),
       y: moveEvent.clientY - Math.round(editorRectInfo.top) + offsetGapAdaptor('y', point)
@@ -1377,6 +1518,12 @@ onMounted(() => {
       htmlToImage()
     })
   }
+  // company: Esc exits configure for this card
+  window.addEventListener('keydown', onConfigureEsc, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onConfigureEsc, true)
 })
 </script>
 

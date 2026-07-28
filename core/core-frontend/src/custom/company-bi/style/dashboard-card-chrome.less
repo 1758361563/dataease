@@ -1,0 +1,194 @@
+/**
+ * Lightweight card controls (no title bar):
+ * - top-center horizontal 6-dot drag handle
+ * - top-right ⋯ / ✓完成
+ * - bottom-right SE resize grip
+ */
+
+.dashboard-editor {
+  .shape:not(.shape-group-area) {
+    .bi-card-chrome {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      pointer-events: none;
+      background: none;
+      border: none;
+    }
+
+    .bi-card-chrome__drag {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      pointer-events: auto;
+    }
+
+    .bi-card-chrome__actions {
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      pointer-events: auto;
+    }
+
+    .bi-card-drag-handle {
+      width: 58px;
+      height: 28px;
+      display: inline-flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 0;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      cursor: grab;
+      opacity: 0;
+      transition: opacity 0.06s ease, background 0.06s ease;
+    }
+
+    .bi-card-chrome.is-hovered .bi-card-drag-handle,
+    .bi-card-chrome.is-active .bi-card-drag-handle,
+    .bi-card-drag-handle.is-visible {
+      opacity: 1;
+    }
+
+    .bi-card-drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .bi-card-drag-handle:hover {
+      background: rgba(31, 35, 41, 0.06);
+    }
+
+    .bi-card-drag-handle:hover .bi-drag-dot {
+      background: #667085;
+    }
+
+    .bi-card-drag-handle.is-dragging {
+      background: #eff6ff;
+    }
+
+    .bi-card-drag-handle.is-dragging .bi-drag-dot {
+      background: #2563eb;
+    }
+
+    .bi-drag-dot {
+      width: 3px;
+      height: 3px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: #98a2b3;
+    }
+
+    .bi-card-finish {
+      min-width: 62px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 8px;
+      color: #2563eb;
+      background: #eff6ff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .bi-card-finish:hover {
+      background: #dbeafe;
+    }
+
+    .bi-card-finish__check {
+      font-size: 14px;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+    .bi-card-chrome__more-slot {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      min-height: 32px;
+    }
+
+    .bi-card-chrome .edit-bar,
+    .bi-card-chrome .bar-main-feishu {
+      position: static !important;
+      top: auto !important;
+      right: auto !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      transform: none !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+    }
+
+    .bi-card-controls {
+      position: absolute;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .bi-card-resize-handle {
+      position: absolute;
+      right: 1px;
+      bottom: 1px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      padding: 4px;
+      border: 0;
+      border-radius: 0 0 var(--bi-radius-md, 8px) 0;
+      background: transparent;
+      cursor: nwse-resize;
+      pointer-events: auto;
+      opacity: 0;
+      transition: opacity 0.06s ease;
+      z-index: 9;
+    }
+
+    .shape-outer:hover .bi-card-resize-handle,
+    .shape-outer.active .bi-card-resize-handle,
+    .shape-outer.shape-selected .bi-card-resize-handle {
+      opacity: 1;
+    }
+
+    .bi-card-resize-handle path {
+      fill: none;
+      stroke: #98a2b3;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      pointer-events: none;
+    }
+
+    .bi-card-resize-handle:hover {
+      background: linear-gradient(135deg, transparent 45%, rgba(37, 99, 235, 0.08) 100%);
+    }
+
+    .bi-card-resize-handle:hover path,
+    .bi-card-resize-handle.is-resizing path {
+      stroke: #2563eb;
+    }
+
+    &.bi-card-chrome-on {
+      > .shape-outer > .shape-point,
+      > .shape-outer > .de-drag-area {
+        display: none !important;
+      }
+    }
+  }
+}

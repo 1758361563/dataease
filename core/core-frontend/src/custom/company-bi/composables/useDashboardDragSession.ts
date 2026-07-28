@@ -59,7 +59,7 @@ export interface SessionView {
   overlay: SessionOverlay | null
   placeholder: SessionPlaceholder | null
   neighborPreview: Record<string, { x: number; y: number }>
-  sourceDisplay: 'ghost' | 'hidden'
+  sourceDisplay: 'ghost' | 'hidden' | 'solid'
 }
 
 export interface SessionCommit {
@@ -168,32 +168,56 @@ function createSession() {
     }
   }
 
-  const moveResize = (clientX: number, clientY: number, pixelBox: SessionOrigin['pixel']) => {
+  const moveResize = (clientX: number, clientY: number, pixelBox?: SessionOrigin['pixel']) => {
     if (!input) return
-    const { matrix } = input
-    view.overlay = {
-      x: matrix.contentClientRect.left + pixelBox.left - matrix.scrollLeft,
-      y: matrix.contentClientRect.top + pixelBox.top - matrix.scrollTop,
-      width: Math.max(matrix.cellWidth * 0.5, pixelBox.width),
-      height: Math.max(matrix.cellHeight * 0.5, pixelBox.height)
+    const { matrix, origin, resizeHandle } = input
+    const handle = resizeHandle || 'rb'
+
+    // SE / E / S: pin top-left. Never trust legacy style.left/top (official rb path
+    // rewrites top via symmetricPoint and can jump the card upward into neighbors/Tab).
+    const pinTopLeft = handle === 'rb' || handle === 'r' || handle === 'b'
+    const left = pinTopLeft ? origin.pixel.left : pixelBox?.left ?? origin.pixel.left
+    const top = pinTopLeft ? origin.pixel.top : pixelBox?.top ?? origin.pixel.top
+    let width = pixelBox?.width ?? origin.pixel.width
+    let height = pixelBox?.height ?? origin.pixel.height
+
+    if (pinTopLeft) {
+      const localX = clientX - matrix.contentClientRect.left + matrix.scrollLeft
+      const localY = clientY - matrix.contentClientRect.top + matrix.scrollTop
+      if (handle === 'rb' || handle === 'r') {
+        width = Math.max(matrix.cellWidth * 0.5, localX - left)
+      } else {
+        width = origin.pixel.width
+      }
+      if (handle === 'rb' || handle === 'b') {
+        height = Math.max(matrix.cellHeight * 0.5, localY - top)
+      } else {
+        height = origin.pixel.height
+      }
     }
 
-    const rawW = pixelBox.width / matrix.cellWidth
-    const rawH = pixelBox.height / matrix.cellHeight
-    const prev = view.placeholder || {
-      x: input.origin.x,
-      y: input.origin.y,
-      sizeX: input.origin.sizeX,
-      sizeY: input.origin.sizeY
+    view.overlay = {
+      x: matrix.contentClientRect.left + left - matrix.scrollLeft,
+      y: matrix.contentClientRect.top + top - matrix.scrollTop,
+      width,
+      height
     }
-    const sizeX = hystereticSize(rawW, prev.sizeX, 1, matrix.cols)
+
+    const rawW = width / matrix.cellWidth
+    const rawH = height / matrix.cellHeight
+    const prev = view.placeholder || {
+      x: origin.x,
+      y: origin.y,
+      sizeX: origin.sizeX,
+      sizeY: origin.sizeY
+    }
+    const maxSizeX = pinTopLeft ? Math.max(1, matrix.cols - origin.x + 1) : matrix.cols
+    const sizeX = hystereticSize(rawW, prev.sizeX, 1, maxSizeX)
     const sizeY = hystereticSize(rawH, prev.sizeY, 1, 999)
-    const x = clamp(
-      Math.floor(pixelBox.left / matrix.cellWidth) + 1,
-      1,
-      Math.max(1, matrix.cols - sizeX + 1)
-    )
-    const y = Math.max(1, Math.floor(pixelBox.top / matrix.cellHeight) + 1)
+    const x = pinTopLeft
+      ? origin.x
+      : clamp(Math.floor(left / matrix.cellWidth) + 1, 1, Math.max(1, matrix.cols - sizeX + 1))
+    const y = pinTopLeft ? origin.y : Math.max(1, Math.floor(top / matrix.cellHeight) + 1)
 
     if (prev.x !== x || prev.y !== y || prev.sizeX !== sizeX || prev.sizeY !== sizeY) {
       view.placeholder = { x, y, sizeX, sizeY }
@@ -204,7 +228,7 @@ function createSession() {
     if (!input || !view.active) return
     if (input.mode === 'drag') {
       moveDrag(clientX, clientY)
-    } else if (pixelBox) {
+    } else {
       moveResize(clientX, clientY, pixelBox)
     }
   }

@@ -1,0 +1,2 @@
+# company: 提交时统一归一化为 LF，防止 Windows 编辑器写入的 CRLF 进仓库
+* text eol=lf
