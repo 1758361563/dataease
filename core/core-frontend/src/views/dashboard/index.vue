@@ -41,6 +41,23 @@ const embeddedStore = useEmbedded()
 const { wsCache } = useCache()
 const canvasCacheOutRef = ref(null)
 const deCanvasRef = ref(null)
+// company: single dashboard-level Esc handler for exiting configure mode.
+// (previously every card mounted its own window keydown listener — one listener here
+// is enough since dashboardEditorMode/configuringComponentId are already global.)
+const onConfigureEsc = (e: KeyboardEvent) => {
+  if (e.key !== 'Escape') return
+  if (dvMainStore.dashboardEditorMode !== 'configure') return
+  const target = e.target as HTMLElement | null
+  if (
+    target?.closest?.(
+      '.ed-popper, .ed-select-dropdown, .ed-dialog, .ed-message-box, .ed-color-picker'
+    )
+  ) {
+    return
+  }
+  e.stopPropagation()
+  dvMainStore.exitConfigure()
+}
 const eventCheck = e => {
   if (e.key === 'panel-weight' && !compareStorage(e.oldValue, e.newValue)) {
     const resourceId = embeddedStore.resourceId || router.currentRoute.value.query.resourceId
@@ -211,6 +228,7 @@ onMounted(async () => {
   })
   window.addEventListener('storage', eventCheck)
   window.addEventListener('message', winMsgHandle)
+  window.addEventListener('keydown', onConfigureEsc, true)
   const resourceId = embeddedStore.resourceId || router.currentRoute.value.query.resourceId
   const pid = embeddedStore.pid || router.currentRoute.value.query.pid
   const opt = embeddedStore.opt || router.currentRoute.value.query.opt
@@ -336,6 +354,7 @@ onUnmounted(() => {
   document.body.style.overflow = ''
   window.removeEventListener('storage', eventCheck)
   window.removeEventListener('message', winMsgHandle)
+  window.removeEventListener('keydown', onConfigureEsc, true)
 })
 </script>
 

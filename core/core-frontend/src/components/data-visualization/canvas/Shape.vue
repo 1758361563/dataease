@@ -184,7 +184,7 @@ import calculateComponentPositionAndSize, {
 } from '@/utils/calculateComponentPositionAndSize'
 import { mod360 } from '@/utils/translate'
 import { deepCopy } from '@/utils/utils'
-import { computed, nextTick, onMounted, onBeforeUnmount, ref, toRefs, reactive } from 'vue'
+import { computed, nextTick, onMounted, ref, toRefs, reactive } from 'vue'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
 import { contextmenuStoreWithOut } from '@/store/modules/data-visualization/contextmenu'
@@ -310,19 +310,6 @@ const onChromeResizeStart = (e: MouseEvent) => {
 }
 
 const onChromeFinish = () => {
-  dvMainStore.exitConfigure()
-}
-
-const onConfigureEsc = (e: KeyboardEvent) => {
-  if (e.key !== 'Escape') return
-  if (!isConfiguringThis.value) return
-  const t = e.target as HTMLElement | null
-  if (
-    t?.closest?.('.ed-popper, .ed-select-dropdown, .ed-dialog, .ed-message-box, .ed-color-picker')
-  ) {
-    return
-  }
-  e.stopPropagation()
   dvMainStore.exitConfigure()
 }
 
@@ -1518,12 +1505,6 @@ onMounted(() => {
       htmlToImage()
     })
   }
-  // company: Esc exits configure for this card
-  window.addEventListener('keydown', onConfigureEsc, true)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onConfigureEsc, true)
 })
 </script>
 

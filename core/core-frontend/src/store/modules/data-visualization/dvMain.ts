@@ -69,9 +69,8 @@ export const dvMainStore = defineStore('dataVisualization', {
       curComponent: null,
       curTabName: null, // 当前选中的tabName 大屏图层区域使用
       curComponentIndex: null,
-      // company: right config panel is explicit-open only (⋯ → 配置), not on click-select
-      componentEditorVisible: false,
-      // company: layout vs configure — sidebar visibility alone is not the interaction mode
+      // company: layout vs configure — single source of truth for the dashboard editor mode.
+      // componentEditorVisible is derived from this (see getters) so it can't drift out of sync.
       dashboardEditorMode: 'layout' as 'layout' | 'configure',
       configuringComponentId: null as string | null,
       curCanvasScaleMap: {},
@@ -217,6 +216,11 @@ export const dvMainStore = defineStore('dataVisualization', {
       viewPageInfo: {} //表格分页信息
     }
   },
+  getters: {
+    // company: right config panel visibility is a pure function of the editor mode —
+    // do not add a second stored flag for this, it's exactly how the two drifted apart before.
+    componentEditorVisible: state => state.dashboardEditorMode === 'configure'
+  },
   actions: {
     setLastHiddenComponent(value?) {
       if (value) {
@@ -346,12 +350,19 @@ export const dvMainStore = defineStore('dataVisualization', {
         } else if (component.id !== this.curComponent.id) {
           component['editing'] = false
         }
-        // company: switching selection in layout closes the explicit editor panel
+        // company: switching selection in layout closes the explicit editor panel.
+        // (defensive only — the configure-mode guard above already blocks reaching here
+        // with a mismatched component while configuring; this just keeps state honest
+        // if that guard is ever bypassed.)
         if (!this.curComponent || component.id !== this.curComponent.id) {
-          this.componentEditorVisible = false
+          if (this.dashboardEditorMode === 'configure') {
+            this.dashboardEditorMode = 'layout'
+            this.configuringComponentId = null
+          }
         }
-      } else {
-        this.componentEditorVisible = false
+      } else if (this.dashboardEditorMode === 'configure') {
+        this.dashboardEditorMode = 'layout'
+        this.configuringComponentId = null
       }
       this.curComponent = component
       this.curComponentIndex = index
@@ -375,25 +386,43 @@ export const dvMainStore = defineStore('dataVisualization', {
         })
       }
     },
-    setComponentEditorVisible(visible: boolean) {
-      this.componentEditorVisible = !!visible
-      if (!visible && this.dashboardEditorMode === 'configure') {
-        this.dashboardEditorMode = 'layout'
-        this.configuringComponentId = null
-      }
-    },
     /** company: ⋯ → 配置 — enter configure mode for one component */
     enterConfigure(componentId: string) {
       if (!componentId) return
       this.dashboardEditorMode = 'configure'
       this.configuringComponentId = componentId
-      this.componentEditorVisible = true
     },
     /** company: ✓完成 / Esc — back to layout; keep selection */
     exitConfigure() {
       this.dashboardEditorMode = 'layout'
       this.configuringComponentId = null
-      this.componentEditorVisible = false
+    },
+    /** company: does componentId still exist anywhere in the tree (main canvas / Group / Tab children)? */
+    componentExistsById(componentId, componentData = this.componentData) {
+      return componentData.some(component => {
+        if (component.id === componentId) return true
+        if (component.component === 'Group' && component.propValue?.length) {
+          return this.componentExistsById(componentId, component.propValue)
+        }
+        if (component.innerType === 'DeTabs' && component.propValue?.length) {
+          return component.propValue.some(tabItem =>
+            this.componentExistsById(componentId, tabItem.componentData || [])
+          )
+        }
+        return false
+      })
+    },
+    /** company: delete / undo / redo / reload can all remove the component being configured —
+     *  if that happens the configure-mode guard in setCurComponent would otherwise lock the
+     *  canvas on a target that no longer exists. Call after any componentData mutation. */
+    ensureConfigureTargetExists() {
+      if (
+        this.dashboardEditorMode === 'configure' &&
+        this.configuringComponentId &&
+        !this.componentExistsById(this.configuringComponentId)
+      ) {
+        this.exitConfigure()
+      }
     },
     setBashMatrixInfo(bashMatrixInfo) {
       this.bashMatrixInfo = bashMatrixInfo
@@ -450,6 +479,8 @@ export const dvMainStore = defineStore('dataVisualization', {
 
     setComponentData(componentData = []) {
       this.componentData = componentData
+      // company: covers undo/redo/snapshot-restore/reload — all replace componentData wholesale
+      this.ensureConfigureTargetExists()
     },
 
     addCopyComponent(component, idMap, canvasViewInfoPre = this.canvasViewInfo) {
@@ -632,6 +663,8 @@ export const dvMainStore = defineStore('dataVisualization', {
         componentData.splice(index, 1)
         // VQuery 组件
         checkFilterRemove(deletedComponent)
+        // company: deleting the component currently in configure mode must not lock the canvas
+        this.ensureConfigureTargetExists()
       }
     },
     updateCurDvInfo(dvInfo) {
