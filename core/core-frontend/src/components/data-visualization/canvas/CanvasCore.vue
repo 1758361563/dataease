@@ -1783,17 +1783,6 @@ defineExpose({
       :matrix-style="matrixStyle"
       :themes="themes"
     ></de-grid-screen>
-    <!-- company: snap preview ghost removed — components snap directly -->
-    <!--
-    <drag-shadow
-      v-if="infoBox && infoBox.moveItem && editMode !== 'preview'"
-      :base-height="dashboardScaleWithWidth ? baseWidth * 1.6 : baseHeight"
-      :base-width="baseWidth"
-      :cur-gap="curGap"
-      :element="infoBox.moveItem"
-    ></drag-shadow>
-    -->
-
     <!--切换canvas 拖拽阴影部分-->
     <point-shadow v-if="pointShadowShow" :canvas-id="canvasId" />
     <GroupAreaShadow
