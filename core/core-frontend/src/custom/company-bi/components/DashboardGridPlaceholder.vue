@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="view.active && view.placeholder"
+    v-if="view.active && view.placeholder && tabDragIntent !== 'insert'"
     class="bi-grid-placeholder"
     :style="boxStyle"
     aria-hidden="true"
@@ -9,7 +9,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { dashboardDragSession } from '@/custom/company-bi/composables/useDashboardDragSession'
+import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 
 const props = defineProps({
   cellWidth: { type: Number, required: true },
@@ -18,6 +20,9 @@ const props = defineProps({
 })
 
 const view = dashboardDragSession.rawView
+// company: while tab-insert intent is confirmed, drop goes INTO the tab —
+// the main-canvas placeholder would show a position that will never be used
+const { tabDragIntent } = storeToRefs(dvMainStoreWithOut())
 
 const boxStyle = computed(() => {
   const ph = view.placeholder

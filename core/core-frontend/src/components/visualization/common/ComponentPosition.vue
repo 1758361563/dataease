@@ -104,7 +104,7 @@ import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import _ from 'lodash'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
 import { groupSizeStyleAdaptor, groupStyleRevert } from '@/utils/style'
-import { isGroupCanvas, isTabCanvas } from '@/utils/canvasUtils'
+import { isDashboard, isGroupCanvas, isTabCanvas } from '@/utils/canvasUtils'
 import { useI18n } from '@/hooks/web/useI18n'
 const parentNode = ref(null)
 const canvasId = ref('canvas-main')
@@ -180,8 +180,12 @@ const onPositionChange = key => {
     })
   }
 
-  if (['Group', 'DeTabs'].includes(curComponent.value.component)) {
+  if (
+    ['Group'].includes(curComponent.value.component) ||
+    (['DeTabs'].includes(curComponent.value.component) && !isDashboard())
+  ) {
     //如果当前组件是Group分组或者Tab 则要进行内部组件深度计算
+    // company Tab B+: dashboard DeTabs keep fixed children
     groupSizeStyleAdaptor(curComponent.value)
   }
 

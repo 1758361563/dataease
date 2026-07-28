@@ -908,7 +908,11 @@ const handleMouseDownOnShape = e => {
       }
 
       //如果当前组件是Group分组 则要进行内部组件深度计算
-      if (['DeTabs', 'Group'].includes(element.value.component)) {
+      // company Tab B+: dashboard DeTabs keep fixed physical children — no proportional rescale
+      if (
+        ['Group'].includes(element.value.component) ||
+        (['DeTabs'].includes(element.value.component) && !dashboardActive.value)
+      ) {
         groupSizeStyleAdaptor(element.value)
       }
       //如果当前画布是Group内部画布 则对应组件定位在resize时要还原到groupStyle中
@@ -1024,6 +1028,9 @@ const handleMouseDownOnPoint = (point, e) => {
   e.preventDefault()
 
   const style = { ...defaultStyle.value }
+  // company: dashboard rb/r/b resize pins top-left (see pin below); capture mousedown origin
+  const originLeft = style['left']
+  const originTop = style['top']
 
   // 组件宽高比
   const proportion = style['width'] / style['height']
@@ -1143,6 +1150,16 @@ const handleMouseDownOnPoint = (point, e) => {
     }
     calculateRadioComponentPositionAndSize(point, style, symmetricPoint)
 
+    // company: dashboard SE/E/S resize must never move the card's top-left.
+    // symmetricPoint is reverse-derived from the handle's DOM rect + gap rounding;
+    // inside a Tab (cell ≈ 10px) the few-px drift jumps the card up a row and the
+    // matrix then pushes the neighbor above to below it. Session path already pins;
+    // this pins the official (non-session) path, e.g. tab-inner resize.
+    if (dashboardActive.value && !useBiSession && ['rb', 'r', 'b'].includes(point)) {
+      style.left = originLeft
+      style.top = originTop
+    }
+
     if (useBiSession) {
       dashboardDragSession.move(moveEvent.clientX, moveEvent.clientY, {
         left: style.left,
@@ -1159,9 +1176,12 @@ const handleMouseDownOnPoint = (point, e) => {
     dashboardActive.value && emit('onResizing', moveEvent)
     element.value['resizing'] = true
     //如果当前组件是Group分组或者Tab 则要进行内部组件深度计算
+    // company Tab B+: dashboard outer Tab resize must NOT scale children
     if (
       ['Group'].includes(element.value.component) ||
-      (['DeTabs'].includes(element.value.component) && !element.value.resizeInnerKeep)
+      (['DeTabs'].includes(element.value.component) &&
+        !dashboardActive.value &&
+        !element.value.resizeInnerKeep)
     ) {
       groupSizeStyleAdaptor(element.value)
     }
@@ -1177,7 +1197,12 @@ const handleMouseDownOnPoint = (point, e) => {
 
   const up = () => {
     // 如果内部组件保持尺寸时，这里在鼠标抬起时，重新计算一下内部组件占比
-    if (['DeTabs'].includes(element.value.component) && element.value.resizeInnerKeep) {
+    // company: dashboard Tab B+ never uses proportional groupStyle — skip
+    if (
+      ['DeTabs'].includes(element.value.component) &&
+      element.value.resizeInnerKeep &&
+      !dashboardActive.value
+    ) {
       tabInnerStyleRevert(element.value)
     }
 

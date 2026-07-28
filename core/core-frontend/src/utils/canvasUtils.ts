@@ -128,8 +128,21 @@ export function findNewComponent(componentName, innerType, staticMap?) {
 export function commonHandleDragStart(e, dvModel) {
   const componentInfo = e.target.dataset.id
   if (dvModel === 'dashboard') {
-    // 仪表板使用组件消息传输方式
-    eventBus.emit('handleDragStartMoveIn-canvas-main', componentInfo)
+    // company: hide native HTML5 drag ghost — Overlay owns the follow visual
+    try {
+      const ghost = document.createElement('canvas')
+      ghost.width = 1
+      ghost.height = 1
+      e.dataTransfer.setDragImage(ghost, 0, 0)
+    } catch (_) {
+      // setDragImage can throw in some browsers; session Overlay still works
+    }
+    // company: pass pointer so Overlay starts under cursor (not at canvas bottom origin)
+    eventBus.emit('handleDragStartMoveIn-canvas-main', {
+      componentInfo,
+      clientX: e.clientX,
+      clientY: e.clientY
+    })
   } else {
     // 大屏使用组件消息传输方式
     e.dataTransfer.setData('id', componentInfo)

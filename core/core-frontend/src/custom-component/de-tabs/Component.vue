@@ -481,7 +481,9 @@ const componentMoveIn = component => {
           const matrixBase = refInstance.getBaseMatrixSize() //矩阵基础大小
           canvasChangeAdaptor(component, matrixBase)
           component.x = 1
-          component.y = 200
+          // company Tab B+: append below existing tab content (addItemBox uses maxYCount
+          // when y is undefined). Official y=200 forced a bottom drop then canvasInit float-up.
+          component.y = undefined
           component.style.left = 0
           component.style.top = 0
           tabItem.componentData.push(component)
@@ -784,7 +786,10 @@ onMounted(() => {
   currentInstance = getCurrentInstance()
   initCarousel()
   nextTick(() => {
-    groupSizeStyleAdaptor(element.value)
+    // company Tab B+: dashboard tabs do not proportionally rescale children on mount
+    if (!isDashboard()) {
+      groupSizeStyleAdaptor(element.value)
+    }
   })
   setTimeout(() => {
     viewToolTipsChange()

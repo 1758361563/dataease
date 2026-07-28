@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div
-      v-if="view.active && view.overlay"
+      v-if="view.active && view.overlay && tabDragIntent !== 'insert'"
       class="bi-dash-drag-overlay"
       :style="overlayStyle"
       aria-hidden="true"
@@ -18,9 +18,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { dashboardDragSession } from '@/custom/company-bi/composables/useDashboardDragSession'
+import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 
 const view = dashboardDragSession.rawView
+// company: confirmed tab-insert switches the follow visual to the compact
+// TabDragOverlay chip; the full-size card here would suggest canvas placement
+const { tabDragIntent } = storeToRefs(dvMainStoreWithOut())
 
 const overlayStyle = computed(() => {
   const o = view.overlay

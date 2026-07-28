@@ -56,8 +56,15 @@ const dvMainStore = dvMainStoreWithOut()
 const composeStore = composeStoreWithOut()
 const contextmenuStore = contextmenuStoreWithOut()
 
-const { curComponent, dvInfo, editMode, tabMoveOutComponentId, canvasState, mainScrollTop } =
-  storeToRefs(dvMainStore)
+const {
+  curComponent,
+  dvInfo,
+  editMode,
+  tabMoveOutComponentId,
+  canvasState,
+  mainScrollTop,
+  pcMatrixCount
+} = storeToRefs(dvMainStore)
 const { editorMap, areaData, isCtrlOrCmdDown } = storeToRefs(composeStore)
 const props = defineProps({
   themes: {
@@ -1123,6 +1130,28 @@ const endItemMove = (_, item, index) => {
 }
 
 const handleMouseUp = (e, item, index) => {
+  // company: toolbar HTML5 drop finishes session here (Shape path ends session before emitting onMouseUp)
+  if (
+    item &&
+    dashboardDragSession.rawView.active &&
+    dashboardDragSession.rawView.componentId === item.id
+  ) {
+    const ph = dashboardDragSession.rawView.placeholder
+    if (ph) {
+      onCommitLayout(
+        {
+          componentId: item.id,
+          x: ph.x,
+          y: ph.y,
+          sizeX: ph.sizeX,
+          sizeY: ph.sizeY,
+          changed: true
+        },
+        item
+      )
+    }
+    dashboardDragSession.cancel()
+  }
   endItemMove(e, item, index)
   clearInfoBox(e)
 }
@@ -1415,7 +1444,73 @@ const onMouseUp = e => {
   infoBox.value = {}
 }
 
-const handleDragStartMoveIn = componentInfo => {
+/** company: start Overlay+Placeholder session for toolbar HTML5 drag-in */
+const startToolbarDragSession = (item, clientX?: number, clientY?: number) => {
+  moveTime = 0
+  document.body.classList.add('bi-dashboard-dragging')
+  const editorEl = document.getElementById(mainDomId.value)
+  const contentRect = editorEl?.getBoundingClientRect?.()
+  const cellW = cellWidth.value || baseCellInfo.value.baseWidth || 1
+  const cellH = cellHeight.value || baseCellInfo.value.baseHeight || 1
+  const sizeX = Math.max(1, item.sizeX || 1)
+  const sizeY = Math.max(1, item.sizeY || 1)
+  const pixelW = cellW * sizeX
+  const pixelH = cellH * sizeY
+  const x = Math.max(1, Math.round(item.x) || 1)
+  const y = Math.max(1, Math.round(item.y) || 1)
+  item.x = x
+  item.y = y
+  item.sizeX = sizeX
+  item.sizeY = sizeY
+
+  dashboardDragSession.start({
+    mode: 'drag',
+    componentId: item.id,
+    canvasId: canvasId.value,
+    label: item.label || item.name || '',
+    // grab near top-center so the card feels hung under the cursor
+    pointerOffset: { x: pixelW / 2, y: Math.min(28, pixelH / 2) },
+    origin: {
+      x,
+      y,
+      sizeX,
+      sizeY,
+      pixel: {
+        left: cellW * (x - 1),
+        top: cellH * (y - 1),
+        width: pixelW,
+        height: pixelH
+      }
+    },
+    matrix: {
+      cellWidth: cellW,
+      cellHeight: cellH,
+      gap: curGap.value,
+      cols: pcMatrixCount.value.x,
+      contentClientRect: {
+        left: contentRect?.left || 0,
+        top: contentRect?.top || 0,
+        width: contentRect?.width || 0,
+        height: contentRect?.height || 0
+      },
+      scrollTop: 0,
+      scrollLeft: 0
+    }
+  })
+  // source card stays isShow=false; Overlay is the only follow visual
+  dashboardDragSession.rawView.sourceDisplay = 'hidden'
+  if (typeof clientX === 'number' && typeof clientY === 'number') {
+    dashboardDragSession.move(clientX, clientY)
+  }
+}
+
+const handleDragStartMoveIn = payload => {
+  // company: accept { componentInfo, clientX, clientY } or legacy string
+  const componentInfo = typeof payload === 'string' ? payload : payload?.componentInfo
+  const clientX = typeof payload === 'object' ? payload?.clientX : undefined
+  const clientY = typeof payload === 'object' ? payload?.clientY : undefined
+  if (!componentInfo) return
+
   const moveInItemInfo = findDragComponent(componentInfo)
   // 初始的移动组件 距离左侧的位置 300 是DbToolbar 最左侧区域宽度
   moveInItemInfo.x = 300 / cellWidth.value
@@ -1437,9 +1532,20 @@ const handleDragStartMoveIn = componentInfo => {
   infoBox.value.moveItemIndex = componentData.value.length - 1
   infoBox.value.oldX = 1 // 实际对象原始X位置
   infoBox.value.oldY = 1
+
+  // company: toolbar drag-in uses the same Overlay/Placeholder session as card drag
+  if (dashboardActive.value && isMainCanvas(canvasId.value)) {
+    startToolbarDragSession(moveInItemInfo, clientX, clientY)
+  }
 }
 
 const handleDragEnd = e => {
+  // company: abandoned toolbar drag — tear down session before removing placeholder item
+  if (dashboardDragSession.rawView.active) {
+    dashboardDragSession.cancel()
+  }
+  document.body.classList.remove('bi-dashboard-dragging')
+  moveTime = 200
   // 当isShow 是false时，说明未移入画布 则需要进行清理占位
   if (infoBox.value && infoBox.value.moveItem && !infoBox.value.moveItem.isShow) {
     removeItem(componentData.value.length - 1)
@@ -1449,6 +1555,16 @@ const handleDragEnd = e => {
 
 const handleDragOver = e => {
   if (!infoBox.value || !infoBox.value.moveItem) {
+    return
+  }
+  const moveItem = infoBox.value.moveItem
+  // company: drive session from HTML5 dragover (no mousemove available during native DnD)
+  if (
+    dashboardDragSession.rawView.active &&
+    dashboardDragSession.rawView.componentId === moveItem.id
+  ) {
+    dashboardDragSession.move(e.clientX, e.clientY)
+    scrollScreen(e)
     return
   }
   infoBox.value.moveItem.style.left = e.pageX
