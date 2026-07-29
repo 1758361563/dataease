@@ -1,40 +1,20 @@
 <template>
   <div
     class="bar-main"
-    v-if="!mobileInPc && !isMobile()"
+    v-if="!mobileInPc && !isMobile() && previewMenuVisible"
     :class="[
       showEditPosition,
       {
         'bar-main-background': mainBackgroundShow,
-        'bar-main-feishu': showPosition === 'canvas'
+        'bar-main-feishu': showPosition === 'canvas' || showPosition === 'preview'
       }
     ]"
     @mousedown="fieldsAreaDown"
   >
     <!-- company canvas: Feishu-style — only ⋯ menu; other icons live inside dropdown -->
-    <template v-if="showPosition !== 'canvas'">
-      <el-tooltip
-        effect="dark"
-        placement="top"
-        :content="t('visualization.sort')"
-        v-if="element.component === 'DeTabs'"
-      >
-        <el-icon class="bar-base-icon" @click="tabSort">
-          <Sort />
-        </el-icon>
-      </el-tooltip>
-      <template v-if="element.component === 'VQuery'">
-        <span :title="t('visualization.add_query_filter')">
-          <el-icon class="bar-base-icon" @click="addQueryCriteria">
-            <Icon name="icon_add_outlined"><icon_add_outlined class="svg-icon" /></Icon
-          ></el-icon>
-        </span>
-        <span :title="t('visualization.edit_query_filter')">
-          <el-icon class="bar-base-icon" @click="editQueryCriteria">
-            <Icon name="icon_edit_outlined"><icon_edit_outlined class="svg-icon" /></Icon
-          ></el-icon>
-        </span>
-      </template>
+    <!-- company preview (2026-07-28): tab sort / query add+edit are editor-only,
+         never shown on the dashboard page; viewer uses the same ⋯ menu as canvas -->
+    <template v-if="showPosition !== 'canvas' && showPosition !== 'preview'">
       <el-tooltip
         effect="dark"
         placement="top"
@@ -110,7 +90,10 @@
     <el-dropdown
       trigger="click"
       placement="bottom-end"
-      v-if="barShowCheck('setting') || showPosition === 'canvas'"
+      v-if="
+        (showPosition === 'canvas' && previewMenuVisible) ||
+        (showPosition === 'preview' && previewMenuVisible)
+      "
       ref="curDropdown"
       popper-class="hide-focus_bg bi-component-more-menu"
       @command="() => {}"
@@ -226,11 +209,14 @@
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    <!-- company (2026-07-28): viewer uses ⋯ dropdown for export — no separate
+         download icon floating next to it -->
     <el-dropdown
       trigger="click"
       placement="right-start"
       v-if="
         showPosition !== 'canvas' &&
+        showPosition !== 'preview' &&
         !['picture-group', 'rich-text'].includes(element.innerType) &&
         barShowCheck('previewDownload') &&
         showDownload &&
@@ -272,8 +258,6 @@
 </template>
 
 <script lang="ts" setup>
-import icon_edit_outlined from '@/assets/svg/icon_edit_outlined.svg'
-import icon_add_outlined from '@/assets/svg/icon_add_outlined.svg'
 import dvBarEnlarge from '@/assets/svg/dv-bar-enlarge.svg'
 import dvDetails from '@/assets/svg/dv-details.svg'
 import icon_params_setting from '@/assets/svg/icon_params_setting.svg'
@@ -371,10 +355,20 @@ const barShowCheck = barName => {
   )
 }
 
+// company (2026-07-28): preview keeps the same Feishu ⋯ chrome as canvas —
+// no blue pill background, just the small white card with a border
 const mainBackgroundShow = computed(() => {
-  // company: Feishu ⋯ has no primary blue pill background
-  if (showPosition.value === 'canvas') return false
+  if (showPosition.value === 'canvas' || showPosition.value === 'preview') return false
   return !['batchOpt', 'multiplexing'].includes(showPosition.value)
+})
+
+// company (2026-07-28): viewer ⋯ is data-view/export only — hide it on
+// components that don't have data to show or export (filter components,
+// decorations, rich-text, picture-group)
+const previewMenuVisible = computed(() => {
+  if (showPosition.value !== 'preview') return true
+  if (element.value.component !== 'UserView') return false
+  return !['picture-group', 'rich-text'].includes(element.value.innerType)
 })
 const props = defineProps({
   element: {
@@ -746,7 +740,7 @@ watch(
   left: -26px;
 }
 
-/* company: Feishu-style embedded ⋯ */
+/* company: Feishu-style embedded ⋯ (canvas + preview share this chrome) */
 .bar-main-feishu {
   top: 6px;
   right: 6px !important;

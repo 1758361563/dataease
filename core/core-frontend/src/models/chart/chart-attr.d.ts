@@ -46,6 +46,14 @@ declare interface ChartAttr {
    * 指标名称
    */
   indicatorName: ChartIndicatorNameStyle
+  /**
+   * 对比指标卡布局（company）
+   */
+  indicatorCombo?: {
+    layout: 'columns' | 'row' | 'list'
+    align: 'center' | 'left'
+    showDivider: boolean
+  }
 }
 /**
  * 基础样式设置

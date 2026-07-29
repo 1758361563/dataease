@@ -7,6 +7,7 @@ import icon_drilling_outlined from '@/assets/svg/icon_drilling_outlined.svg'
 import { useI18n } from '@/hooks/web/useI18n'
 import ChartComponentG2Plot from './components/ChartComponentG2Plot.vue'
 import DeIndicator from '@/custom-component/indicator/DeIndicator.vue'
+import DeIndicatorCombo from '@/custom/company-bi/components/indicator-combo/DeIndicatorCombo.vue'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import { useAppStoreWithOut } from '@/store/modules/app'
 import { useEmbedded } from '@/store/modules/embedded'
@@ -1304,6 +1305,24 @@ const clearG2Tooltip = () => {
       <de-indicator
         :scale="scale"
         v-else-if="showChartView(ChartLibraryType.INDICATOR)"
+        :themes="canvasStyleData.dashboard.themeColor"
+        ref="chartComponent"
+        :view="view"
+        :element="element"
+        :show-position="showPosition"
+        :suffixId="suffixId"
+        :font-family="fontFamily"
+        :common-params="commonParams"
+        @touchstart="clearG2Tooltip"
+        @onChartClick="chartClick"
+        @onPointClick="onPointClick"
+        @onDrillFilters="onDrillFilters"
+        @onJumpClick="jumpClick"
+        @onComponentEvent="() => emit('onComponentEvent')"
+      />
+      <de-indicator-combo
+        :scale="scale"
+        v-else-if="showChartView(ChartLibraryType.INDICATOR_COMBO)"
         :themes="canvasStyleData.dashboard.themeColor"
         ref="chartComponent"
         :view="view"

@@ -12,14 +12,18 @@
 
 .dashboard-editor {
   .shape:not(.shape-group-area) > .shape-outer > .shape-inner {
-    border: 1px solid var(--bi-border);
-    box-shadow: var(--bi-shadow-card);
+    border: 1px solid var(--bi-card-border, var(--bi-border));
+    border-radius: var(--bi-card-radius, var(--bi-radius-md));
+    box-shadow: var(--bi-card-shadow, var(--bi-shadow-card));
+    background: var(--bi-card-bg, var(--bi-bg-surface));
   }
 }
 
 .canvas-container:not(.datav-preview) {
   .wrapper-outer:not([class*='-GroupArea']) > .wrapper-inner {
-    border: 1px solid var(--bi-border);
-    box-shadow: var(--bi-shadow-card);
+    border: 1px solid var(--bi-card-border, var(--bi-border));
+    border-radius: var(--bi-card-radius, var(--bi-radius-md));
+    box-shadow: var(--bi-card-shadow, var(--bi-shadow-card));
+    background: var(--bi-card-bg, var(--bi-bg-surface));
   }
 }

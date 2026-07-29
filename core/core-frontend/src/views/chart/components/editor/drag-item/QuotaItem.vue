@@ -104,7 +104,14 @@ watch(
   },
   { deep: true }
 )
-const AXIS_FORMAT_VIEW = ['table-normal', 'table-info', 'table-pivot', 'indicator', 'rich-text']
+const AXIS_FORMAT_VIEW = [
+  'table-normal',
+  'table-info',
+  'table-pivot',
+  'indicator',
+  'indicator-combo',
+  'rich-text'
+]
 const showValueFormatter = computed<boolean>(() => {
   return (
     AXIS_FORMAT_VIEW.includes(props.chart.type) &&
@@ -113,8 +120,8 @@ const showValueFormatter = computed<boolean>(() => {
 })
 
 const isEnableCompare = () => {
-  // 指标卡开放同环比配置
-  if (chart.value.type === 'indicator') {
+  // 指标卡/复合指标卡开放同环比配置
+  if (chart.value.type === 'indicator' || chart.value.type === 'indicator-combo') {
     state.disableEditCompare = false
     return
   }
@@ -254,8 +261,8 @@ const quickCalc = param => {
       break
     case 'setting':
       // 选择占比外，设置自动
-      // 指标卡不需要重置数值格式
-      if (chart.value.type !== 'indicator') {
+      // 指标卡/复合指标卡不需要重置数值格式
+      if (chart.value.type !== 'indicator' && chart.value.type !== 'indicator-combo') {
         resetValueFormatter(item.value)
       }
       editCompare()
@@ -307,6 +314,7 @@ const showHideIcon = computed(() => {
 const NOT_SUPPORT_SORT = [
   'circle-packing',
   'indicator',
+  'indicator-combo',
   'liquid',
   'gauge',
   'word-cloud',

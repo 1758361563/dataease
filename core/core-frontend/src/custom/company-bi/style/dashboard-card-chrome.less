@@ -114,11 +114,30 @@
       font-weight: 700;
     }
 
+    // ⋯ menu: hidden until hover/active, same reveal pattern as the drag
+    // handle above. Visibility lives on the slot wrapper (not the bar) so the
+    // "✓完成" button rendered next to it in configure mode stays visible.
     .bi-card-chrome__more-slot {
       display: flex;
       align-items: center;
       justify-content: flex-end;
       min-height: 32px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.06s ease;
+    }
+
+    .bi-card-chrome.is-hovered .bi-card-chrome__more-slot,
+    .bi-card-chrome.is-active .bi-card-chrome__more-slot {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* keep menu visible while its dropdown is open (hover leaves the shape) */
+    .bi-card-chrome__more-slot:has(.ed-tooltip__trigger[aria-expanded='true']),
+    .bi-card-chrome__more-slot:focus-within {
+      opacity: 1;
+      pointer-events: auto;
     }
 
     .bi-card-chrome .edit-bar,
@@ -126,8 +145,6 @@
       position: static !important;
       top: auto !important;
       right: auto !important;
-      opacity: 1 !important;
-      pointer-events: auto !important;
       transform: none !important;
       background: transparent !important;
       box-shadow: none !important;

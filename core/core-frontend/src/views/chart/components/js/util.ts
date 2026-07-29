@@ -241,7 +241,14 @@ export function getRemark(chart) {
   return remark
 }
 
-export const quotaViews = ['label', 'richTextView', 'indicator', 'gauge', 'liquid']
+export const quotaViews = [
+  'label',
+  'richTextView',
+  'indicator',
+  'indicator-combo',
+  'gauge',
+  'liquid'
+]
 // 地图
 const mapChartTypes = ['bubble-map', 'flow-map', 'heat-map', 'map', 'symbolic-map']
 // 分布图

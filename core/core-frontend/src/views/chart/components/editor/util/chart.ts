@@ -1308,6 +1308,13 @@ export const CHART_TYPE_CONFIGS = [
         value: 'indicator',
         title: t('chart.chart_indicator'),
         icon: 'indicator'
+      },
+      {
+        render: 'custom',
+        category: 'quota',
+        value: 'indicator-combo',
+        title: t('chart.chart_indicator_combo'),
+        icon: 'indicator'
       }
     ]
   },
@@ -1810,6 +1817,11 @@ export const BASE_VIEW_CONFIG = {
     tableCell: DEFAULT_TABLE_CELL,
     indicator: DEFAULT_INDICATOR_STYLE,
     indicatorName: DEFAULT_INDICATOR_NAME_STYLE,
+    indicatorCombo: {
+      layout: 'columns',
+      align: 'center',
+      showDivider: true
+    },
     map: {
       id: '',
       level: 'world'

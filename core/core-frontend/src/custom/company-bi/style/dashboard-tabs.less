@@ -1,26 +1,44 @@
 /**
- * Folder-style tabs for dashboard DeTabs.
+ * Segmented pill tabs for dashboard DeTabs.
  *
  * Official DeTabs renders an el-tabs (line type) with an underline active bar.
- * This layer restyles the chrome into modern folder tabs: a muted strip with
- * the active tab as a white rounded "tongue" merging into the content below.
+ * This layer restyles the chrome into a modern segmented control: tabs sit in
+ * a rounded gray track, the active tab is a white pill with a soft shadow.
  * Colors are intentionally fixed to company tokens (design-system default
  * beats per-component font color config here).
  *
- * DOM (see custom-component/de-tabs/Component.vue + DeCustomTab.vue):
- *   .custom-tabs-head > .de-tabs > .ed-tabs__header > ... > .ed-tabs__item
+ * The "+" add-tab button is pinned right after the last tab instead of the
+ * element-plus default `float: right` at the far end of the header row, where
+ * it overlapped the card-chrome "⋯" action at the component corner.
+ *
+ * DOM (see custom-component/de-tabs/Component.vue + DeCustomTab.vue +
+ * element-plus tabs.mjs):
+ *   .custom-tabs-head > .de-tabs
+ *     > .ed-tabs__header
+ *       > .ed-tabs__nav-wrap > ... > .ed-tabs__nav > .ed-tabs__item × n
+ *       > .ed-tabs__new-tab        (sibling of nav-wrap, EP floats it right)
  * Header must stay 46px tall: content height is hardcoded calc(100% - 46px).
  */
 
-.company-folder-tabs() {
+.company-pill-tabs() {
   .custom-tabs-head .de-tabs {
+    // forked EP sets justify-content: space-between here, which pins the "+"
+    // at the far right; flex-start keeps it right after the tab cluster.
     > .ed-tabs__header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 6px;
       height: 46px !important;
       margin: 0;
-      padding: 6px 8px 0;
+      padding: 0 10px;
       box-sizing: border-box;
-      background: var(--bi-bg-page);
-      border-radius: 8px 8px 0 0;
+    }
+
+    .ed-tabs__nav-wrap {
+      flex: 0 1 auto;
+      min-width: 0;
+      margin-bottom: 0;
     }
 
     // kill the line-type underline & separator
@@ -34,44 +52,82 @@
       border: none;
     }
 
+    // segmented track holding the tab pills
+    .ed-tabs__nav {
+      float: none;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      border-radius: var(--bi-radius-md);
+      background: rgba(31, 35, 41, 0.05);
+    }
+
     .ed-tabs__item {
-      height: 40px;
-      padding: 0 16px !important;
-      margin-right: 2px;
-      border-radius: 8px 8px 0 0;
+      height: 30px;
+      line-height: 30px;
+      padding: 0 14px !important;
+      margin: 0;
+      border: none;
+      border-radius: var(--bi-radius-sm);
       background: transparent;
       color: var(--bi-text-secondary);
-      transition: background-color 0.15s ease, color 0.15s ease;
+      transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 
       &:hover {
-        background: rgba(31, 35, 41, 0.06);
+        background: rgba(255, 255, 255, 0.65);
         color: var(--bi-text-primary);
       }
 
       &.is-active {
         background: var(--bi-bg-surface);
         color: var(--bi-text-primary);
+        box-shadow: var(--bi-shadow-card);
       }
     }
+  }
 
-    .ed-tabs__new-tab {
-      margin-right: 8px;
-      border: none;
-      border-radius: 6px;
-      color: var(--bi-text-secondary);
+  // "+" add-tab button: hug the last tab instead of floating to the far
+  // right. Needs higher specificity than the scoped
+  // `.ed-tabs-light :deep(.ed-tabs__new-tab)` rules in de-tabs/Component.vue.
+  .custom-tabs-head .de-tabs > .ed-tabs__header > .ed-tabs__new-tab {
+    float: none;
+    flex: none;
+    margin: 0;
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    border: none;
+    border-radius: var(--bi-radius-sm);
+    background-color: transparent;
+    color: var(--bi-text-secondary);
 
-      &:hover {
-        background: rgba(31, 35, 41, 0.06);
-        color: var(--bi-text-primary);
-      }
+    .ed-icon {
+      transform: none;
+      font-size: 14px;
     }
+
+    &:hover {
+      background: rgba(31, 35, 41, 0.06);
+      color: var(--bi-text-primary);
+    }
+  }
+
+  // headHorizontalPosition right/center: keep the tab cluster (and the "+"
+  // hugging it) aligned, now that nav-wrap shrinks to content width.
+  .custom-tabs-head.tab-head-right .de-tabs > .ed-tabs__header > .ed-tabs__nav-wrap {
+    margin-left: auto;
+  }
+  .custom-tabs-head.tab-head-center .de-tabs > .ed-tabs__header > .ed-tabs__nav-wrap {
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 
 .dashboard-editor {
-  .company-folder-tabs();
+  .company-pill-tabs();
 }
 
 .canvas-container:not(.datav-preview) {
-  .company-folder-tabs();
+  .company-pill-tabs();
 }

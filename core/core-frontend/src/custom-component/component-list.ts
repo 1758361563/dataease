@@ -327,10 +327,12 @@ const list = [
     x: 1,
     y: 1,
     sizeX: 36,
-    sizeY: 1,
+    // company: default to 2 cells tall on 36x18 grid so the chrome handles
+    // (⋯ / resize grip / 6-dot drag) don't overlap the inner prompt text
+    sizeY: 2,
     style: {
       width: 400,
-      height: 100
+      height: 110
     },
     request: {
       method: 'GET',

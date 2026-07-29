@@ -26,6 +26,7 @@ declare type EditorProperty =
   | 'linkage'
   | 'indicator-value-selector'
   | 'indicator-name-selector'
+  | 'indicator-combo-layout-selector'
   | 'quadrant-selector'
   | 'map-symbolic-selector'
   | 'flow-map-line-selector'

@@ -4,7 +4,8 @@ import { computed, reactive, toRefs, watch } from 'vue'
 import {
   compareYearList,
   compareMonthList,
-  compareDayList
+  compareDayList,
+  compareDayListGuandata
 } from '@/views/chart/components/editor/drag-item/components/compare'
 
 const { t } = useI18n()
@@ -63,6 +64,26 @@ const initDateFormatter = () => {
 }
 
 const hintStr = computed<string>(() => {
+  // 对比指标卡：观远「基于日期筛选」——整段区间偏移，不是官方按日拆开单期对比
+  if (chart.value?.type === 'indicator-combo') {
+    const type = compareItem.value.compareCalc.type
+    const resultData = compareItem.value.compareCalc.resultData
+    const rangeHint: Record<string, string> = {
+      day_mom: '两端点分别前移 1 天',
+      week_yoy: '两端点分别前移 7 天',
+      week_mom: '两端点分别前移 7 天',
+      month_yoy: '两端点分别减 1 个自然月（无对应日号则截到目标月最后一天；不保天数相同）',
+      month_mom: '两端点分别减 1 个自然月（无对应日号则截到目标月最后一天；不保天数相同）',
+      year_yoy: '两端点分别减 1 个自然年（无对应日号则截到目标月最后一天）',
+      year_mom: '两端点分别减 1 个自然年（无对应日号则截到目标月最后一天）'
+    }
+    const range = rangeHint[type] || '按对比类型整体偏移筛选区间'
+    if (resultData === 'pre') return `${range}后的上期聚合值`
+    if (resultData === 'sub') return `本期聚合值 - 上期聚合值（${range}）`
+    if (resultData === 'percent') return `(本期 - 上期) / 上期；上期 = ${range}`
+    return range
+  }
+
   let dataFormatter = state.dateFormatter
   const checkedField = state.fieldList.filter(ele => ele.id === compareItem.value.compareCalc.field)
   if (checkedField && checkedField.length > 0) {
@@ -161,8 +182,10 @@ watch(
 )
 
 const isIndicator = computed(() => {
-  return chart.value.type === 'indicator'
+  return chart.value.type === 'indicator' || chart.value.type === 'indicator-combo'
 })
+
+const isIndicatorCombo = computed(() => chart.value.type === 'indicator-combo')
 
 // 过滤xaxis，extStack所有日期字段
 const initFieldList = () => {
@@ -205,7 +228,15 @@ const initFieldList = () => {
   }
 }
 // 同环比计算类型
-const yoyLabel = ['day_mom', 'month_yoy', 'year_yoy', 'month_mom', 'year_mom']
+const yoyLabel = [
+  'day_mom',
+  'week_yoy',
+  'week_mom',
+  'month_yoy',
+  'year_yoy',
+  'month_mom',
+  'year_mom'
+]
 // 获得不同字段格式对应能计算的同环比列表
 const initCompareType = () => {
   const checkedField = state.fieldList.filter(ele => ele.id === compareItem.value.compareCalc.field)
@@ -218,7 +249,8 @@ const initCompareType = () => {
         state.compareList = compareMonthList
         break
       case 'y_M_d':
-        state.compareList = compareDayList
+        // 对比指标卡对齐观远：环比/周同比/月同比/年同比
+        state.compareList = isIndicatorCombo.value ? compareDayListGuandata : compareDayList
         break
       default:
         break
@@ -299,7 +331,11 @@ initDateFormatter()
 
       <el-form-item :label="t('chart.tip')">
         <span class="exp-style" style="padding-top: 2px">
-          {{ t('chart.compare_calc_tip') }}
+          {{
+            isIndicatorCombo
+              ? '需仪表板日期筛选器绑定与上方相同的日期字段；本期取筛选区间聚合，上期为区间整体偏移后聚合（观远「基于日期筛选」）。'
+              : t('chart.compare_calc_tip')
+          }}
         </span>
       </el-form-item>
     </el-form>

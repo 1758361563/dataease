@@ -25,6 +25,7 @@ import SummarySelector from '@/views/chart/components/editor/editor-style/compon
 import MiscStyleSelector from '@/views/chart/components/editor/editor-style/components/MiscStyleSelector.vue'
 import IndicatorValueSelector from '@/views/chart/components/editor/editor-style/components/IndicatorValueSelector.vue'
 import IndicatorNameSelector from '@/views/chart/components/editor/editor-style/components/IndicatorNameSelector.vue'
+import IndicatorComboLayoutSelector from '@/custom/company-bi/components/indicator-combo/IndicatorComboLayoutSelector.vue'
 import QuadrantSelector from '@/views/chart/components/editor/editor-style/components/QuadrantSelector.vue'
 import FlowMapLineSelector from '@/views/chart/components/editor/editor-style/components/FlowMapLineSelector.vue'
 import FlowMapPointSelector from '@/views/chart/components/editor/editor-style/components/FlowMapPointSelector.vue'
@@ -127,6 +128,7 @@ const emit = defineEmits([
   'onExtTooltipChange',
   'onIndicatorChange',
   'onIndicatorNameChange',
+  'onIndicatorComboLayoutChange',
   'onChangeQuadrantForm',
   'onChangeFlowMapLineForm',
   'onChangeFlowMapPointForm'
@@ -187,6 +189,10 @@ const onIndicatorNameChange = (val, prop) => {
     value.indicatorValue = indicatorValueRef.value?.getFormData()
   }
   state.initReady && emit('onIndicatorNameChange', value, prop)
+}
+
+const onIndicatorComboLayoutChange = (val, prop) => {
+  state.initReady && emit('onIndicatorComboLayoutChange', val, prop)
 }
 
 const onLegendChange = (val, prop) => {
@@ -445,6 +451,22 @@ watch(
                 @onIndicatorNameChange="onIndicatorNameChange"
               />
             </collapse-switch-item>
+            <el-collapse-item
+              :effect="themes"
+              v-if="showProperties('indicator-combo-layout-selector')"
+              name="indicator-combo-layout"
+              :title="
+                selectorSpec['indicator-combo-layout-selector']?.title ||
+                t('chart.indicator_combo_layout')
+              "
+            >
+              <indicator-combo-layout-selector
+                :themes="themes"
+                class="attr-selector"
+                :chart="chart"
+                @onIndicatorComboLayoutChange="onIndicatorComboLayoutChange"
+              />
+            </el-collapse-item>
             <el-collapse-item
               :effect="themes"
               v-if="showProperties('misc-selector') && !chart.type.includes('mix')"

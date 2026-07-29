@@ -494,8 +494,8 @@ export function adaptTitleFontFamily(fontFamily, viewInfo) {
   if (viewInfo) {
     const _fontFamily = defaultTo(CHART_FONT_FAMILY_MAP_TRANS[fontFamily], fontFamily)
     viewInfo.customStyle['text']['fontFamily'] = _fontFamily
-    //针对指标卡设置字体
-    if (viewInfo.type === 'indicator') {
+    //针对指标卡/复合指标卡设置字体
+    if (viewInfo.type === 'indicator' || viewInfo.type === 'indicator-combo') {
       viewInfo.customAttr['indicator']['fontFamily'] = fontFamily
       viewInfo.customAttr['indicator']['suffixFontFamily'] = fontFamily
       viewInfo.customAttr['indicatorName']['fontFamily'] = fontFamily

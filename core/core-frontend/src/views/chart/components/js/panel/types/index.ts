@@ -16,7 +16,8 @@ export enum ChartLibraryType {
   S2 = 's2',
   RICH_TEXT = 'rich-text',
   PICTURE_GROUP = 'picture-group',
-  INDICATOR = 'indicator'
+  INDICATOR = 'indicator',
+  INDICATOR_COMBO = 'indicator-combo'
 }
 export abstract class ChartWrapper<O> {
   chartInstance: O

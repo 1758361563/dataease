@@ -56,7 +56,7 @@ const init = () => {
 }
 const showIgnoreOption = computed(() => {
   return !(
-    equalsAny(props.chart.type, 'table-pivot', 'table-info', 'indicator') ||
+    equalsAny(props.chart.type, 'table-pivot', 'table-info', 'indicator', 'indicator-combo') ||
     props.chart.type.includes('chart-mix')
   )
 })

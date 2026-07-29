@@ -494,8 +494,13 @@ init()
       </el-col>
     </el-col>
 
-    <!--指标卡-->
-    <el-col v-if="props.chart.type && props.chart.type === 'indicator'">
+    <!--指标卡/复合指标卡-->
+    <el-col
+      v-if="
+        props.chart.type &&
+        (props.chart.type === 'indicator' || props.chart.type === 'indicator-combo')
+      "
+    >
       <el-col>
         <div class="inner-container">
           <span class="label" :class="'label-' + props.themes">{{

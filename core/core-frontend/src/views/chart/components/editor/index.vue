@@ -779,8 +779,12 @@ const addAxis = (e, axis: AxisType) => {
     typeValid = dragCheckType(view.value[axis], type)
   }
 
-  // 针对指标卡进行数值类型判断
-  if (typeValid && type === 'q' && view.value.type === 'indicator') {
+  // 针对指标卡/复合指标卡进行数值类型判断
+  if (
+    typeValid &&
+    type === 'q' &&
+    (view.value.type === 'indicator' || view.value.type === 'indicator-combo')
+  ) {
     const list = view.value[axis]
     if (list && list.length > 0) {
       let valid = true
@@ -1065,7 +1069,11 @@ const onTypeChange = (render, type) => {
         emitter.emit('removeAxis', { axisType: 'yAxis', axis, editType: 'remove' })
       }
     }
-    if (['liquid', 'gauge', 'indicator', 'multi-scatter', 't-heatmap'].includes(view.value.type)) {
+    if (
+      ['liquid', 'gauge', 'indicator', 'indicator-combo', 'multi-scatter', 't-heatmap'].includes(
+        view.value.type
+      )
+    ) {
       removeItems('drillFields')
     }
     if (!['line', 'area', 'bar', 'bar-group'].includes(view.value.type)) {
@@ -1157,6 +1165,12 @@ const onIndicatorNameChange = (val, prop) => {
     }
   }
   view.value.customAttr.indicatorName = val.indicatorName
+  renderChart(view.value)
+}
+
+const onIndicatorComboLayoutChange = val => {
+  recordSnapshotInfo('render')
+  view.value.customAttr.indicatorCombo = val
   renderChart(view.value)
 }
 
@@ -2031,6 +2045,10 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
   const arr = activeDimension.value.length ? activeDimension.value : activeQuota.value
   for (let i = 0; i < arr.length; i++) {
     const obj = cloneDeep(arr[i])
+    // 对比指标卡：同字段可重复拖入，写入稳定实例 id（禁止改 field.id）
+    if (view.value.type === 'indicator-combo' && type === 'yAxis') {
+      obj.metricInstanceId = String(guid())
+    }
     state.moveId = obj.id as unknown as number
     view.value[type] ??= []
     const targetId = ev.srcElement.offsetParent?.querySelector('.node-id_private')?.dataset?.id
@@ -2052,6 +2070,17 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
       addAxis(e, type as AxisType)
     }
   }
+}
+
+/** 对比指标卡 yAxis 用稳定 metricInstanceId 作 key；其它图表仍用 field.id */
+const yAxisItemKey = (item: any) => {
+  if (view.value.type === 'indicator-combo') {
+    if (!item.metricInstanceId) {
+      item.metricInstanceId = String(guid())
+    }
+    return item.metricInstanceId
+  }
+  return item.id
 }
 
 const fieldLoading = ref(false)
@@ -2150,6 +2179,7 @@ const chartStyleScroll = (val: any) => {
               @onTextChange="onTextChange"
               @onIndicatorChange="onIndicatorChange"
               @onIndicatorNameChange="onIndicatorNameChange"
+              @onIndicatorComboLayoutChange="onIndicatorComboLayoutChange"
               @onLegendChange="onLegendChange"
               @onBackgroundChange="onBackgroundChange"
               @onStyleAttrChange="onStyleAttrChange"
@@ -2863,7 +2893,7 @@ const chartStyleScroll = (val: any) => {
                               <draggable
                                 :list="view.yAxis"
                                 :move="onMove"
-                                item-key="id"
+                                :item-key="yAxisItemKey"
                                 group="drag"
                                 animation="300"
                                 class="drag-block-style"
@@ -3062,7 +3092,7 @@ const chartStyleScroll = (val: any) => {
                               <draggable
                                 :list="view.yAxis"
                                 :move="onMove"
-                                item-key="id"
+                                :item-key="yAxisItemKey"
                                 group="drag"
                                 animation="300"
                                 class="drag-block-style"
@@ -3578,6 +3608,7 @@ const chartStyleScroll = (val: any) => {
                           @onTextChange="onTextChange"
                           @onIndicatorChange="onIndicatorChange"
                           @onIndicatorNameChange="onIndicatorNameChange"
+                          @onIndicatorComboLayoutChange="onIndicatorComboLayoutChange"
                           @onLegendChange="onLegendChange"
                           @onBackgroundChange="onBackgroundChange"
                           @onStyleAttrChange="onStyleAttrChange"

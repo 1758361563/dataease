@@ -17,6 +17,8 @@ import { isDashboard, trackBarStyleCheck } from '@/utils/canvasUtils'
 import ViewTrackBar from '@/components/visualization/ViewTrackBar.vue'
 import { hasNextDrillLevel } from '@/views/chart/components/views/util/drill'
 import { ElMessage } from 'element-plus-secondary'
+import IndicatorMainBlock from '@/custom/company-bi/components/indicator-combo/IndicatorMainBlock.vue'
+import { indicatorDisplayName } from '@/custom/company-bi/components/indicator-combo/displayName'
 
 const props = defineProps({
   // 公共参数集
@@ -104,10 +106,9 @@ const resultObject = computed(() => {
 
 const resultName = computed(() => {
   if (view.value?.yAxis?.length) {
-    const axis = view.value.yAxis[0]
-    return axis.chartShowName ? axis.chartShowName : axis.name
+    return indicatorDisplayName(view.value.yAxis[0])
   }
-  return undefined
+  return ''
 })
 
 const result = computed(() => {
@@ -298,6 +299,9 @@ const renderChart = async view => {
     const { indicator, indicatorName } = chart.customAttr
 
     if (indicator) {
+      // 公司视觉：主值区整体居中；对齐选项仍可通过 selector 覆盖
+      contentStyle.value['align-items'] = 'center'
+      contentStyle.value['justify-content'] = 'center'
       switch (indicator.hPosition) {
         case 'left':
           contentStyle.value['align-items'] = 'flex-start'
@@ -354,26 +358,25 @@ const renderChart = async view => {
       showSuffix.value = indicator.suffixEnable
       suffixContent.value = defaultTo(indicator.suffix, '')
     }
-    if (indicatorName?.show) {
-      let nameColor = indicatorName.color
+    if (indicatorName?.show !== false) {
+      let nameColor = indicatorName?.color
 
       indicatorNameShow.value = true
       indicatorNameClass.value = {
-        color: nameColor,
-        'font-size': indicatorName.fontSize + 'px',
+        color: nameColor || DEFAULT_INDICATOR_NAME_STYLE.color,
+        'font-size': (indicatorName?.fontSize || DEFAULT_INDICATOR_NAME_STYLE.fontSize) + 'px',
         'font-family': defaultTo(
-          indicatorName.fontFamily,
+          indicatorName?.fontFamily,
           CHART_FONT_FAMILY_MAP[DEFAULT_INDICATOR_NAME_STYLE.fontFamily]
         ),
-        'font-weight': indicatorName.isBolder ? 'bold' : 'normal',
-        'font-style': indicatorName.isItalic ? 'italic' : 'normal',
-        'letter-spacing': indicatorName.letterSpace + 'px',
-        'text-shadow': indicatorName.fontShadow ? '2px 2px 4px' : 'none',
+        'font-weight': indicatorName?.isBolder ? 'bold' : 'normal',
+        'font-style': indicatorName?.isItalic ? 'italic' : 'normal',
+        'letter-spacing': (indicatorName?.letterSpace || 0) + 'px',
+        'text-shadow': indicatorName?.fontShadow ? '2px 2px 4px' : 'none',
         'font-synthesis': 'weight style'
       }
-      indicatorNameWrapperStyle['margin-top'] =
-        (indicatorName.nameValueSpacing ?? DEFAULT_INDICATOR_NAME_STYLE.nameValueSpacing) + 'px'
-      indicatorNamePositionBottom.value = indicatorName.namePosition !== 'top'
+      // 公司视觉：名称固定在数值上方，不再渲染底部技术名行
+      indicatorNamePositionBottom.value = false
     } else {
       indicatorNameShow.value = false
       indicatorNamePositionBottom.value = false
@@ -608,6 +611,7 @@ defineExpose({
 <template>
   <div
     ref="indicatorRef"
+    class="bi-indicator-shell"
     :class="{ 'menu-point': showCursor }"
     :style="contentStyle"
     @mouseup="onPointClick"
@@ -621,18 +625,17 @@ defineExpose({
       @trackClick="trackClick"
       :is-data-v-mobile="dataVMobile"
     />
-    <div v-if="indicatorNameShow && !indicatorNamePositionBottom">
-      <span :style="indicatorNameClass">{{ resultName }}</span>
-      <div :style="indicatorNameWrapperStyle"></div>
-    </div>
-    <div>
-      <span :style="indicatorClass">{{ formattedResult }}</span>
-      <span :style="indicatorSuffixClass" v-if="showSuffix">{{ suffixContent }}</span>
-    </div>
-    <div v-if="indicatorNameShow && indicatorNamePositionBottom">
-      <div :style="indicatorNameWrapperStyle"></div>
-      <span :style="indicatorNameClass">{{ resultName }}</span>
-    </div>
+    <indicator-main-block
+      fill
+      :label="resultName"
+      :value="formattedResult"
+      :suffix="suffixContent"
+      :show-label="indicatorNameShow"
+      :show-suffix="showSuffix"
+      :label-style="indicatorNameClass"
+      :value-style="indicatorClass"
+      :suffix-style="indicatorSuffixClass"
+    />
   </div>
 </template>
 
