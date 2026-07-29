@@ -10,6 +10,13 @@ import elementResizeDetectorMaker from 'element-resize-detector'
 import UserViewEnlarge from '@/components/visualization/UserViewEnlarge.vue'
 import CanvasOptBar from '@/components/visualization/CanvasOptBar.vue'
 import { isDashboard, isMainCanvas, refreshOtherComponent } from '@/utils/canvasUtils'
+import {
+  TAB_INNER_GUTTER_COLS,
+  dashboardTabInnerItemStyle,
+  resolveTabInnerCell,
+  resetTabInnerCoordTrace,
+  traceTabInnerCoord
+} from '@/custom/company-bi/utils/dashboardGridLayout'
 import { activeWatermarkCheckUser } from '@/components/watermark/watermark'
 import router from '@/router'
 import { XpackComponent } from '@/components/plugin'
@@ -128,8 +135,11 @@ const scaleWidthPoint = ref(100)
 const scaleHeightPoint = ref(100)
 const scaleMin = ref(100)
 const previewCanvas = ref(null)
+const previewGridRoot = ref(null)
 const cellWidth = ref(10)
 const cellHeight = ref(10)
+/** company: visual inset for tab/group preview (applied on .preview-grid-root, not outer pad) */
+const TAB_INNER_INSET_PX = 16
 const userViewEnlargeRef = ref(null)
 const searchCount = ref(0)
 const refreshTimer = ref(null)
@@ -137,6 +147,7 @@ const renderReady = ref(false)
 const dashboardActive = computed(() => {
   return dvInfo.value.type === 'dashboard'
 })
+const isTabInnerPreview = computed(() => dashboardActive.value && !isMainCanvas(canvasId.value))
 const state = reactive({
   initState: true,
   scrollMain: 0
@@ -294,6 +305,28 @@ useEmitt({
   }
 })
 
+const updateTabInnerCellFromRoot = () => {
+  const gridBox = previewGridRoot.value as HTMLElement | null
+  const outer = previewCanvas.value as HTMLElement | null
+  const rootWidth = Math.max(
+    gridBox?.clientWidth || (outer ? outer.clientWidth - TAB_INNER_INSET_PX * 2 : 0),
+    1
+  )
+  const rootHeight = Math.max(
+    gridBox?.clientHeight || (outer ? outer.clientHeight - TAB_INNER_INSET_PX * 2 : 0),
+    1
+  )
+  const resolved = resolveTabInnerCell({
+    rootWidth,
+    rootHeight,
+    cols: pcMatrixCount.value.x,
+    rows: pcMatrixCount.value.y,
+    scaleWithWidth: dashboardScaleWithWidth.value
+  })
+  cellWidth.value = resolved.cellWidth
+  cellHeight.value = resolved.cellHeight
+}
+
 const resetLayout = () => {
   if (downloadStatus.value) {
     return
@@ -314,12 +347,26 @@ const resetLayout = () => {
           ? Math.floor(Math.min(scaleWidthPoint.value, scaleHeightPoint.value))
           : scaleWidthPoint.value
       if (dashboardActive.value) {
-        cellWidth.value = canvasWidth / pcMatrixCount.value.x
-        // 如果是保持比例 则宽高相同
-        if (dashboardScaleWithWidth.value) {
-          cellHeight.value = cellWidth.value * 1.6
+        // company Tab preview: preview-grid-root is the ONLY measure + position root.
+        // cell = root.clientWidth / 36 — never main-canvas bashMatrix.
+        if (isTabInnerPreview.value) {
+          updateTabInnerCellFromRoot()
         } else {
-          cellHeight.value = canvasHeight / pcMatrixCount.value.y
+          cellWidth.value = canvasWidth / pcMatrixCount.value.x
+          if (dashboardScaleWithWidth.value) {
+            cellHeight.value = cellWidth.value * 1.6
+          } else {
+            cellHeight.value = canvasHeight / pcMatrixCount.value.y
+          }
+        }
+        // main canvas still publishes bashMatrix for any non-Tab consumers
+        if (isMainCanvas(canvasId.value)) {
+          dvMainStore.setBashMatrixInfo({
+            baseWidth: cellWidth.value,
+            baseHeight: cellHeight.value,
+            baseMarginLeft: 0,
+            baseMarginTop: 0
+          })
         }
         scaleMin.value = isMainCanvas(canvasId.value)
           ? scaleMin.value * 1.2
@@ -354,6 +401,49 @@ const restore = () => {
 }
 
 const getShapeItemShowStyle = item => {
+  // company: Tab/Group preview — local 36-col grid + explicit leading gutter
+  if (isTabInnerPreview.value) {
+    const style = dashboardTabInnerItemStyle(item, {
+      cellWidth: cellWidth.value,
+      cellHeight: cellHeight.value,
+      curGap: curGap.value,
+      gutterCols: TAB_INNER_GUTTER_COLS
+    })
+    const styleLeftPx = cellWidth.value * (item.x - 1 + TAB_INNER_GUTTER_COLS)
+    const styleWidthPx = cellWidth.value * item.sizeX
+    nextTick(() => {
+      const root = previewGridRoot.value as HTMLElement | null
+      const wrapper = root?.querySelector(
+        `#wrapper-outer-id-${item.id}, [id="wrapper-outer-id-${item.id}"]`
+      ) as HTMLElement | null
+      const dom = wrapper || (root?.querySelector('.wrapper-outer') as HTMLElement | null)
+      const rootWidth = root?.clientWidth
+      traceTabInnerCoord({
+        lane: 'preview-DePreview',
+        canvasId: canvasId.value,
+        componentId: item.id,
+        gridX: item.x,
+        gridY: item.y,
+        sizeX: item.sizeX,
+        sizeY: item.sizeY,
+        cols: pcMatrixCount.value.x,
+        gutterCols: TAB_INNER_GUTTER_COLS,
+        cellWidth: cellWidth.value,
+        cellHeight: cellHeight.value,
+        styleLeftPx,
+        styleWidthPx,
+        rootWidth,
+        colsThatFit: rootWidth ? rootWidth / cellWidth.value : undefined,
+        leftSlackPx: styleLeftPx,
+        rightSlackPx:
+          rootWidth != null ? rootWidth - styleLeftPx - styleWidthPx : undefined,
+        domLeft: dom ? getComputedStyle(dom).left : undefined,
+        domWidth: dom ? getComputedStyle(dom).width : undefined,
+        offsetParentIsRoot: !!(dom && root && dom.offsetParent === root)
+      })
+    })
+    return style
+  }
   return getShapeItemStyle(item, {
     dvModel: dvInfo.value.type,
     cellWidth: cellWidth.value,
@@ -367,6 +457,28 @@ const curGap = computed(() => {
     ? dvMainStore.canvasStyleData?.dashboard?.gapSize
     : 0
 })
+
+const tabGridResizeObserver = ref<ResizeObserver | null>(null)
+
+const bindTabGridResizeObserver = () => {
+  unbindTabGridResizeObserver()
+  if (!isTabInnerPreview.value || !previewGridRoot.value) return
+  const ro = new ResizeObserver(() => {
+    updateTabInnerCellFromRoot()
+    // side-tree animation: one more measure on the next frame after width settles
+    requestAnimationFrame(() => {
+      updateTabInnerCellFromRoot()
+      resetTabInnerCoordTrace()
+    })
+  })
+  ro.observe(previewGridRoot.value)
+  tabGridResizeObserver.value = ro
+}
+
+const unbindTabGridResizeObserver = () => {
+  tabGridResizeObserver.value?.disconnect()
+  tabGridResizeObserver.value = null
+}
 
 const initRefreshTimer = () => {
   // 数据刷新计时器 (仪表开启刷新并且是预览状态才启动刷新)
@@ -428,6 +540,11 @@ const winMsgOuterParamsHandle = msgInfo => {
 onMounted(() => {
   initRefreshTimer()
   resetLayout()
+  nextTick(() => {
+    if (isTabInnerPreview.value) {
+      bindTabGridResizeObserver()
+    }
+  })
   window.addEventListener('resize', restore)
   const erd = elementResizeDetectorMaker()
   erd.listenTo(document.getElementById(domId), () => {
@@ -438,6 +555,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  unbindTabGridResizeObserver()
   //初始化隐藏弹框区
   dvMainStore.canvasStateChange({ key: 'curPointArea', value: 'base' })
   clearInterval(refreshTimer.value)
@@ -551,7 +669,9 @@ defineExpose({
     :class="{
       'de-download-custom': downloadStatus,
       'datav-preview': dataVPreview,
-      'datav-preview-unpublish': showUnpublishFlag
+      'datav-preview-unpublish': showUnpublishFlag,
+      // company: same 16px inset as editor DeCanvas .db-canvas
+      'bi-tab-inner-preview': isTabInnerPreview
     }"
     ref="previewCanvas"
     @mousedown="handleMouseDown"
@@ -579,7 +699,38 @@ defineExpose({
       :component-data="baseComponentData"
       :is-fixed="isFixedFlag"
     ></canvas-opt-bar>
-    <template v-if="renderReady && !showUnpublishFlag">
+    <!--
+      Tab/group preview: always mount .preview-grid-root (measure + containing
+      block). Inset via margin on the root — NOT padding on .canvas-container —
+      so abspos wrappers' left:0 matches the measured width box.
+    -->
+    <div v-if="isTabInnerPreview" ref="previewGridRoot" class="preview-grid-root">
+      <component-wrapper
+        v-for="(item, index) in baseComponentData"
+        v-show="renderReady && !showUnpublishFlag && item.isShow"
+        :active="item.id === (curComponent || {})['id']"
+        :canvas-id="canvasId"
+        :canvas-style-data="canvasStyleData"
+        :dv-info="dvInfo"
+        :cur-style="getShapeItemShowStyle(item)"
+        :canvas-view-info="canvasViewInfo"
+        :view-info="canvasViewInfo[item.id]"
+        :key="index"
+        :config="item"
+        :style="getShapeItemShowStyle(item)"
+        :show-position="showPosition"
+        :search-count="curSearchCount"
+        :scale="mobileInPc && isDashboard() ? 100 : scaleMin"
+        :is-selector="props.isSelector"
+        :font-family="canvasStyleData.fontFamily || fontFamily"
+        :scroll-main="state.scrollMain"
+        @userViewEnlargeOpen="userViewEnlargeOpen($event, item)"
+        @datasetParamsInit="datasetParamsInit(item)"
+        @onPointClick="onPointClick"
+        :index="index"
+      />
+    </div>
+    <template v-else-if="renderReady && !showUnpublishFlag">
       <component-wrapper
         v-for="(item, index) in baseComponentData"
         v-show="item.isShow"
@@ -642,6 +793,26 @@ defineExpose({
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
+}
+
+/* company: marker only — do NOT pad this node (it is position:relative and
+   would be the wrong containing block if abspos children escaped the grid root;
+   inset lives on .preview-grid-root instead). */
+.bi-tab-inner-preview {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+/* company: sole measure + containing block for Tab/Group preview abspos items.
+   No overflow:hidden — geometry must not rely on clipping. */
+.preview-grid-root {
+  position: relative;
+  box-sizing: border-box;
+  width: calc(100% - 32px);
+  height: calc(100% - 32px);
+  margin: 16px;
+  min-width: 0;
+  min-height: 0;
 }
 
 .fix-button {

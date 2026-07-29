@@ -30,7 +30,8 @@ import {
   isDashboard,
   isGroupOrTabCanvas,
   isMainCanvas,
-  isSameCanvas
+  isSameCanvas,
+  isTabCanvas
 } from '@/utils/canvasUtils'
 import { guid } from '@/views/visualized/data/dataset/form/util'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
@@ -46,6 +47,11 @@ import PopArea from '@/custom-component/pop-area/Component.vue'
 import DashboardDragOverlay from '@/custom/company-bi/components/DashboardDragOverlay.vue'
 import DashboardGridPlaceholder from '@/custom/company-bi/components/DashboardGridPlaceholder.vue'
 import { dashboardDragSession } from '@/custom/company-bi/composables/useDashboardDragSession'
+import {
+  TAB_INNER_GUTTER_COLS,
+  dashboardTabInnerItemStyle,
+  traceTabInnerCoord
+} from '@/custom/company-bi/utils/dashboardGridLayout'
 import DatasetParamsComponent from '@/components/visualization/DatasetParamsComponent.vue'
 import DeGrid from '@/components/data-visualization/DeGrid.vue'
 import DeGridScreen from '@/components/data-visualization/DeGridScreen.vue'
@@ -214,7 +220,7 @@ const mainCanvasFlag = isMainCanvas(canvasId.value)
 const editorX = ref(0)
 const editorY = ref(0)
 const start = ref({
-  // 选中区域的起点
+  // ???????
   x: 0,
   y: 0
 })
@@ -364,7 +370,7 @@ const groupCanvasActive = computed(() => {
   return isGroupOrTabCanvas(canvasId.value)
 })
 
-// 融合矩阵设计
+// ??????
 const renderOk = ref(false)
 const moveAnimate = ref(false)
 const cellWidth = ref(0)
@@ -373,27 +379,27 @@ const maxCell = ref(0)
 const infoBox = ref(null)
 const container = ref(null)
 const positionBox = ref([])
-const coordinates = ref([]) //坐标点集合
+const coordinates = ref([]) //?????
 
 let lastTask = undefined
-let isOverlay = false //是否正在交换位置
-let moveTime = 100 //移动动画时间
+let isOverlay = false //????????
+let moveTime = 100 //??????
 
 const itemMaxY = ref(0)
 let itemMaxX = 0
 let snapshotTimer = ref(null)
 
-// 根据需要需要扩充外部scroll区域也可以进行组合的功能 此方法变更为外部组件调用
+// ??????????scroll???????????? ????????????
 const handleMouseDown = e => {
-  // 仪表板和预览状态不显示菜单和组创建
+  // ?????????????????
   if (dashboardActive.value || editMode.value === 'preview') {
     return
   }
-  // 右键返回
+  // ????
   if (e.buttons === 2) {
     return
   }
-  // 如果没有选中组件 在画布上点击时需要调用 e.preventDefault() 防止触发 drop 事件
+  // ???????? ??????????? e.preventDefault() ???? drop ??
   if (!curComponent.value || isPreventDrop(curComponent.value.component)) {
     // e.preventDefault()
   }
@@ -406,7 +412,7 @@ const handleMouseDown = e => {
   const startY = e.clientY
   start.value.x = startX - editorX.value
   start.value.y = startY - editorY.value
-  // 展示选中区域
+  // ??????
   isShowArea.value = true
 
   const move = moveEvent => {
@@ -453,15 +459,15 @@ const hideArea = () => {
 }
 
 const createGroup = () => {
-  // 获取选中区域的组件数据
+  // ???????????
   const areaDataLocal = getSelectArea()
   if (areaDataLocal.length <= 1) {
     hideArea()
     return
   }
 
-  // 根据选中区域和区域中每个组件的位移信息来创建 Group 组件
-  // 要遍历选择区域的每个组件，获取它们的 left top right bottom 信息来进行比较
+  // ?????????????????????? Group ??
+  // ?????????????????? left top right bottom ???????
   let top = Infinity,
     left = Infinity
   let right = -Infinity,
@@ -503,12 +509,12 @@ const createGroup = () => {
     height: height.value
   }
 
-  // 设置选中区域位移大小信息和区域内的组件数据
+  // ?????????????????????
   composeStore.setAreaData({
     style: areaDataStyle,
     components: areaDataLocal
   })
-  // 如果有组件被group选中 取消当前画布选中的组件
+  // ??????group?? ???????????
   if (areaDataLocal.length > 0) {
     dvMainStore.setCurComponent({ component: null, index: null })
     isShowArea.value = false
@@ -517,9 +523,9 @@ const createGroup = () => {
 
 const getSelectArea = () => {
   const result = []
-  // 区域起点坐标
+  // ??????
   const { x, y } = start.value
-  // 计算所有的组件数据，判断是否在选中区域内
+  // ????????????????????
   componentData.value.forEach(component => {
     if (component.isLock || !component.isShow) return
 
@@ -534,27 +540,27 @@ const getSelectArea = () => {
     }
   })
 
-  // 返回在选中区域内的所有组件
+  // ?????????????
   return result
 }
 
 const handleContextMenu = event => {
-  // 仪表板和预览状态不显示菜单和组创建
+  // ?????????????????
   if (dashboardActive.value || editMode.value === 'preview') {
     return
   }
   event.stopPropagation()
   event.preventDefault()
-  // 获取鼠标的全局坐标
+  // ?????????
   const mouseX = event.clientX
   const mouseY = event.clientY
 
-  // 获取最外层 div 的偏移量
+  // ????? div ????
   const rect = container.value.getBoundingClientRect()
   const offsetX = rect.left
   const offsetY = rect.top
 
-  // 计算鼠标相对于最外层 div 的坐标
+  // ?????????? div ???
   let left = mouseX - offsetX
   let top = mouseY - offsetY
 
@@ -574,7 +580,7 @@ const handleContextMenu = event => {
       }
     }
   }
-  // 组件处于编辑状态的时候 如富文本 不弹出右键菜单
+  // ??????????? ???? ???????
   if (!curComponent.value || (curComponent.value && !curComponent.value.editing)) {
     if (
       curComponent.value &&
@@ -600,6 +606,47 @@ const getSvgComponentStyle = style => {
 }
 
 const getShapeItemShowStyle = item => {
+  // company: Tab/Group editor ? same local 36-col + gutter as DePreview Tab
+  if (dashboardActive.value && isTabCanvas(canvasId.value)) {
+    const style = dashboardTabInnerItemStyle(item, {
+      cellWidth: cellWidth.value,
+      cellHeight: cellHeight.value,
+      curGap: curGap.value,
+      gutterCols: TAB_INNER_GUTTER_COLS
+    })
+    const styleLeftPx = cellWidth.value * (item.x - 1 + TAB_INNER_GUTTER_COLS)
+    const styleWidthPx = cellWidth.value * item.sizeX
+    nextTick(() => {
+      const root = container.value as HTMLElement | null
+      const shape = root?.querySelector(`#shape-id-${item.id}`) as HTMLElement | null
+      const dom = shape || (root?.querySelector('.shape') as HTMLElement | null)
+      const rootWidth = root?.clientWidth
+      traceTabInnerCoord({
+        lane: 'editor-DeCanvas',
+        canvasId: canvasId.value,
+        componentId: item.id,
+        gridX: item.x,
+        gridY: item.y,
+        sizeX: item.sizeX,
+        sizeY: item.sizeY,
+        cols: itemMaxX || dvMainStore.pcMatrixCount?.x,
+        gutterCols: TAB_INNER_GUTTER_COLS,
+        cellWidth: cellWidth.value,
+        cellHeight: cellHeight.value,
+        styleLeftPx,
+        styleWidthPx,
+        rootWidth,
+        colsThatFit: rootWidth ? rootWidth / cellWidth.value : undefined,
+        leftSlackPx: styleLeftPx,
+        rightSlackPx:
+          rootWidth != null ? rootWidth - styleLeftPx - styleWidthPx : undefined,
+        domLeft: dom ? getComputedStyle(dom).left : undefined,
+        domWidth: dom ? getComputedStyle(dom).width : undefined,
+        offsetParentIsRoot: !!(dom && root && dom.offsetParent === root)
+      })
+    })
+    return style
+  }
   return getShapeItemStyle(item, {
     dvModel: dvInfo.value.type,
     cellWidth: cellWidth.value,
@@ -613,7 +660,7 @@ const handleInput = (element, value) => {
   if (element.component !== 'VText') {
     return
   }
-  // 根据文本组件高度调整 shape 高度
+  // ?????????? shape ??
   dvMainStore.setShapeStyle({
     top: null,
     left: null,
@@ -655,7 +702,7 @@ const editStyle = computed(() => {
   }
 })
 
-//融合矩阵设计
+//??????
 function debounce(func, time) {
   if (!isOverlay) {
     ;(function (t) {
@@ -687,13 +734,13 @@ function scrollScreen(e) {
 }
 
 /**
- * 重置位置盒子
+ * ??????
  *
  */
 function resetPositionBox() {
-  //根据当前容器的宽度来决定多少列
+  //???????????????
   itemMaxX = maxCell.value
-  let rows = 36 //初始36行，后面根据需求会自动增加
+  let rows = 36 //??36?????????????
   for (let i = 0; i < rows; i++) {
     let row = []
 
@@ -707,16 +754,16 @@ function resetPositionBox() {
 }
 
 /**
- * 查找位置盒子
+ * ??????
  */
 function findPositionX(item) {
   const width = item.sizeX
   let resultX = 1
-  let checkPointYIndex = -1 // -1 没有占用任何Y方向画布
-  // 组件宽度
+  let checkPointYIndex = -1 // -1 ??????Y????
+  // ????
   let pb = positionBox.value
   if (width <= 0) return
-  // 查找组件最高位置索引 component 规则 y最新为1
+  // ?????????? component ?? y???1
   componentData.value.forEach(component => {
     const componentYIndex = component.y + component.sizeY - 2
     if (checkPointYIndex < componentYIndex) {
@@ -727,16 +774,16 @@ function findPositionX(item) {
   if (checkPointYIndex < 0) {
     return 1
   } else {
-    // 获取最后一列X方向数组
+    // ??????X????
     const pbX = pb[checkPointYIndex]
-    // 从X i位置索引开始检查 ；
-    // 检查宽度为组件宽度width 检查索引终点为checkEndIndex = i + width - 1 ；
-    // 退出检查条件为索引终点checkEndIndex 越界 pbX终点索引；
+    // ?X i???????? ?
+    // ?????????width ???????checkEndIndex = i + width - 1 ?
+    // ???????????checkEndIndex ?? pbX?????
     for (let i = 0, checkEndIndex = width - 1; checkEndIndex < pbX.length; i++, checkEndIndex++) {
       let adaptorCount = 0
-      // 定位最后一列占位位置
+      // ??????????
       for (let k = 0; k < width; k++) {
-        // pbX[i + k].el === false 表示当前矩阵点位未被占用，当连续未被占用的矩阵点位宽度为width时 表示改起始点位i可用
+        // pbX[i + k].el === false ????????????????????????????width? ???????i??
         if (!pbX[i + k].el) {
           adaptorCount++
         }
@@ -751,7 +798,7 @@ function findPositionX(item) {
 }
 
 /**
- * 填充位置盒子
+ * ??????
  */
 function addItemToPositionBox(item) {
   let pb = positionBox.value
@@ -806,7 +853,7 @@ function removeItemFromPositionBox(item) {
 }
 
 /**
- * 重新计算宽度，使最小单元格能占满整个容器
+ * ????????????????????
  *
  */
 function reCalcCellWidth() {
@@ -847,19 +894,19 @@ function resizePlayer(item, newSize) {
 }
 
 /**
- * 检查移动的位置，如果不合法，会自动修改
+ * ???????????????????
  */
 function checkItemPosition(item, position) {
   position = position || {}
   position.x = position.x || item.x
   position.y = position.y || item.y
 
-  // 检查位置
+  // ????
   if (item.x < 1) {
     item.x = 1
   }
 
-  // 检查大小
+  // ????
   if (item.sizeX > itemMaxX) {
     item.sizeX = itemMaxX
   }
@@ -889,7 +936,7 @@ function checkItemPosition(item, position) {
 }
 
 /**
- * 移动正在拖动的元素
+ * ?????????
  */
 function movePlayer(item, position) {
   removeItemFromPositionBox(item)
@@ -962,7 +1009,7 @@ function removeItem(index) {
     removeItemComponent(item)
     dvMainStore.removeLinkageInfo(item['id'])
     if (isMainCanvas(canvasId.value)) {
-      // 主画布中存在隐藏组件 直接从原始componentData中进行删除
+      // ?????????? ?????componentData?????
       dvMainStore.deleteComponentById(item.id, undefined, false)
     } else {
       componentData.value.splice(index, 1)
@@ -1011,7 +1058,7 @@ function changeItemCoordinate(item) {
 }
 
 /**
- * 清空目标位置的元素
+ * ?????????
  *
  */
 function emptyTargetCell(item) {
@@ -1026,7 +1073,7 @@ function emptyTargetCell(item) {
 }
 
 /**
- * 当前位置的item能否上浮
+ * ?????item????
  */
 function canItemGoUp(item) {
   let upperRows = 0
@@ -1042,7 +1089,7 @@ function canItemGoUp(item) {
 }
 
 /**
- * 在移动之前，找到当前下移的元素的下面的元素（递归）
+ * ?????????????????????????
  */
 function moveItemDown(item, size) {
   removeItemFromPositionBox(item)
@@ -1075,7 +1122,7 @@ function setPlayerPosition(item, position) {
 }
 
 /**
- * 寻找子元素到父元素的最大距离
+ * ??????????????
  */
 function calcDiff(parent, son, size) {
   let diffs = []
@@ -1181,8 +1228,8 @@ const dashboardScaleWithWidth = computed(() => {
   return isDashboard() && canvasStyleData.value?.dashboardAdaptor === 'withWidth'
 })
 const cellInit = () => {
-  // 此处向下取整 保留1位小数,why: 矩阵模式计算 x,y时 会使用 style.left/cellWidth style.top/cellWidth
-  // 当初始状态细微的差距(主要是减少)都会导致 x，y 减少一个矩阵大小造成偏移,
+  // ?????? ??1???,why: ?????? x,y? ??? style.left/cellWidth style.top/cellWidth
+  // ??????????(?????)???? x?y ????????????,
   cellWidth.value = Math.floor((baseWidth.value + baseMarginLeft.value) * 1000) / 1000
   if (dashboardScaleWithWidth.value) {
     cellHeight.value = cellWidth.value * 1.6
@@ -1202,16 +1249,16 @@ const canvasSizeInit = () => {
 const canvasInit = () => {
   cellInit()
   positionBox.value = []
-  coordinates.value = [] //坐标点集合
+  coordinates.value = [] //?????
   lastTask = undefined
-  isOverlay = false //是否正在交换位置
-  moveTime = 200 //移动动画时间
+  isOverlay = false //????????
+  moveTime = 200 //??????
   itemMaxY.value = 0
   itemMaxX = 0
 
   reCalcCellWidth()
   resetPositionBox()
-  // 根据高度排序
+  // ??????
   if (isDashboard()) {
     componentPreSort(componentData.value)
   }
@@ -1241,8 +1288,8 @@ const afterInitOk = func => {
 }
 
 const forceComputed = () => {
-  // 这里强制触发复制添加计算，因为位置计算使用的是method 并没有内部样式属性变化
-  // 在一些情况下无法触发重新计算导致位置偏移 cellHeight 属性是在监控中的，这里进行强制计算
+  // ???????????????????????method ???????????
+  // ???????????????????? cellHeight ?????????????????
   cellHeight.value = cellHeight.value + 0.001
   nextTick(function () {
     cellHeight.value = cellHeight.value - 0.001
@@ -1255,7 +1302,7 @@ const maxYCount = () => {
   } else {
     return componentData.value
       .filter(item => item.y)
-      .map(item => item.y + item.sizeY) // 计算每个元素的 y + sizeY
+      .map(item => item.y + item.sizeY) // ??????? y + sizeY
       .reduce((max, current) => Math.max(max, current), 0)
   }
 }
@@ -1272,7 +1319,7 @@ const onStartResize = (e, item, index) => {
   // company: kill collision-queue lock during resize so snap ghost tracks pointer
   moveTime = 0
   document.body.classList.add('bi-dashboard-dragging')
-  // 移动时 换算矩阵和悬浮位置大小
+  // ??? ???????????
   syncShapeItemStyle(item, cellWidth.value, cellHeight.value)
   if (!resizable.value) return
   resizeStart.value(e, item, index)
@@ -1285,12 +1332,12 @@ const onStartResize = (e, item, index) => {
   infoBox.value.moveItem = item
   infoBox.value.moveItemIndex = index
 
-  infoBox.value.originX = 0 // 克隆对象原始X位置
+  infoBox.value.originX = 0 // ??????X??
   infoBox.value.originY = 0
   infoBox.value.startX = 0
   infoBox.value.startY = 0
 
-  infoBox.value.oldX = item.x // 实际对象原始X位置
+  infoBox.value.oldX = item.x // ??????X??
   infoBox.value.oldY = item.y
   infoBox.value.oldSizeX = item.sizex
   infoBox.value.oldSizeY = item.sizey
@@ -1300,7 +1347,7 @@ const onStartMove = (e, item, index) => {
   // company: kill collision-queue lock during drag so snap ghost tracks pointer
   moveTime = 0
   document.body.classList.add('bi-dashboard-dragging')
-  // 移动时 换算矩阵和悬浮位置大小
+  // ??? ???????????
   syncShapeItemStyle(item, cellWidth.value, cellHeight.value)
   if (!infoBox.value) {
     infoBox.value = {}
@@ -1309,12 +1356,12 @@ const onStartMove = (e, item, index) => {
   infoBox.value.moveItem = item
   infoBox.value.moveItemIndex = index
 
-  infoBox.value.originX = 0 // 克隆对象原始X位置
+  infoBox.value.originX = 0 // ??????X??
   infoBox.value.originY = 0
   infoBox.value.startX = 0
   infoBox.value.startY = 0
 
-  infoBox.value.oldX = item.x // 实际对象原始X位置
+  infoBox.value.oldX = item.x // ??????X??
   infoBox.value.oldY = item.y
   infoBox.value.oldSizeX = item.sizex
   infoBox.value.oldSizeY = item.sizey
@@ -1326,13 +1373,13 @@ const onDragging = (e, item) => {
     scrollScreen(e)
     return
   }
-  // item 中的 style 为当前实时的位置
+  // item ?? style ????????
   const infoBoxTemp = infoBox.value
   let moveItem = _.get(infoBoxTemp, 'moveItem')
   scrollScreen(e)
   if (!draggable.value) return
   dragging.value(e, moveItem, moveItem._dragId)
-  // company: direct grid snap — no isPlayer free-float, no ghost preview
+  // company: direct grid snap ? no isPlayer free-float, no ghost preview
   moveItem['isPlayer'] = false
   let oldX = infoBoxTemp.oldX
   let oldY = infoBoxTemp.oldY
@@ -1359,12 +1406,12 @@ const onResizing = (e, item) => {
     return
   }
   const { width, height } = item.style
-  // item 中的 style 为当前实时的位置
+  // item ?? style ????????
   const infoBoxTemp = infoBox.value
   let resizeItem = _.get(infoBoxTemp, 'resizeItem')
-  //调整大小时
+  //?????
   resizing.value(e, resizeItem, resizeItem._dragId)
-  // company: direct grid snap — no isPlayer free-float
+  // company: direct grid snap ? no isPlayer free-float
   resizeItem['isPlayer'] = false
   let nowSizeX =
     width % cellWidth.value > (cellWidth.value / 4) * 3
@@ -1377,7 +1424,7 @@ const onResizing = (e, item) => {
   nowSizeX = Math.max(1, nowSizeX)
   nowSizeY = Math.max(1, nowSizeY)
 
-  // 增加5px偏移量 防止resize时向下取整 组件向右偏移
+  // ??5px??? ??resize????? ??????
   let newX = Math.floor((item.style.left + 5) / cellWidth.value + 1)
   let newY = Math.floor((item.style.top + 5) / cellHeight.value + 1)
   newX = newX > 0 ? newX : 1
@@ -1420,7 +1467,7 @@ const onCommitLayout = (patch, item) => {
 }
 
 const onMouseUp = e => {
-  // startMove 中组织冒泡会导致移动事件无法传播，在这里设置（鼠标抬起）效果一致
+  // startMove ????????????????????????????????
   // company: restore collision animation budget after drag/resize
   moveTime = 200
   document.body.classList.remove('bi-dashboard-dragging')
@@ -1512,9 +1559,9 @@ const handleDragStartMoveIn = payload => {
   if (!componentInfo) return
 
   const moveInItemInfo = findDragComponent(componentInfo)
-  // 初始的移动组件 距离左侧的位置 300 是DbToolbar 最左侧区域宽度
+  // ??????? ??????? 300 ?DbToolbar ???????
   moveInItemInfo.x = 300 / cellWidth.value
-  // 仪表板初始移动的组件暂时不显示 在松开鼠标时再确实该组件的去留
+  // ??????????????? ???????????????
   moveInItemInfo.isShow = false
   moveInItemInfo.id = guid()
   dvMainStore.addComponent({ component: moveInItemInfo, index: undefined })
@@ -1523,14 +1570,14 @@ const handleDragStartMoveIn = payload => {
     adaptCurThemeCommonStyle(moveInItemInfo)
   }
   addItemBox(moveInItemInfo)
-  // 直接定位到当前画布位置
+  // ???????????
   // emits('scrollCanvasAdjust', 1)
   if (!infoBox.value) {
     infoBox.value = {}
   }
   infoBox.value.moveItem = moveInItemInfo
   infoBox.value.moveItemIndex = componentData.value.length - 1
-  infoBox.value.oldX = 1 // 实际对象原始X位置
+  infoBox.value.oldX = 1 // ??????X??
   infoBox.value.oldY = 1
 
   // company: toolbar drag-in uses the same Overlay/Placeholder session as card drag
@@ -1540,13 +1587,13 @@ const handleDragStartMoveIn = payload => {
 }
 
 const handleDragEnd = e => {
-  // company: abandoned toolbar drag — tear down session before removing placeholder item
+  // company: abandoned toolbar drag ? tear down session before removing placeholder item
   if (dashboardDragSession.rawView.active) {
     dashboardDragSession.cancel()
   }
   document.body.classList.remove('bi-dashboard-dragging')
   moveTime = 200
-  // 当isShow 是false时，说明未移入画布 则需要进行清理占位
+  // ?isShow ?false????????? ?????????
   if (infoBox.value && infoBox.value.moveItem && !infoBox.value.moveItem.isShow) {
     removeItem(componentData.value.length - 1)
     clearInfoBox(e)
@@ -1597,13 +1644,13 @@ const initSnapshotTimer = () => {
 }
 
 const linkJumpSetOpen = item => {
-  //跳转设置需要先触发保存
+  //???????????
   canvasSave(() => {
     linkJumpRef.value.dialogInit(item)
   })
 }
 const linkageSetOpen = item => {
-  //跳转设置需要先触发保存
+  //???????????
   canvasSave(() => {
     linkageRef.value.dialogInit(item)
   })
@@ -1631,7 +1678,7 @@ const showGridScreen = computed(() => {
   )
 })
 
-// 批量设置
+// ????
 
 const dataVBatchOptAdaptor = () => {
   dvMainStore.setBatchOptStatus(true)
@@ -1653,7 +1700,7 @@ const groupAreaShadowShow = computed(
     componentData.value[componentData.value.length - 1].component === 'GroupArea' &&
     isCtrlOrCmdDown.value
 )
-// 点击事件导致选择区域变更
+// ????????????
 const groupAreaClickChange = async () => {
   let groupAreaCom
   const groupAreaHis = dvMainStore.componentData.filter(ele => ele.component === 'GroupArea')
@@ -1663,13 +1710,13 @@ const groupAreaClickChange = async () => {
   if (areaData.value.components.length === 0) {
     dvMainStore.setBatchOptStatus(false)
   }
-  // 显示Group视括组件
+  // ??Group????
   if (areaData.value.components.length > 1) {
     dataVBatchOptAdaptor()
-    // 重新计算边界
+    // ??????
     composeStore.calcComposeArea()
     if (groupAreaHis.length === 0) {
-      // 如果不存在 新建视括组件
+      // ????? ??????
       groupAreaCom = findNewComponent('GroupArea', 'GroupArea')
       dvMainStore.addComponent({ component: groupAreaCom, index: undefined })
     }
@@ -1689,7 +1736,7 @@ const groupAreaClickChange = async () => {
   }
 }
 
-// v-if 使用 内容不渲染 默认参数不起用
+// v-if ?? ????? ???????
 const popAreaAvailable = computed(
   () => canvasStyleData.value?.popupAvailable && isMainCanvas(canvasId.value)
 )
@@ -1700,7 +1747,7 @@ onMounted(() => {
     initWatermark()
     dvMainStore.setEditMode('edit')
   }
-  // 获取编辑器元素
+  // ???????
   composeStore.getEditor(canvasId.value)
   eventBus.on('handleDragStartMoveIn-' + canvasId.value, handleDragStartMoveIn)
   eventBus.on('handleDragEnd-' + canvasId.value, handleDragEnd)
@@ -1764,7 +1811,7 @@ defineExpose({
       :component-data="componentData"
       :canvas-id="canvasId"
     ></canvas-opt-bar>
-    <!-- 弹框区域 -->
+    <!-- ???? -->
     <PopArea
       v-if="popAreaAvailable"
       :dv-info="dvInfo"
@@ -1776,14 +1823,14 @@ defineExpose({
       :canvas-state="canvasState"
       :show-position="'popEdit'"
     ></PopArea>
-    <!-- 网格线 -->
+    <!-- ??? -->
     <de-grid v-if="showGrid" :matrix-style="matrixStyle" :themes="themes"></de-grid>
     <de-grid-screen
       v-if="showGridScreen"
       :matrix-style="matrixStyle"
       :themes="themes"
     ></de-grid-screen>
-    <!--切换canvas 拖拽阴影部分-->
+    <!--??canvas ??????-->
     <point-shadow v-if="pointShadowShow" :canvas-id="canvasId" />
     <GroupAreaShadow
       v-if="groupAreaShadowShow"
@@ -1799,7 +1846,7 @@ defineExpose({
     />
     <DashboardDragOverlay v-if="dashboardActive" />
 
-    <!--页面组件列表展示-->
+    <!--????????-->
     <Shape
       v-for="(item, index) in componentData"
       v-show="itemShow(item)"
@@ -1885,11 +1932,11 @@ defineExpose({
         :font-family="fontFamily"
       />
     </Shape>
-    <!-- 右击菜单 -->
+    <!-- ???? -->
     <ContextMenu v-if="contextMenuShow" show-position="canvasCore" />
-    <!-- 标线 -->
+    <!-- ?? -->
     <MarkLine v-if="markLineShow" />
-    <!-- 选中区域 -->
+    <!-- ???? -->
     <Area v-show="isShowArea" :start="start" :width="width" :height="height" />
     <user-view-enlarge ref="userViewEnlargeRef"></user-view-enlarge>
     <link-jump-set ref="linkJumpRef"></link-jump-set>

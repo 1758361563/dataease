@@ -11,6 +11,7 @@ import { getCanvasStyle, syncShapeItemStyle } from '@/utils/style'
 import { adaptCurThemeCommonStyle } from '@/utils/canvasStyle'
 import CanvasCore from '@/components/data-visualization/canvas/CanvasCore.vue'
 import { isMainCanvas, isDashboard } from '@/utils/canvasUtils'
+import { resolveTabInnerCell } from '@/custom/company-bi/utils/dashboardGridLayout'
 
 // change-begin
 const props = defineProps({
@@ -60,7 +61,7 @@ const domId = ref('de-canvas-' + canvasId.value)
 
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
-const { pcMatrixCount, curOriginThemes, mobileInPc, bashMatrixInfo } = storeToRefs(dvMainStore)
+const { pcMatrixCount, curOriginThemes, mobileInPc } = storeToRefs(dvMainStore)
 const canvasOut = ref(null)
 const canvasInner = ref(null)
 const canvasInitStatus = ref(false)
@@ -209,17 +210,16 @@ const dashboardCanvasSizeInit = () => {
   // company: .db-canvas padding 16px × 2 sides = 32
   state.screenWidth = canvasOut.value.clientWidth - 32
   state.screenHeight = canvasOut.value.clientHeight - 32
-  // company Tab B+: tab/group inner canvas must share the main canvas physical cell.
-  // Official code divided tabWidth/36 — so enlarging the Tab grew every child cell.
-  // Fixed cells → outer frame grows = more empty space; children keep absolute size.
-  if (
-    isDashboard() &&
-    !isMainCanvas(canvasId.value) &&
-    bashMatrixInfo.value?.baseWidth > 0 &&
-    bashMatrixInfo.value?.baseHeight > 0
-  ) {
-    baseWidth.value = bashMatrixInfo.value.baseWidth
-    baseHeight.value = bashMatrixInfo.value.baseHeight
+  // company Tab: same local root/cols cell as DePreview (no bashMatrix mix)
+  if (isDashboard() && !isMainCanvas(canvasId.value)) {
+    const resolved = resolveTabInnerCell({
+      rootWidth: state.screenWidth,
+      rootHeight: state.screenHeight,
+      cols: pcMatrixCount.value.x,
+      rows: pcMatrixCount.value.y
+    })
+    baseWidth.value = resolved.cellWidth
+    baseHeight.value = resolved.cellHeight
   } else {
     baseWidth.value = state.screenWidth / pcMatrixCount.value.x
     baseHeight.value = state.screenHeight / pcMatrixCount.value.y
