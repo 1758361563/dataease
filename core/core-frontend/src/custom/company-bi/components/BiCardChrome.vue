@@ -7,7 +7,7 @@
       'is-hovered': hovered
     }"
   >
-    <!-- top-center: 6-dot drag only — no title bar, no divider -->
+    <!-- top-center: single-row 6-dot grip, flush to card edge -->
     <div v-show="!isConfigure" class="bi-card-chrome__drag">
       <BiCardDragHandle
         :visible="showHandles"
