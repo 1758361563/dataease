@@ -77,6 +77,8 @@ public class Det2AppDatasetRebindV1Manage {
         Map<Long, List<AppCoreDatasetTableVO>> sourceTablesByGroup = appData.getDatasetTablesInfo().stream()
                 .collect(Collectors.groupingBy(AppCoreDatasetTableVO::getDatasetGroupId));
 
+        Set<Long> activeFieldIds = collectActiveFieldIds(request.getCanvasViewInfo(), request.getComponentData());
+
         for (AppCoreDatasetGroupVO sourceGroup : datasetGroups) {
             Long targetGroupId = sourceGroup.getSystemDatasetId();
             List<AppCoreDatasetTableVO> sourceTables = sourceTablesByGroup.getOrDefault(sourceGroup.getId(), List.of());
@@ -100,12 +102,12 @@ public class Det2AppDatasetRebindV1Manage {
                     physicalFieldMap,
                     dsTableFieldsIdMap,
                     dsTableFieldsDatasetNameMap,
+                    activeFieldIds,
                     errors);
 
             targetSnapshots.put(sourceGroup.getId(), buildTargetSnapshotFields(targetGroupId));
         }
 
-        Set<Long> activeFieldIds = collectActiveFieldIds(request.getCanvasViewInfo(), request.getComponentData());
         validateActiveFields(activeFieldIds, appData.getDatasetTableFieldsInfo(), physicalFieldMap, errors);
 
         if (!errors.isEmpty()) {
@@ -199,6 +201,7 @@ public class Det2AppDatasetRebindV1Manage {
             Map<Long, DatasetTableFieldDTO> physicalFieldMap,
             Map<Long, Long> dsTableFieldsIdMap,
             Map<String, String> dsTableFieldsDatasetNameMap,
+            Set<Long> activeFieldIds,
             List<Det2AppRebindError> errors) {
         List<DatasetTableFieldDTO> targetFields = datasetTableFieldManage.selectByDatasetGroupId(targetGroupId);
         Map<String, List<DatasetTableFieldDTO>> targetByOrigin = targetFields.stream()
@@ -212,39 +215,48 @@ public class Det2AppDatasetRebindV1Manage {
             if (src.getExtField() == null || src.getExtField() != 0) {
                 continue;
             }
+            boolean active = src.getId() != null && activeFieldIds.contains(src.getId());
             String origin = src.getOriginName();
             List<DatasetTableFieldDTO> matches = targetByOrigin.get(origin);
             if (matches == null || matches.isEmpty()) {
-                errors.add(Det2AppRebindError.field(
-                        "FIELD_NOT_FOUND",
-                        "Target 数据集缺少 originName 字段: " + origin,
-                        origin,
-                        src.getId()));
+                if (active) {
+                    errors.add(Det2AppRebindError.field(
+                            "FIELD_NOT_FOUND",
+                            "Target 数据集缺少 originName 字段: " + origin,
+                            origin,
+                            src.getId()));
+                }
                 continue;
             }
             if (matches.size() > 1) {
-                errors.add(Det2AppRebindError.field(
-                        "FIELD_AMBIGUOUS",
-                        "Target originName 不唯一: " + origin,
-                        origin,
-                        src.getId()));
+                if (active) {
+                    errors.add(Det2AppRebindError.field(
+                            "FIELD_AMBIGUOUS",
+                            "Target originName 不唯一: " + origin,
+                            origin,
+                            src.getId()));
+                }
                 continue;
             }
             DatasetTableFieldDTO tgt = matches.get(0);
             if (!isGroupTypeCompatible(src.getGroupType(), tgt.getGroupType())) {
-                errors.add(Det2AppRebindError.field(
-                        "GROUP_TYPE_CONFLICT",
-                        "groupType 不兼容: " + origin + " source=" + src.getGroupType() + " target=" + tgt.getGroupType(),
-                        origin,
-                        src.getId()));
+                if (active) {
+                    errors.add(Det2AppRebindError.field(
+                            "GROUP_TYPE_CONFLICT",
+                            "groupType 不兼容: " + origin + " source=" + src.getGroupType() + " target=" + tgt.getGroupType(),
+                            origin,
+                            src.getId()));
+                }
                 continue;
             }
             if (!isDeTypeCompatible(src.getDeType(), tgt.getDeType())) {
-                errors.add(Det2AppRebindError.field(
-                        "DE_TYPE_CONFLICT",
-                        "deType 不兼容: " + origin + " source=" + src.getDeType() + " target=" + tgt.getDeType(),
-                        origin,
-                        src.getId()));
+                if (active) {
+                    errors.add(Det2AppRebindError.field(
+                            "DE_TYPE_CONFLICT",
+                            "deType 不兼容: " + origin + " source=" + src.getDeType() + " target=" + tgt.getDeType(),
+                            origin,
+                            src.getId()));
+                }
                 continue;
             }
             physicalFieldMap.put(src.getId(), tgt);
@@ -363,23 +375,11 @@ public class Det2AppDatasetRebindV1Manage {
         if (!node.isObject()) {
             return;
         }
-        JsonNode checkedFieldsMap = node.get("checkedFieldsMap");
-        if (checkedFieldsMap != null && checkedFieldsMap.isObject()) {
-            checkedFieldsMap.fields().forEachRemaining(entry -> {
-                String val = entry.getValue().asText();
-                if (StringUtils.isNotBlank(val)) {
-                    try {
-                        ids.add(Long.parseLong(val));
-                    } catch (NumberFormatException ignored) {
-                        // skip non-numeric
-                    }
-                }
-            });
-        }
+        collectSelectedCheckedFieldMapIds(node, ids);
         JsonNode treeCheckedList = node.get("treeCheckedList");
         if (treeCheckedList != null && treeCheckedList.isArray()) {
             for (JsonNode item : treeCheckedList) {
-                walkComponentForFieldIds(item, ids);
+                collectSelectedCheckedFieldMapIds(item, ids);
             }
         }
         JsonNode propValue = node.get("propValue");
@@ -390,6 +390,48 @@ public class Det2AppDatasetRebindV1Manage {
         if (componentData != null) {
             walkComponentForFieldIds(componentData, ids);
         }
+    }
+
+    private void collectSelectedCheckedFieldMapIds(JsonNode node, Set<Long> ids) {
+        if (node == null || !node.isObject()) {
+            return;
+        }
+        JsonNode checkedFieldsMap = node.get("checkedFieldsMap");
+        if (checkedFieldsMap == null || !checkedFieldsMap.isObject()) {
+            return;
+        }
+        Set<String> selectedChartIds = null;
+        JsonNode checkedFields = node.get("checkedFields");
+        if (checkedFields != null && checkedFields.isArray()) {
+            selectedChartIds = new HashSet<>();
+            for (JsonNode chartIdNode : checkedFields) {
+                if (chartIdNode != null && !chartIdNode.isNull()) {
+                    String chartId = chartIdNode.asText();
+                    if (StringUtils.isNotBlank(chartId)) {
+                        selectedChartIds.add(chartId);
+                    }
+                }
+            }
+        }
+        final Set<String> selected = selectedChartIds;
+        checkedFieldsMap.fields().forEachRemaining(entry -> {
+            if (selected != null && !selected.contains(entry.getKey())) {
+                return;
+            }
+            JsonNode valNode = entry.getValue();
+            if (valNode == null || valNode.isNull()) {
+                return;
+            }
+            String val = valNode.asText();
+            if (StringUtils.isBlank(val)) {
+                return;
+            }
+            try {
+                ids.add(Long.parseLong(val));
+            } catch (NumberFormatException ignored) {
+                // skip non-numeric
+            }
+        });
     }
 
     private void rebindChartViews(
