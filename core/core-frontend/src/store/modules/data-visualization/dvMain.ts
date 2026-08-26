@@ -144,10 +144,10 @@ export const dvMainStore = defineStore('dataVisualization', {
         width: 1920,
         height: 1080
       },
-      // company: 36x18 coarse grid (was 72x36) for Metabase-like snapping
+      // company: restored official 72×36 (A5 had coarsened this to 36×18)
       pcMatrixCount: {
-        x: 36,
-        y: 18
+        x: 72,
+        y: 36
       },
       mobileMatrixCount: {
         x: 6,

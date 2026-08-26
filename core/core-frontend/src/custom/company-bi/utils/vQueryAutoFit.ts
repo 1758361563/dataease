@@ -1,5 +1,9 @@
 import { ShorthandMode } from '@/Types'
 
+/** Physical min/max from the old 36×18 caps (2 / 8) after restoring 72×36. */
+export const VQUERY_MIN_SIZE_Y = 4
+export const VQUERY_MAX_SIZE_Y = 16
+
 /**
  * How many grid rows a VQuery card needs so wrapped conditions aren't clipped.
  * Snap up to whole cells: e.g. 2.1 cells of content → 3, not a hardcoded +1.
@@ -9,11 +13,13 @@ export function sizeYToFitQueryContent(opts: {
   cellHeight: number
   chromePx: number
   minSizeY?: number
+  maxSizeY?: number
 }): number {
-  const minSizeY = opts.minSizeY ?? 2
+  const minSizeY = opts.minSizeY ?? VQUERY_MIN_SIZE_Y
+  const maxSizeY = opts.maxSizeY ?? VQUERY_MAX_SIZE_Y
   if (opts.contentHeight <= 0 || opts.cellHeight <= 0) return minSizeY
   const raw = Math.ceil((opts.contentHeight + opts.chromePx) / opts.cellHeight)
-  return Math.min(8, Math.max(minSizeY, raw))
+  return Math.min(maxSizeY, Math.max(minSizeY, raw))
 }
 
 /** Vertical chrome outside the condition row (shape gap + card inner padding + slack). */

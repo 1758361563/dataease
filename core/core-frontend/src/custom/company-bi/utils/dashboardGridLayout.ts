@@ -2,7 +2,7 @@
  * company: Tab/Group inner canvas grid geometry.
  *
  * One coordinate system per Tab content root:
- *   cell = root.clientWidth / cols   (cols = 36)
+ *   cell = root.clientWidth / cols   (cols = pcMatrixCount.x, currently 72)
  *   left = (x - 1) * cell
  *
  * Do NOT reuse main-canvas bashMatrix here — that mixes two containers and
@@ -10,6 +10,7 @@
  */
 
 import './applyDashboardDensityPhase1'
+import './layoutGridAdapter'
 
 /**
  * Leading column gutter inside Tab content.

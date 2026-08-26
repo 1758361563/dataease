@@ -47,6 +47,10 @@ import { useCache } from '@/hooks/web/useCache'
 import { isDesktop } from '@/utils/ModelUtil'
 import { ShorthandMode } from '@/Types'
 import { formatterItem } from '@/views/chart/components/js/formatter'
+import {
+  adaptDashboardLayoutGrid,
+  stampCanonicalLayoutGridVersion
+} from '@/custom/company-bi/utils/layoutGridAdapter'
 const { t } = useI18n()
 const appearanceStore = useAppearanceStoreWithOut()
 const { wsCache } = useCache()
@@ -478,6 +482,7 @@ export function initCanvasDataPrepare(dvId, params, callBack) {
     const canvasStyleResult = JSON.parse(canvasInfo.canvasStyleData)
     const canvasViewInfoPreview = canvasInfo.canvasViewInfo
     historyAdaptor(canvasStyleResult, canvasDataResult, canvasInfo, attachInfo, canvasVersion)
+    adaptDashboardLayoutGrid(canvasStyleResult, canvasDataResult, dvInfo.type)
     const curPreviewGap =
       dvInfo.type === 'dashboard' && canvasStyleResult['dashboard'].gap === 'yes'
         ? canvasStyleResult['dashboard'].gapSize
@@ -673,6 +678,9 @@ export async function canvasSave(callBack) {
 
 export async function canvasSaveWithParams(params, callBack) {
   dvMainStore.removeGroupArea()
+  if (curDvInfo.value?.type === 'dashboard') {
+    stampCanonicalLayoutGridVersion(canvasStyleData.value)
+  }
   const componentDataToSave = cloneDeep(componentData.value)
   componentDataToSave.forEach(item => {
     if (item.component === 'UserView') {
@@ -1030,6 +1038,11 @@ export async function decompressionPre(params, callBack) {
     null,
     { resourceTable: 'snapshot' },
     null
+  )
+  adaptDashboardLayoutGrid(
+    deTemplateData.canvasStyleData,
+    deTemplateData.componentData,
+    deTemplateData.canvasStyleData?.dashboard ? 'dashboard' : undefined
   )
   callBack(deTemplateData)
 }

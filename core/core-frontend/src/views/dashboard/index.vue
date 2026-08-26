@@ -474,7 +474,9 @@ onUnmounted(() => {
         flex: 1;
         width: 100%;
         .db-canvas {
-          padding: 16px;
+          /* company: this unscoped rule outranks DeCanvas's own scoped one,
+             so the inset token has to be applied here too. */
+          padding: var(--bi-dashboard-inset, 8px);
           background-size: 100% 100% !important;
           overflow-y: auto;
           width: 100%;

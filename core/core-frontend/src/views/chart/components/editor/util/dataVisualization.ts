@@ -68,6 +68,8 @@ export const DEFAULT_DASHBOARD_STYLE_BASE = {
   gapMode: 'custom',
   showGrid: true,
   matrixBase: 4, // 当前matrix的基数 （是pcMatrixCount的几倍）
+  // company: 1 = legacy 36×18 (A5); 2 = canonical 72×36
+  layoutGridVersion: 2,
   resultMode: 'all', // 图表结果显示模式 all 图表 custom 仪表板自定义
   resultCount: 1000 // 图表结果显示条数
 }

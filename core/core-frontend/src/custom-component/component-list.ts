@@ -326,10 +326,10 @@ const list = [
     freeze: false, // 是否冻结再顶部 主画布生效
     x: 1,
     y: 1,
-    sizeX: 36,
-    // company: default to 2 cells tall on 36x18 grid so the chrome handles
-    // (⋯ / resize grip / 6-dot drag) don't overlap the inner prompt text
-    sizeY: 2,
+    sizeX: 72,
+    // company: 4 cells on 72×36 = same physical height as the old 2 cells on 36×18,
+    // so chrome handles still don't overlap the inner prompt text
+    sizeY: 4,
     style: {
       width: 400,
       height: 110
@@ -357,8 +357,8 @@ const list = [
     actionSelection: ACTION_SELECTION,
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     style: {
       adaptation: 'adaptation',
       width: 600,
@@ -376,8 +376,8 @@ const list = [
     icon: 'icon-video',
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     style: {
       width: 600,
       height: 300
@@ -395,8 +395,8 @@ const list = [
     icon: 'icon-stream',
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     style: {
       width: 600,
       height: 300
@@ -416,8 +416,8 @@ const list = [
     frameLinks: FRAMELINKS,
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     style: {
       width: 600,
       height: 300
@@ -434,8 +434,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 6,
+    sizeX: 36,
+    sizeY: 12,
     propValue: {},
     style: {
       width: 300,
@@ -465,8 +465,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     propValue: {
       url: '',
       flip: {
@@ -492,8 +492,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 5,
-    sizeY: 5,
+    sizeX: 10,
+    sizeY: 10,
     style: {
       width: 40,
       height: 40,
@@ -512,8 +512,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 15,
-    sizeY: 15,
+    sizeX: 30,
+    sizeY: 30,
     style: {
       width: 600,
       height: 300,
@@ -618,8 +618,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     style: {
       width: 600,
       height: 300,
@@ -646,8 +646,8 @@ const list = [
     icon: 'scroll-text',
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     style: {
       width: 400,
       height: 80,
@@ -678,8 +678,8 @@ const list = [
     canvasActive: false,
     x: 1,
     y: 1,
-    sizeX: 18,
-    sizeY: 7,
+    sizeX: 36,
+    sizeY: 14,
     style: {
       width: 600,
       height: 300,

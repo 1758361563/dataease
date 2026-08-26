@@ -368,7 +368,8 @@ defineExpose({
   width: 100%;
   height: 100%;
   .db-canvas {
-    padding: 16px;
+    /* keep in sync with .preview-grid-root margin via the shared token */
+    padding: var(--bi-dashboard-inset, 8px);
     background-size: 100% 100% !important;
     overflow-y: auto;
     width: 100%;

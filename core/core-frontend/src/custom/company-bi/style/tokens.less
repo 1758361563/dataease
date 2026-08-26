@@ -39,6 +39,12 @@
   --bi-up: #e5484d;
   --bi-down: #30a46c;
 
+  /* ---- Dashboard canvas inset ----
+     Single knob for the visual gutter around a dashboard grid. Editor
+     (.db-canvas padding) and Tab/Group preview (.preview-grid-root margin)
+     must stay equal, otherwise cell = width / 36 diverges between the two. */
+  --bi-dashboard-inset: 8px;
+
   /* ---- Global radius: buttons, inputs, selects, tags, etc. ---- */
   --ed-border-radius-base: 8px !important;
   --ed-border-radius-small: 6px !important;

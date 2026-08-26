@@ -16,7 +16,7 @@ const checkItemPosition = component => {
   component.y = dvMainStore.componentData.reduce((pre, next) => {
     return Math.max(pre, next.y + next.sizeY)
   }, 1)
-  component.sizeY = 10
+  component.sizeY = 20
 }
 
 const apdataQuery = ele => {

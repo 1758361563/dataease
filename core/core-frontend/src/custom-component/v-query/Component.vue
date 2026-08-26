@@ -32,7 +32,12 @@ import { comInfo } from './com-info'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import StyleInject from './StyleInject.vue'
 import { isDashboard } from '@/utils/canvasUtils'
-import { sizeYToFitQueryContent, queryCardChromePx } from '@/custom/company-bi/utils/vQueryAutoFit'
+import {
+  sizeYToFitQueryContent,
+  queryCardChromePx,
+  VQUERY_MIN_SIZE_Y,
+  VQUERY_MAX_SIZE_Y
+} from '@/custom/company-bi/utils/vQueryAutoFit'
 const props = defineProps({
   view: {
     type: Object,
@@ -824,7 +829,7 @@ const fitQueryHeight = () => {
   const item = element.value
   if (!el || !item || item.dragging || item.resizing) return
 
-  const current = Number(item.sizeY) || 2
+  const current = Number(item.sizeY) || VQUERY_MIN_SIZE_Y
 
   const contentHeight = measureQueryFieldsHeight(el)
   const cellHeight = Number(item.style?.height) / Math.max(current, 1)
@@ -841,13 +846,13 @@ const fitQueryHeight = () => {
       gap,
       innerPadding: item.commonBackground?.innerPadding
     }),
-    minSizeY: 2
+    minSizeY: VQUERY_MIN_SIZE_Y
   })
   if (needed === current) {
     lastAutoSizeY = needed
     return
   }
-  if (needed < current && lastAutoSizeY !== current && current <= 8) return
+  if (needed < current && lastAutoSizeY !== current && current <= VQUERY_MAX_SIZE_Y) return
   lastAutoSizeY = needed
   eventBus.emit(`fitMatrixItem-${item.canvasId || 'canvas-main'}`, {
     id: item.id,

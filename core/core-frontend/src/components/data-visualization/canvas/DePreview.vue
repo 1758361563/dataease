@@ -138,8 +138,17 @@ const previewCanvas = ref(null)
 const previewGridRoot = ref(null)
 const cellWidth = ref(10)
 const cellHeight = ref(10)
-/** company: visual inset for tab/group preview (applied on .preview-grid-root, not outer pad) */
-const TAB_INNER_INSET_PX = 16
+/**
+ * company: visual inset for tab/group preview (applied on .preview-grid-root,
+ * not outer pad). Reads the shared --bi-dashboard-inset token so this fallback
+ * never drifts from the CSS; only used when the grid root is not yet mounted.
+ */
+const readDashboardInsetPx = () => {
+  if (typeof window === 'undefined') return 8
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--bi-dashboard-inset')
+  const parsed = parseFloat(raw)
+  return Number.isFinite(parsed) ? parsed : 8
+}
 const userViewEnlargeRef = ref(null)
 const searchCount = ref(0)
 const refreshTimer = ref(null)
@@ -308,12 +317,10 @@ useEmitt({
 const updateTabInnerCellFromRoot = () => {
   const gridBox = previewGridRoot.value as HTMLElement | null
   const outer = previewCanvas.value as HTMLElement | null
-  const rootWidth = Math.max(
-    gridBox?.clientWidth || (outer ? outer.clientWidth - TAB_INNER_INSET_PX * 2 : 0),
-    1
-  )
+  const inset = readDashboardInsetPx()
+  const rootWidth = Math.max(gridBox?.clientWidth || (outer ? outer.clientWidth - inset * 2 : 0), 1)
   const rootHeight = Math.max(
-    gridBox?.clientHeight || (outer ? outer.clientHeight - TAB_INNER_INSET_PX * 2 : 0),
+    gridBox?.clientHeight || (outer ? outer.clientHeight - inset * 2 : 0),
     1
   )
   const resolved = resolveTabInnerCell({
@@ -348,7 +355,7 @@ const resetLayout = () => {
           : scaleWidthPoint.value
       if (dashboardActive.value) {
         // company Tab preview: preview-grid-root is the ONLY measure + position root.
-        // cell = root.clientWidth / 36 — never main-canvas bashMatrix.
+        // cell = root.clientWidth / pcMatrixCount.x — never main-canvas bashMatrix.
         if (isTabInnerPreview.value) {
           updateTabInnerCellFromRoot()
         } else {
@@ -401,7 +408,7 @@ const restore = () => {
 }
 
 const getShapeItemShowStyle = item => {
-  // company: Tab/Group preview — local 36-col grid + explicit leading gutter
+  // company: Tab/Group preview — local pcMatrixCount grid + explicit leading gutter
   if (isTabInnerPreview.value) {
     const style = dashboardTabInnerItemStyle(item, {
       cellWidth: cellWidth.value,
@@ -669,7 +676,7 @@ defineExpose({
       'de-download-custom': downloadStatus,
       'datav-preview': dataVPreview,
       'datav-preview-unpublish': showUnpublishFlag,
-      // company: same 16px inset as editor DeCanvas .db-canvas
+      // company: same inset token as editor DeCanvas .db-canvas
       'bi-tab-inner-preview': isTabInnerPreview
     }"
     ref="previewCanvas"
@@ -807,9 +814,9 @@ defineExpose({
 .preview-grid-root {
   position: relative;
   box-sizing: border-box;
-  width: calc(100% - 32px);
-  height: calc(100% - 32px);
-  margin: 16px;
+  width: calc(100% - var(--bi-dashboard-inset, 8px) * 2);
+  height: calc(100% - var(--bi-dashboard-inset, 8px) * 2);
+  margin: var(--bi-dashboard-inset, 8px);
   min-width: 0;
   min-height: 0;
 }

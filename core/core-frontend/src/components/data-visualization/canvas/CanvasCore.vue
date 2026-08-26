@@ -52,6 +52,7 @@ import {
   dashboardTabInnerItemStyle,
   traceTabInnerCoord
 } from '@/custom/company-bi/utils/dashboardGridLayout'
+import { VQUERY_MAX_SIZE_Y } from '@/custom/company-bi/utils/vQueryAutoFit'
 import DatasetParamsComponent from '@/components/visualization/DatasetParamsComponent.vue'
 import DeGrid from '@/components/data-visualization/DeGrid.vue'
 import DeGridScreen from '@/components/data-visualization/DeGridScreen.vue'
@@ -606,7 +607,7 @@ const getSvgComponentStyle = style => {
 }
 
 const getShapeItemShowStyle = item => {
-  // company: Tab/Group editor ? same local 36-col + gutter as DePreview Tab
+  // company: Tab/Group editor — same local pcMatrixCount + gutter as DePreview Tab
   if (dashboardActive.value && isTabCanvas(canvasId.value)) {
     const style = dashboardTabInnerItemStyle(item, {
       cellWidth: cellWidth.value,
@@ -739,7 +740,7 @@ function scrollScreen(e) {
 function resetPositionBox() {
   //???????????????
   itemMaxX = maxCell.value
-  let rows = 36 //??36?????????????
+  const rows = pcMatrixCount.value?.y || 36
   for (let i = 0; i < rows; i++) {
     let row = []
 
@@ -870,7 +871,7 @@ const fitMatrixItem = payload => {
   if (!id || !nextSizeY) return
   const item = componentData.value.find(c => c.id === id)
   if (!item || item.dragging || item.resizing) return
-  const capped = Math.min(Math.max(1, nextSizeY), 8)
+  const capped = Math.min(Math.max(1, nextSizeY), VQUERY_MAX_SIZE_Y)
   if (item.sizeY === capped) return
   resizePlayer(item, { sizeX: item.sizeX, sizeY: capped })
   syncShapeItemStyle(item, cellWidth.value, cellHeight.value)
