@@ -216,7 +216,7 @@ public class TablePivotHandler extends GroupChartHandler {
                 var tmpData = new HashMap<String, String>();
                 for (int i = 0; i < yAxis.size(); i++) {
                     var a = yAxis.get(i);
-                    tmpData.put(a.getDataeaseName(), data.getFirst()[i]);
+                    tmpData.put(a.resultKey(), data.getFirst()[i]);
                 }
                 tmp.put("data", tmpData);
                 tmp.put("sql", Base64.getEncoder().encodeToString(querySql.getBytes()));
@@ -310,7 +310,7 @@ public class TablePivotHandler extends GroupChartHandler {
             var rowData = data.getFirst();
             for (int i = 0; i < rowData.length; i++) {
                 var qAxis = quotaAxis.get(i);
-                rootResult.put(qAxis.getDataeaseName(), rowData[i]);
+                rootResult.put(qAxis.resultKey(), rowData[i]);
             }
             return rootResult;
         }
@@ -329,7 +329,7 @@ public class TablePivotHandler extends GroupChartHandler {
                 if (j == dimAxis.size() - 1) {
                     for (int k = 0; k < quotaAxis.size(); k++) {
                         var qAxis = quotaAxis.get(k);
-                        curSubMap.put(qAxis.getDataeaseName(), rowData[j + k + 1]);
+                        curSubMap.put(qAxis.resultKey(), rowData[j + k + 1]);
                     }
                 }
             }

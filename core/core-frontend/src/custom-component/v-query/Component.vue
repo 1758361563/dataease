@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import icon_edit_outlined from '@/assets/svg/icon_edit_outlined.svg'
-import icon_deleteTrash_outlined from '@/assets/svg/icon_delete-trash_outlined.svg'
 import eventBus from '@/utils/eventBus'
 import colorFunctions from 'less/lib/less/functions/color.js'
 import colorTree from 'less/lib/less/tree/color.js'
@@ -18,7 +16,6 @@ import {
   reactive,
   ref,
   toRefs,
-  unref,
   watch,
   computed,
   onMounted,
@@ -34,7 +31,8 @@ import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { comInfo } from './com-info'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import StyleInject from './StyleInject.vue'
-import { getKeyList, reRenderAll } from '@/custom-component/v-query/QueryUtils'
+import { isDashboard } from '@/utils/canvasUtils'
+import { sizeYToFitQueryContent, queryCardChromePx } from '@/custom/company-bi/utils/vQueryAutoFit'
 const props = defineProps({
   view: {
     type: Object,
@@ -67,14 +65,18 @@ const props = defineProps({
 const { element, view, scale } = toRefs(props)
 const { t } = useI18n()
 const vQueryRef = ref()
+const fieldsRef = ref<HTMLElement | null>(null)
+let lastAutoSizeY: number | null = null
+let fitTimer: ReturnType<typeof setTimeout> | null = null
+let fieldsObserver: ResizeObserver | null = null
 const dvMainStore = dvMainStoreWithOut()
-const { curComponent, canvasViewInfo, mobileInPc, firstLoadMap, editMode } =
+const { curComponent, canvasViewInfo, mobileInPc, firstLoadMap, editMode, canvasStyleData } =
   storeToRefs(dvMainStore)
 const canEdit = ref(false)
 const queryConfig = ref()
 const defaultStyle = {
   border: '',
-  placeholderSize: 14,
+  placeholderSize: 16,
   placeholderShow: true,
   background: '',
   text: '',
@@ -87,7 +89,7 @@ const defaultStyle = {
   labelShow: true,
   title: '',
   labelColor: '#1f2329',
-  fontSize: '14',
+  fontSize: '16',
   fontWeight: '',
   fontStyle: '',
   fontSizeBtn: '14',
@@ -96,7 +98,7 @@ const defaultStyle = {
   queryConditionWidth: 227,
   nameboxSpacing: 8,
   queryConditionSpacing: 16,
-  queryConditionHeight: 32,
+  queryConditionHeight: 36,
   btnColor: '#3370ff',
   labelColorBtn: '#ffffff'
 }
@@ -269,7 +271,7 @@ const setCustomStyle = val => {
   customStyle.btnList = [...btnList]
   customStyle.layout = layout
   customStyle.placeholderShow = placeholderShow ?? true
-  customStyle.placeholderSize = placeholderSize ?? 14
+  customStyle.placeholderSize = placeholderSize ?? 16
   nextTick(() => {
     vQueryRef.value.style.setProperty(
       '--ed-component-size',
@@ -291,7 +293,7 @@ const setCustomStyle = val => {
   customStyle.queryConditionWidth = queryConditionWidth ?? 227
   customStyle.nameboxSpacing = nameboxSpacing ?? 8
   customStyle.queryConditionSpacing = queryConditionSpacing ?? 16
-  customStyle.queryConditionHeight = queryConditionHeight ?? 32
+  customStyle.queryConditionHeight = queryConditionHeight ?? 36
   customStyle.labelColorBtn = labelColorBtn || '#ffffff'
   customStyle.labelShow = labelShow ?? true
   customStyle.btnColor = btnColor || '#3370ff'
@@ -557,8 +559,15 @@ onBeforeUnmount(() => {
   if (closeTime) {
     clearTimeout(closeTime)
   }
+  if (fitTimer) {
+    clearTimeout(fitTimer)
+    fitTimer = null
+  }
+  fieldsObserver?.disconnect()
+  fieldsObserver = null
   emitter.off(`addQueryCriteria${element.value.id}`)
   emitter.off(`editQueryCriteria${element.value.id}`)
+  emitter.off(`openQueryConfiguration${element.value.id}`)
   emitter.off(`updateQueryCriteria${element.value.id}`)
   eventBus.off('componentClick', onComponentClick)
 })
@@ -604,12 +613,20 @@ const updateQueryCriteria = () => {
 onMounted(() => {
   emitter.on(`addQueryCriteria${element.value.id}`, addCriteriaConfigOut)
   emitter.on(`editQueryCriteria${element.value.id}`, editQueryCriteria)
+  emitter.on(`openQueryConfiguration${element.value.id}`, openQueryConfiguration)
   emitter.on(`updateQueryCriteria${element.value.id}`, updateQueryCriteria)
   updateQueryCriteria()
 
   if (dvMainStore.mobileInPc && !isMobile()) {
     queryData()
   }
+  nextTick(() => {
+    scheduleFitQueryHeight()
+    if (typeof ResizeObserver !== 'undefined' && fieldsRef.value) {
+      fieldsObserver = new ResizeObserver(() => scheduleFitQueryHeight())
+      fieldsObserver.observe(fieldsRef.value)
+    }
+  })
 })
 
 const dragover = () => {
@@ -654,16 +671,13 @@ const editQueryCriteria = () => {
   editeQueryConfig(list.value[0].id)
 }
 
-const addCriteriaConfigOut = () => {
-  queryConfig.value.setConditionOut()
+/** ⋯ → 配置：open full QueryConditionConfiguration (empty list creates first condition) */
+const openQueryConfiguration = () => {
+  editQueryCriteria()
 }
 
-const delQueryConfig = index => {
-  const com = cloneDeep(unref(list))
-  list.value.splice(index, 1)
-  element.value.propValue = [...list.value]
-  snapshotStore.recordSnapshotCache('delQueryConfig')
-  reRenderAll(com, cloneDeep(unref(list)))
+const addCriteriaConfigOut = () => {
+  queryConfig.value.setConditionOut()
 }
 
 const resetData = () => {
@@ -797,6 +811,67 @@ const clearData = () => {
 const listVisible = computed(() => {
   return list.value.filter(itx => itx.visible)
 })
+
+const scheduleFitQueryHeight = () => {
+  if (fitTimer) clearTimeout(fitTimer)
+  fitTimer = setTimeout(fitQueryHeight, 80)
+}
+
+const fitQueryHeight = () => {
+  if (editMode.value !== 'edit' || props.showPosition === 'preview') return
+  if (!isDashboard() || mobileInPc.value) return
+  const el = fieldsRef.value
+  const item = element.value
+  if (!el || !item || item.dragging || item.resizing) return
+
+  const current = Number(item.sizeY) || 2
+
+  const contentHeight = measureQueryFieldsHeight(el)
+  const cellHeight = Number(item.style?.height) / Math.max(current, 1)
+  if (!cellHeight || contentHeight <= 0) return
+
+  const gap =
+    canvasStyleData.value?.dashboard?.gap === 'yes'
+      ? canvasStyleData.value?.dashboard?.gapSize || 0
+      : 0
+  const needed = sizeYToFitQueryContent({
+    contentHeight,
+    cellHeight,
+    chromePx: queryCardChromePx({
+      gap,
+      innerPadding: item.commonBackground?.innerPadding
+    }),
+    minSizeY: 2
+  })
+  if (needed === current) {
+    lastAutoSizeY = needed
+    return
+  }
+  if (needed < current && lastAutoSizeY !== current && current <= 8) return
+  lastAutoSizeY = needed
+  eventBus.emit(`fitMatrixItem-${item.canvasId || 'canvas-main'}`, {
+    id: item.id,
+    sizeY: needed
+  })
+}
+
+const measureQueryFieldsHeight = (el: HTMLElement) => {
+  const kids = Array.from(el.children) as HTMLElement[]
+  if (!kids.length) return 0
+  let top = Infinity
+  let bottom = 0
+  for (const kid of kids) {
+    if (!kid.offsetHeight) continue
+    top = Math.min(top, kid.offsetTop)
+    bottom = Math.max(bottom, kid.offsetTop + kid.offsetHeight)
+  }
+  return Number.isFinite(top) ? bottom - top : 0
+}
+
+watch(
+  () => listVisible.value.length,
+  () => nextTick(scheduleFitQueryHeight)
+)
 
 const componentWithSure = computed(() => {
   return customStyle.btnList.includes('sure')
@@ -973,12 +1048,12 @@ const autoStyle = computed(() => {
           </el-button>
         </div>
       </div>
-      <div class="query-fields-container">
+      <div class="query-fields-container" ref="fieldsRef">
         <div
           class="query-item"
           :style="{ marginRight: `${customStyle.queryConditionSpacing}px` }"
           :key="ele.id"
-          v-for="(ele, index) in listVisible"
+          v-for="ele in listVisible"
         >
           <div class="query-field" :style="paddingTop">
             <div class="label" :style="marginRight">
@@ -995,31 +1070,6 @@ const autoStyle = computed(() => {
                   </el-tooltip>
                 </div>
                 <span v-if="ele.required" class="required">*</span>
-              </div>
-              <div
-                class="label-wrapper-tooltip"
-                v-if="
-                  !['preview', 'edit-preview'].includes(showPosition) &&
-                  !dvMainStore.mobileInPc &&
-                  editMode === 'edit'
-                "
-              >
-                <el-tooltip
-                  effect="dark"
-                  :content="t('v_query.set_filter_condition')"
-                  placement="top"
-                >
-                  <el-icon @click="editeQueryConfig(ele.id)">
-                    <Icon name="icon_edit_outlined"><icon_edit_outlined class="svg-icon" /></Icon>
-                  </el-icon>
-                </el-tooltip>
-                <el-tooltip effect="dark" :content="t('v_query.delete_condition')" placement="top">
-                  <el-icon style="margin-left: 8px" @click="delQueryConfig(index)">
-                    <Icon name="icon_delete-trash_outlined"
-                      ><icon_deleteTrash_outlined class="svg-icon"
-                    /></Icon>
-                  </el-icon>
-                </el-tooltip>
               </div>
             </div>
             <div class="query-select">
@@ -1219,18 +1269,6 @@ const autoStyle = computed(() => {
           margin-left: 3px;
           line-height: 22px;
         }
-        .label-wrapper-tooltip {
-          align-items: center;
-          background: #fff;
-          border-radius: 2px;
-          font-size: 16px;
-          display: none;
-          flex: 0 0 auto;
-          height: 16px;
-          line-height: 16px;
-          color: #575757;
-          white-space: nowrap;
-        }
       }
 
       .query-select {
@@ -1263,19 +1301,6 @@ const autoStyle = computed(() => {
       .query-field {
         padding-top: 30px;
 
-        &:hover {
-          .label-wrapper-tooltip {
-            display: inline-flex !important;
-            cursor: pointer;
-            padding: 4px 8px;
-            height: 26px;
-            width: 58px;
-            border-radius: 6px;
-            border: 1px solid #dee0e3;
-            background: #fff;
-            box-shadow: 0px 4px 8px 0px rgba(31, 35, 41, 0.1);
-          }
-        }
         .label {
           align-items: center;
           height: 16px;
@@ -1314,25 +1339,6 @@ const autoStyle = computed(() => {
 
           .label-wrapper {
             max-width: 200px;
-          }
-          .label-wrapper-tooltip {
-            position: absolute;
-            right: 0;
-            top: -21px;
-            z-index: 11;
-            padding: 4px 8px;
-            height: 26px;
-            width: 58px;
-            border-radius: 6px;
-            border: 1px solid #dee0e3;
-            background: #fff;
-            box-shadow: 0px 4px 8px 0px rgba(31, 35, 41, 0.1);
-          }
-        }
-        &:hover {
-          .label-wrapper-tooltip {
-            display: block;
-            cursor: pointer;
           }
         }
       }

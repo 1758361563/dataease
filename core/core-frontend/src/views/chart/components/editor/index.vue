@@ -63,6 +63,7 @@ import DatasetSelect from '@/views/chart/components/editor/dataset-select/Datase
 import { useDraggable } from '@vueuse/core'
 import { PluginComponent } from '@/components/plugin'
 import { Field, getFieldByDQ, copyChartField, deleteChartField } from '@/api/chart'
+import { instanceKey } from '@/views/chart/components/js/chartFieldInstance'
 import ChartTemplateInfo from '@/views/chart/components/editor/common/ChartTemplateInfo.vue'
 import { XpackComponent } from '@/components/plugin'
 import { useEmbedded } from '@/store/modules/embedded'
@@ -285,7 +286,7 @@ watch(
 const getFields = (id, chartId, type) => {
   if (id && chartId) {
     fieldLoading.value = true
-    getFieldByDQ(id, chartId, { type: type })
+    return getFieldByDQ(id, chartId, { type: type })
       .then(res => {
         state.dimension = (res.dimensionList as unknown as Field[]) || []
         state.quota = (res.quotaList as unknown as Field[]) || []
@@ -310,6 +311,7 @@ const getFields = (id, chartId, type) => {
     state.quotaData = []
 
     fieldLoading.value = false
+    return Promise.resolve()
   }
 }
 
@@ -720,6 +722,9 @@ const dragCheckMapType = list => {
   }
 }
 
+/**
+ * 重复拖入同一指标不再走 copyField。table-pivot / table-normal 用 fieldInstanceId 区分 placement。
+ */
 const addAxis = (e, axis: AxisType) => {
   recordSnapshotInfo('calcData')
   const axisSpec = chartViewInstance.value?.axisConfig[axis]
@@ -806,6 +811,15 @@ const addAxis = (e, axis: AxisType) => {
 
   if (!duplicate) {
     dup = dragMoveDuplicate(view.value[axis], e, 'chart')
+  }
+  const itemNewOnAxis = view.value[axis]?.[e.newDraggableIndex]
+  if (
+    itemNewOnAxis &&
+    (view.value.type === 'table-pivot' || view.value.type === 'table-normal') &&
+    axis === 'yAxis' &&
+    !itemNewOnAxis.fieldInstanceId
+  ) {
+    itemNewOnAxis.fieldInstanceId = String(guid())
   }
   if (view.value[axis].length > limit) {
     const removedAxis = view.value[axis].splice(limit)
@@ -2049,10 +2063,21 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
     if (view.value.type === 'indicator-combo' && type === 'yAxis') {
       obj.metricInstanceId = String(guid())
     }
+    if (
+      (view.value.type === 'table-pivot' || view.value.type === 'table-normal') &&
+      type === 'yAxis'
+    ) {
+      obj.fieldInstanceId = String(guid())
+    }
     state.moveId = obj.id as unknown as number
     view.value[type] ??= []
     const targetId = ev.srcElement.offsetParent?.querySelector('.node-id_private')?.dataset?.id
-    const index = view.value[type].findIndex(ele => ele.id === targetId && ele.id !== obj.id)
+    const index =
+      (view.value.type === 'table-pivot' || view.value.type === 'table-normal') && type === 'yAxis'
+        ? view.value[type].findIndex(
+            ele => instanceKey(ele) === String(targetId) || String(ele.id) === String(targetId)
+          )
+        : view.value[type].findIndex(ele => ele.id === targetId && ele.id !== obj.id)
     let newDraggableIndex
     if (index !== -1) {
       view.value[type].splice(index + 1 + i, 0, obj)
@@ -2072,13 +2097,16 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
   }
 }
 
-/** 对比指标卡 yAxis 用稳定 metricInstanceId 作 key；其它图表仍用 field.id */
+/** 对比指标卡 yAxis 用稳定 metricInstanceId；table yAxis 用 fieldInstanceId；其它图表仍用 field.id */
 const yAxisItemKey = (item: any) => {
   if (view.value.type === 'indicator-combo') {
     if (!item.metricInstanceId) {
       item.metricInstanceId = String(guid())
     }
     return item.metricInstanceId
+  }
+  if (view.value.type === 'table-pivot' || view.value.type === 'table-normal') {
+    return instanceKey(item)
   }
   return item.id
 }

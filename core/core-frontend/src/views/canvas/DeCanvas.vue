@@ -11,7 +11,10 @@ import { getCanvasStyle, syncShapeItemStyle } from '@/utils/style'
 import { adaptCurThemeCommonStyle } from '@/utils/canvasStyle'
 import CanvasCore from '@/components/data-visualization/canvas/CanvasCore.vue'
 import { isMainCanvas, isDashboard } from '@/utils/canvasUtils'
-import { resolveTabInnerCell } from '@/custom/company-bi/utils/dashboardGridLayout'
+import {
+  measurePaddedContentBox,
+  resolveTabInnerCell
+} from '@/custom/company-bi/utils/dashboardGridLayout'
 
 // change-begin
 const props = defineProps({
@@ -206,10 +209,13 @@ const scaleInit = () => {
 }
 
 const dashboardCanvasSizeInit = () => {
-  //div容器获取tableBox.value.clientWidth
-  // company: .db-canvas padding 16px × 2 sides = 32
-  state.screenWidth = canvasOut.value.clientWidth - 32
-  state.screenHeight = canvasOut.value.clientHeight - 32
+  // Measure the padded canvas root (.db-canvas), not .content.
+  // Main canvas currently has padding 16px; Tab/Group inner canvas currently
+  // inherits the same rule. Subtract the *computed* padding so Tab inner is
+  // not unconditionally -32 if that padding is later 0.
+  const box = measurePaddedContentBox(canvasInner.value || canvasOut.value)
+  state.screenWidth = box.width
+  state.screenHeight = box.height
   // company Tab: same local root/cols cell as DePreview (no bashMatrix mix)
   if (isDashboard() && !isMainCanvas(canvasId.value)) {
     const resolved = resolveTabInnerCell({

@@ -90,6 +90,11 @@ declare type AxisSpec = {
    */
   duplicate?: boolean
   /**
+   * @deprecated Gate 1 起 table-pivot / table-normal 不再用 copyField 做重复拖入。
+   * 保留类型以免旧配置读取报错。
+   */
+  duplicateByCopy?: boolean
+  /**
    * 轴提示
    */
   tooltip?: string

@@ -407,7 +407,7 @@ onMounted(() => {
             >
               ({{ t('chart.' + item.summary) }})
             </span>
-            <span :data-id="item.id" class="node-id_private"></span>
+            <span :data-id="item.fieldInstanceId || item.id" class="node-id_private"></span>
           </span>
         </el-tooltip>
         <span

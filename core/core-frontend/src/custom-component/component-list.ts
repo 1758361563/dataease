@@ -188,7 +188,7 @@ export const COMMON_COMPONENT_BACKGROUND_BASE: CommonBackground = {
   outerImage: null,
   innerPadding: {
     mode: ShorthandMode.Uniform,
-    top: 12
+    top: 8
   },
   borderRadius: {
     mode: ShorthandMode.Uniform,
@@ -198,14 +198,14 @@ export const COMMON_COMPONENT_BACKGROUND_BASE: CommonBackground = {
 }
 
 // company: dashboard components default to a finished card look
-// (opaque surface, 8px radius, 12px padding). dataV keeps BASE via SCREEN_DARK.
+// (opaque surface, 8px radius, 8px padding). dataV keeps BASE via SCREEN_DARK.
 export const COMMON_COMPONENT_BACKGROUND_LIGHT = {
   ...COMMON_COMPONENT_BACKGROUND_BASE,
   backgroundColor: 'rgba(255,255,255,1)',
   innerImageColor: 'rgba(16, 148, 229,1)',
   innerPadding: {
     mode: ShorthandMode.Uniform,
-    top: 12
+    top: 8
   },
   borderRadius: {
     mode: ShorthandMode.Uniform,
@@ -219,7 +219,7 @@ export const COMMON_COMPONENT_BACKGROUND_DARK = {
   innerImageColor: '#1094E5',
   innerPadding: {
     mode: ShorthandMode.Uniform,
-    top: 12
+    top: 8
   },
   borderRadius: {
     mode: ShorthandMode.Uniform,

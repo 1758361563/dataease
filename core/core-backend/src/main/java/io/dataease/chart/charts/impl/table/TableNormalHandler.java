@@ -253,7 +253,15 @@ public class TableNormalHandler extends DefaultChartHandler {
             if (CollectionUtils.isNotEmpty(fieldList)) {
                 var customCalcFields = new ArrayList<ChartViewFieldDTO>();
                 var seriesList = JsonUtil.parseList(JsonUtil.toJSONString(fieldList).toString(), new TypeReference<List<ChartViewFieldDTO>>(){});
-                var quotaIds = allFields.stream().map(DatasetTableFieldDTO::getDataeaseName).collect(Collectors.toSet());
+                var quotaKeys = new HashSet<String>();
+                for (ChartViewFieldDTO y : yAxis) {
+                    if (y.resultKey() != null) {
+                        quotaKeys.add(y.resultKey());
+                    }
+                    if (y.getDataeaseName() != null) {
+                        quotaKeys.add(y.getDataeaseName());
+                    }
+                }
                 seriesList.forEach(field -> {
                     if (!BooleanUtils.isTrue(field.getShow()) || !"custom".equalsIgnoreCase(field.getSummary())) {
                         return;
@@ -261,7 +269,7 @@ public class TableNormalHandler extends DefaultChartHandler {
                     if (StringUtils.isBlank(field.getOriginName())) {
                         return;
                     }
-                    if (!quotaIds.contains(field.getField())) {
+                    if (!quotaKeys.contains(field.getField())) {
                         return;
                     }
                     field.setSummary("");

@@ -20,7 +20,7 @@
   }
 }
 
-/* VQuery empty state: compact prompt, not a giant centered void */
+/* VQuery: larger default type, row gap closer to edge padding */
 .dashboard-editor,
 .canvas-container:not(.datav-preview) {
   .v-query-container {
@@ -38,9 +38,51 @@
         }
       }
     }
+
+    .label-wrapper-text,
+    .required {
+      font-size: 16px !important;
+      line-height: 24px !important;
+    }
+
+    .ed-input,
+    .ed-date-editor {
+      --ed-input-height: 36px !important;
+    }
+
+    .ed-select__wrapper,
+    .text-search-select .ed-input__wrapper,
+    .text-search-select .ed-select__wrapper {
+      height: 36px !important;
+      font-size: 16px !important;
+    }
+
+    .ed-select-v2,
+    .ed-select__wrapper,
+    .ed-tag {
+      font-size: 16px !important;
+    }
   }
 
   .v-query {
-    padding: 8px 4px 4px 4px !important;
+    padding: 4px 8px !important;
+    align-items: center;
+
+    .query-fields-container {
+      height: auto !important;
+      align-items: center !important;
+      row-gap: 16px;
+    }
+
+    .query-item {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      line-height: normal !important;
+    }
+
+    .query-button {
+      align-self: center !important;
+      margin-bottom: 0 !important;
+    }
   }
 }

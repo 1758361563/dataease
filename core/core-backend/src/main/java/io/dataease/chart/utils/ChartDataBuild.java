@@ -1405,7 +1405,7 @@ public class ChartDataBuild {
         Map<String, List<String[]>> groupDataList = detailData.stream().collect(Collectors.groupingBy(item -> "(" + StringUtils.join(ArrayUtils.subarray(item, 0, xEndIndex), ")-de-(") + ")"));
 
         tableRow.forEach(row -> {
-            String key = xAxis.stream().map(x -> String.format(format, row.get(x.getDataeaseName()).toString())).collect(Collectors.joining("-de-"));
+            String key = xAxis.stream().map(x -> String.format(format, row.get(x.resultKey()).toString())).collect(Collectors.joining("-de-"));
             List<String[]> detailFieldValueList = groupDataList.get(key);
             List<Map<String, Object>> detailValueMapList = detailFieldValueList.stream().map((detailArr -> {
                 Map<String, Object> temp = new HashMap<>();
@@ -1524,22 +1524,23 @@ public class ChartDataBuild {
         data.forEach(ele -> {
             Map<String, Object> d = new HashMap<>();
             for (int i = 0; i < fields.size(); i++) {
-                if (ObjectUtils.isNotEmpty(desensitizationList.keySet()) && desensitizationList.containsKey(fields.get(i).getDataeaseName())) {
-                    String desensitizationValue = desensitizationValue(desensitizationList.get(fields.get(i).getDataeaseName()), String.valueOf(ele[i]));
+                ChartViewFieldDTO chartViewFieldDTO = fields.get(i);
+                String resultKey = chartViewFieldDTO.resultKey();
+                if (ObjectUtils.isNotEmpty(desensitizationList.keySet()) && desensitizationList.containsKey(chartViewFieldDTO.getDataeaseName())) {
+                    String desensitizationValue = desensitizationValue(desensitizationList.get(chartViewFieldDTO.getDataeaseName()), String.valueOf(ele[i]));
                     ele[i] = desensitizationValue;
-                    d.put(fields.get(i).getDataeaseName(), desensitizationValue);
+                    d.put(resultKey, desensitizationValue);
                     continue;
                 }
                 if (i == ele.length) break;
-                ChartViewFieldDTO chartViewFieldDTO = fields.get(i);
                 if (chartViewFieldDTO.getDeType() == 0 || chartViewFieldDTO.getDeType() == 1 || chartViewFieldDTO.getDeType() == 5 || chartViewFieldDTO.getDeType() == 7) {
-                    d.put(fields.get(i).getDataeaseName(), ele[i]);
+                    d.put(resultKey, ele[i]);
                 } else if (chartViewFieldDTO.getDeType() == 2 || chartViewFieldDTO.getDeType() == 3 || chartViewFieldDTO.getDeType() == 4) {
                     // 如果是在维度中展示，导出excel时展示为字符串，其它情况展示为数值类型
                     if (view.getIsExcelExport() || StringUtils.equalsIgnoreCase(chartViewFieldDTO.getGroupType(), "d")) {
-                        d.put(fields.get(i).getDataeaseName(), StringUtils.isEmpty(ele[i]) ? "" : ele[i]);
+                        d.put(resultKey, StringUtils.isEmpty(ele[i]) ? "" : ele[i]);
                     } else {
-                        d.put(fields.get(i).getDataeaseName(), StringUtils.isEmpty(ele[i]) ? null : new BigDecimal(ele[i]).setScale(8, RoundingMode.HALF_UP));
+                        d.put(resultKey, StringUtils.isEmpty(ele[i]) ? null : new BigDecimal(ele[i]).setScale(8, RoundingMode.HALF_UP));
                     }
                 }
             }
@@ -2020,10 +2021,11 @@ public class ChartDataBuild {
         List<Map<String, Object>> tableRow = (List<Map<String, Object>>) map.get("tableRow");
         final int xEndIndex = detailIndex;
         Map<String, List<String[]>> groupDataList = detailData.stream().collect(Collectors.groupingBy(item -> "(" + StringUtils.join(ArrayUtils.subarray(item, 0, xEndIndex), ")-de-(") + ")"));
+        String extBubbleResultKey = ObjectUtils.isNotEmpty(extBubble) ? extBubble.get(0).resultKey() : "";
         String extBubbleDataeaseName = ObjectUtils.isNotEmpty(extBubble) ? extBubble.get(0).getDataeaseName() : "";
         tableRow.forEach(row -> {
-            BigDecimal rowValue = row.get(extBubbleDataeaseName) == null ? BigDecimal.ZERO : new BigDecimal(row.get(extBubbleDataeaseName).toString());
-            String key = xAxis.stream().map(x -> String.format(format, row.get(x.getDataeaseName()).toString())).collect(Collectors.joining("-de-"));
+            BigDecimal rowValue = row.get(extBubbleResultKey) == null ? BigDecimal.ZERO : new BigDecimal(row.get(extBubbleResultKey).toString());
+            String key = xAxis.stream().map(x -> String.format(format, row.get(x.resultKey()).toString())).collect(Collectors.joining("-de-"));
             List<String[]> detailFieldValueList = groupDataList.get(key);
             List<Map<String, Object>> detailValueMapList = Optional.ofNullable(detailFieldValueList).orElse(new ArrayList<>()).stream().map((detailArr -> {
                 Map<String, Object> temp = new HashMap<>();

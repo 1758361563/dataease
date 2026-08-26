@@ -113,16 +113,6 @@
             @click="tabSort"
             >{{ t('visualization.sort') }}</el-dropdown-item
           >
-          <el-dropdown-item
-            v-if="showPosition === 'canvas' && element.component === 'VQuery'"
-            @click="addQueryCriteria"
-            >{{ t('visualization.add_query_filter') }}</el-dropdown-item
-          >
-          <el-dropdown-item
-            v-if="showPosition === 'canvas' && element.component === 'VQuery'"
-            @click="editQueryCriteria"
-            >{{ t('visualization.edit_query_filter') }}</el-dropdown-item
-          >
           <el-dropdown-item @click="copyComponent" v-if="barShowCheck('copy')">{{
             t('visualization.copy')
           }}</el-dropdown-item>
@@ -433,14 +423,6 @@ const downloadClick = () => {
   dvMainStore.setCurComponent({ component: element.value, index: index.value })
 }
 
-const addQueryCriteria = () => {
-  emitter.emit(`addQueryCriteria${element.value.id}`)
-}
-
-const editQueryCriteria = () => {
-  emitter.emit(`editQueryCriteria${element.value.id}`)
-}
-
 const showEditPosition = computed(() => {
   if (showPosition.value === 'canvas') {
     // company: always embed ⋯ inside the card top-right
@@ -456,6 +438,11 @@ const showEditPosition = computed(() => {
 
 const openComponentEditor = () => {
   dvMainStore.setCurComponent({ component: element.value, index: index.value })
+  // VQuery full editor is QueryConditionConfiguration Modal, not chart view-editor
+  if (element.value.component === 'VQuery') {
+    emitter.emit(`openQueryConfiguration${element.value.id}`)
+    return
+  }
   dvMainStore.enterConfigure(element.value.id)
 }
 const showBarTooltipPosition = computed(() => {

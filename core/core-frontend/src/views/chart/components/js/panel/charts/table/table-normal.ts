@@ -18,6 +18,7 @@ import {
 } from '@/views/chart/components/js/panel/common/common_table'
 import { S2ChartView, S2DrawOptions } from '@/views/chart/components/js/panel/types/impl/s2'
 import { parseJson } from '@/views/chart/components/js/util'
+import { resultKey } from '@/views/chart/components/js/chartFieldInstance'
 import {
   type LayoutResult,
   S2DataConfig,
@@ -67,7 +68,8 @@ export class TableNormal extends S2ChartView<TableSheet> {
     },
     yAxis: {
       name: `${t('chart.drag_block_table_data_column')} / ${t('chart.quota')}`,
-      type: 'q'
+      type: 'q',
+      duplicate: true
     }
   }
 
@@ -105,22 +107,22 @@ export class TableNormal extends S2ChartView<TableSheet> {
       fields = fields.filter(ele => {
         return !filterFields.includes(ele.id)
       })
-      drillFieldMap[curDrillField.dataeaseName] = chart.drillFields[0].dataeaseName
+      drillFieldMap[resultKey(curDrillField)] = resultKey(chart.drillFields[0])
       fields.splice(drillFieldIndex, 0, curDrillField)
     }
     const axisMap = [...chart.xAxis, ...chart.yAxis].reduce((pre, cur) => {
-      pre[cur.dataeaseName] = cur
+      pre[resultKey(cur)] = cur
       return pre
     }, {})
     // add drill list
     fields.forEach(ele => {
-      const f = axisMap[ele.dataeaseName]
+      const f = axisMap[resultKey(ele)]
       if (f?.hide === true) {
         return
       }
-      columns.push(ele.dataeaseName)
+      columns.push(resultKey(ele))
       meta.push({
-        field: ele.dataeaseName,
+        field: resultKey(ele),
         name: ele.chartShowName ?? ele.name,
         formatter: function (value) {
           if (!f) {
@@ -302,7 +304,7 @@ export class TableNormal extends S2ChartView<TableSheet> {
       const cell = newChart.getCell(ev.target)
       const meta = cell.getMeta() as ViewMeta
       const nameIdMap = fields.reduce((pre, next) => {
-        pre[next['dataeaseName']] = next['id']
+        pre[resultKey(next)] = next['id']
         return pre
       }, {})
 

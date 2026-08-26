@@ -3,6 +3,7 @@ import { useI18n } from '@/hooks/web/useI18n'
 import { computed, onMounted, PropType, reactive, watch, ref, nextTick, inject } from 'vue'
 import { DEFAULT_BASIC_STYLE } from '@/views/chart/components/editor/util/chart'
 import { cloneDeep, defaultsDeep, filter, find } from 'lodash-es'
+import { resultKey } from '@/views/chart/components/js/chartFieldInstance'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { storeToRefs } from 'pinia'
 import CustomAggrEdit from './CustomAggrEdit.vue'
@@ -115,7 +116,12 @@ const init = () => {
   const tempList = []
   for (let i = 0; i < axisList.length; i++) {
     const axis = axisList[i]
-    let savedAxis = find(state.basicStyleForm.seriesSummary, s => s.field === axis.dataeaseName)
+    const axisResultKey = resultKey(axis)
+    let savedAxis = find(state.basicStyleForm.seriesSummary, s => s.field === axisResultKey)
+    if (!savedAxis) {
+      const legacy = find(state.basicStyleForm.seriesSummary, s => s.field === axis.dataeaseName)
+      savedAxis = legacy ? { ...legacy, field: axisResultKey } : null
+    }
     if (savedAxis) {
       if (savedAxis.summary == undefined) {
         savedAxis.summary = 'sum'
@@ -125,7 +131,7 @@ const init = () => {
       }
     } else {
       savedAxis = {
-        field: axis.dataeaseName,
+        field: axisResultKey,
         summary: 'sum',
         show: true
       }
@@ -190,8 +196,8 @@ onMounted(() => {
         >
           <el-option
             v-for="c in computedAxis"
-            :key="c.dataeaseName"
-            :value="c.dataeaseName"
+            :key="resultKey(c) || c.dataeaseName"
+            :value="resultKey(c)"
             :label="c.chartShowName ?? c.name"
           />
         </el-select>

@@ -66,6 +66,7 @@ import io.dataease.visualization.dao.auto.mapper.*;
 import io.dataease.visualization.dao.ext.mapper.ExtDataVisualizationMapper;
 import io.dataease.visualization.manage.CoreBusiManage;
 import io.dataease.visualization.manage.CoreVisualizationManage;
+import io.dataease.visualization.manage.Det2AppDatasetRebindV1Manage;
 import io.dataease.visualization.manage.ResourcePermissionManage;
 import io.dataease.visualization.utils.VisualizationUtils;
 import jakarta.annotation.Resource;
@@ -162,6 +163,9 @@ public class DataVisualizationServer implements DataVisualizationApi {
     private ExtChartViewMapper extChartViewMapper;
     @Resource
     private DatasetSQLManage datasetSQLManage;
+
+    @Resource
+    private Det2AppDatasetRebindV1Manage det2AppDatasetRebindV1Manage;
 
     @Resource
     private SnapshotVisualizationLinkageMapper snapshotVisualizationLinkageMapper;
@@ -369,7 +373,16 @@ public class DataVisualizationServer implements DataVisualizationApi {
         if (appData != null) {
             isAppSave = true;
             if ("dataset".equals(request.getDataType())) {
-                appDatasetMatch(appData, datasourceIdMap, dsGroupIdMap, dsTableIdMap, dsTableFieldsIdMap,dsTableFieldsDatasetNameMap);
+                if (!det2AppDatasetRebindV1Manage.tryRebind(
+                        appData,
+                        request,
+                        dsGroupIdMap,
+                        dsTableIdMap,
+                        dsTableFieldsIdMap,
+                        dsTableFieldsDatasetNameMap,
+                        datasourceIdMap)) {
+                    appDatasetMatch(appData, datasourceIdMap, dsGroupIdMap, dsTableIdMap, dsTableFieldsIdMap, dsTableFieldsDatasetNameMap);
+                }
             } else {
                 try {
                     List<AppCoreDatasourceVO> appCoreDatasourceVO = appData.getDatasourceInfo();

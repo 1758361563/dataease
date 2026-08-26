@@ -114,7 +114,7 @@ public class CoreVisualizationExportManage {
                 Object deType = field.getDeType();
                 if (ObjectUtils.isNotEmpty(name) && ObjectUtils.isNotEmpty(dataeaseName)) {
                     heads.add(name.toString());
-                    headKeys.add(dataeaseName.toString());
+                    headKeys.add(field.resultKey());
                     if (deType == null) {
                         field.setDeType(DeTypeConstants.DE_STRING);
                         deType = DeTypeConstants.DE_STRING;
@@ -215,11 +215,14 @@ public class CoreVisualizationExportManage {
             acc.totalCount++;
             for (int j = 0; j < allColumns.size(); j++) {
                 ChartViewFieldDTO field = allColumns.get(j);
-                String fName = field.getDataeaseName();
+                String fName = field.resultKey();
                 if (!config.summaryShowMap.containsKey(fName) || !config.summaryShowMap.get(fName)) continue;
                 String sType = config.summaryTypeMap.get(fName);
                 if (sType == null || "custom".equals(sType)) continue;
                 Object valObj = row.get(fName);
+                if (valObj == null) {
+                    valObj = row.get(field.getDataeaseName());
+                }
                 if (valObj == null || StringUtils.isBlank(valObj.toString())) continue;
                 try {
                     BigDecimal val = new BigDecimal(valObj.toString());

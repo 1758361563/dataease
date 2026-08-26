@@ -8,6 +8,7 @@ import { computed, toRaw } from 'vue'
 import { Options } from '@antv/g2plot/esm'
 import { PickOptions } from '@antv/g2plot/esm/core/plot'
 import { innerExportDataSetDetails, innerExportDetails } from '@/api/chart'
+import { resultKey } from '@/views/chart/components/js/chartFieldInstance'
 import { ElMessage } from 'element-plus-secondary'
 import { useI18n } from '@/hooks/web/useI18n'
 import { useLinkStoreWithOut } from '@/store/modules/link'
@@ -533,7 +534,7 @@ const getExcelDownloadRequest = (data, type?) => {
   const tableRow = JSON.parse(JSON.stringify(data.tableRow))
   const excelHeader = fields.map(item => item.chartShowName ?? item.name)
   const excelTypes = fields.map(item => item.deType)
-  const excelHeaderKeys = fields.map(item => item.dataeaseName)
+  const excelHeaderKeys = fields.map(item => resultKey(item))
   let excelData = tableRow.map(item => excelHeaderKeys.map(i => item[i]))
   let detailFields = []
   if (data.detailFields?.length) {

@@ -239,7 +239,7 @@ const initParams = () => {
   if (!chart.value.customStyle.component.hasOwnProperty('queryConditionHeight')) {
     chart.value.customStyle.component = {
       ...chart.value.customStyle.component,
-      queryConditionHeight: 32
+      queryConditionHeight: 36
     }
   }
   if (!chart.value.customStyle.component.hasOwnProperty('labelShow')) {
@@ -248,7 +248,7 @@ const initParams = () => {
       labelShow: true,
       fontWeight: '',
       fontStyle: '',
-      fontSize: '14',
+      fontSize: '16',
       fontSizeBtn: '14',
       fontWeightBtn: '',
       fontStyleBtn: '',
@@ -264,7 +264,7 @@ const initParams = () => {
     chart.value.customStyle.component = {
       ...chart.value.customStyle.component,
       placeholderShow: true,
-      placeholderSize: 14
+      placeholderSize: 16
     }
   }
 

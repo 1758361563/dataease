@@ -209,6 +209,14 @@ declare interface ChartViewField {
    * 分组类型
    */
   groupType: 'q' | 'd'
+  /**
+   * 图表 placement 身份。table-pivot / table-normal yAxis 新拖入项生成。
+   */
+  fieldInstanceId?: string
+  /**
+   * 对比指标卡既有 placement 身份。resultKey fallback。
+   */
+  metricInstanceId?: string
 }
 
 declare interface Filter {

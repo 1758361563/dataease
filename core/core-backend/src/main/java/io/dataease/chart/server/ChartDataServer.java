@@ -1015,12 +1015,13 @@ public class ChartDataServer implements ChartDataApi {
         }
 
         for (ChartViewFieldDTO field : summaryFields) {
-            String fName = field.getDataeaseName();
+            String fName = field.resultKey();
             String sType = "sum";
             boolean sShow = true;
             if (seriesSummary != null) {
                 for (Map<String, Object> s : seriesSummary) {
-                    if (fName.equals(s.get("field"))) {
+                    Object seriesField = s.get("field");
+                    if (seriesField != null && field.matchesResultIdentity(seriesField.toString())) {
                         sType = s.get("summary") == null ? "sum" : s.get("summary").toString();
                         sShow = s.get("show") == null || (Boolean) s.get("show");
                         break;
@@ -1040,7 +1041,7 @@ public class ChartDataServer implements ChartDataApi {
             acc.totalCount++;
             for (int j = 0; j < allColumns.size() && j < row.length; j++) {
                 ChartViewFieldDTO field = allColumns.get(j);
-                String fName = field.getDataeaseName();
+                String fName = field.resultKey();
                 if (!config.summaryShowMap.containsKey(fName) || !config.summaryShowMap.get(fName)) continue;
                 String sType = config.summaryTypeMap.get(fName);
                 if (sType == null || "custom".equals(sType)) continue;
@@ -1077,13 +1078,16 @@ public class ChartDataServer implements ChartDataApi {
         Object[] totalRow = new Object[allColumns.size()];
         for (int j = 0; j < allColumns.size(); j++) {
             ChartViewFieldDTO field = allColumns.get(j);
-            String fName = field.getDataeaseName();
+            String fName = field.resultKey();
             if (config.summaryShowMap.containsKey(fName) && config.summaryShowMap.get(fName)) {
                 String sType = config.summaryTypeMap.get(fName);
                 switch (sType) {
                     case "custom":
-                        totalRow[j] = customSumResult != null && customSumResult.get(fName) != null
-                                ? customSumResult.get(fName).toPlainString() : null;
+                        BigDecimal customVal = customSumResult == null ? null : customSumResult.get(fName);
+                        if (customVal == null && customSumResult != null) {
+                            customVal = customSumResult.get(field.getDataeaseName());
+                        }
+                        totalRow[j] = customVal != null ? customVal.toPlainString() : null;
                         break;
                     case "max":
                         totalRow[j] = acc.maxMap.get(fName) != null ? acc.maxMap.get(fName).toPlainString() : null;

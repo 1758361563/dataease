@@ -64,7 +64,7 @@ export const MOBILE_SETTING_DARK = {
 
 export const DEFAULT_DASHBOARD_STYLE_BASE = {
   gap: 'yes',
-  gapSize: 8,
+  gapSize: 4,
   gapMode: 'custom',
   showGrid: true,
   matrixBase: 4, // 当前matrix的基数 （是pcMatrixCount的几倍）

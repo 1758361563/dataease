@@ -638,8 +638,7 @@ const getShapeItemShowStyle = item => {
         rootWidth,
         colsThatFit: rootWidth ? rootWidth / cellWidth.value : undefined,
         leftSlackPx: styleLeftPx,
-        rightSlackPx:
-          rootWidth != null ? rootWidth - styleLeftPx - styleWidthPx : undefined,
+        rightSlackPx: rootWidth != null ? rootWidth - styleLeftPx - styleWidthPx : undefined,
         domLeft: dom ? getComputedStyle(dom).left : undefined,
         domWidth: dom ? getComputedStyle(dom).width : undefined,
         offsetParentIsRoot: !!(dom && root && dom.offsetParent === root)
@@ -863,6 +862,21 @@ function reCalcCellWidth() {
   maxCell.value = cells
   itemMaxX = maxCell.value
 }
+/** company: VQuery auto-fit — grow/shrink sizeY so wrapped conditions aren't clipped */
+const fitMatrixItem = payload => {
+  if (!dashboardActive.value) return
+  const id = payload?.id
+  const nextSizeY = payload?.sizeY
+  if (!id || !nextSizeY) return
+  const item = componentData.value.find(c => c.id === id)
+  if (!item || item.dragging || item.resizing) return
+  const capped = Math.min(Math.max(1, nextSizeY), 8)
+  if (item.sizeY === capped) return
+  resizePlayer(item, { sizeX: item.sizeX, sizeY: capped })
+  syncShapeItemStyle(item, cellWidth.value, cellHeight.value)
+  snapshotStore.recordSnapshotCache('fitMatrixItem')
+}
+
 function resizePlayer(item, newSize) {
   removeItemFromPositionBox(item)
   let belowItems = findBelowItems(item)
@@ -1755,6 +1769,7 @@ onMounted(() => {
   eventBus.on('removeMatrixItem-' + canvasId.value, removeItem)
   eventBus.on('removeMatrixItemPosition-' + canvasId.value, removeItemComponent)
   eventBus.on('removeMatrixItemById-' + canvasId.value, removeItemById)
+  eventBus.on('fitMatrixItem-' + canvasId.value, fitMatrixItem)
   eventBus.on('addDashboardItem-' + canvasId.value, addItemBox)
   eventBus.on('snapshotChange-' + canvasId.value, canvasInit)
   eventBus.on('doCanvasInit-' + canvasId.value, canvasInit)
@@ -1771,6 +1786,7 @@ onBeforeUnmount(() => {
   eventBus.off('removeMatrixItem-' + canvasId.value, removeItem)
   eventBus.off('removeMatrixItemPosition-' + canvasId.value, removeItemComponent)
   eventBus.off('removeMatrixItemById-' + canvasId.value, removeItemById)
+  eventBus.off('fitMatrixItem-' + canvasId.value, fitMatrixItem)
   eventBus.off('addDashboardItem-' + canvasId.value, addItemBox)
   eventBus.off('snapshotChange-' + canvasId.value, canvasInit)
   eventBus.off('doCanvasInit' + canvasId.value, canvasInit)

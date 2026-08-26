@@ -9,6 +9,7 @@ import {
   safeDecimalSum,
   safeDecimalMean
 } from '../..//util'
+import { resultKey, rowValue, resultKeysForFieldId } from '@/views/chart/components/js/chartFieldInstance'
 import {
   DEFAULT_BASIC_STYLE,
   DEFAULT_TABLE_CELL,
@@ -571,7 +572,7 @@ export function getStyle(chart: Chart, dataConfig: S2DataConfig): Style {
         const parentNodeWidthMap = {}
         const nodeMaxWidthMap = {}
         const quotaLabelMap = chart.yAxis?.reduce((p, n) => {
-          p[n.dataeaseName] = n.chartShowName || n.name
+          p[resultKey(n)] = n.chartShowName || n.name
           return p
         }, {}) || {}
         let calcCount = 50
@@ -688,7 +689,7 @@ export function getCurrentField(valueFieldList: Axis[], field: ChartViewField) {
   if (list) {
     for (let i = 0; i < list.length; i++) {
       const f = list[i]
-      if (field.dataeaseName === f.dataeaseName) {
+      if (resultKey(field) === resultKey(f) || field.dataeaseName === f.dataeaseName) {
         res = f
         break
       }
@@ -714,10 +715,10 @@ export function getConditions(chart: Chart) {
     allFields.push(...chart.yAxis)
   }
   const fieldIdToName = allFields.reduce((acc, f) => {
-    acc[f.id] = f.dataeaseName
+    acc[f.id] = resultKey(f)
     return acc
   }, {})
-  const allColumnNames = allFields.map(f => f.dataeaseName)
+  const allColumnNames = allFields.map(f => resultKey(f))
 
   if (conditions?.length > 0) {
     const { tableCell, basicStyle, tableHeader } = parseJson(chart.customAttr)
@@ -755,7 +756,11 @@ export function getConditions(chart: Chart) {
           const targetName = fieldIdToName[rule.targetFieldId]
           if (targetName) targets = [targetName]
         } else {
-          targets = [fieldItem.field.dataeaseName]
+          targets = resultKeysForFieldId(
+            allFields,
+            fieldItem.field.id,
+            resultKey(fieldItem.field) || fieldItem.field.dataeaseName
+          )
         }
 
         targets.forEach(targetName => {
@@ -1021,10 +1026,10 @@ export function mappingColor(value, defaultColor, rules, type, filedValueMap?, r
     let targetValue, max, min
 
     let checkValue = value;
-    if (sourceField.dataeaseName) {
-      checkValue = rowData?.[sourceField.dataeaseName]
+    if (sourceField.dataeaseName || sourceField.fieldInstanceId || sourceField.metricInstanceId) {
+      checkValue = rowValue(rowData, sourceField)
       if (checkValue === undefined) {
-        checkValue = rowData?.query?.[sourceField.dataeaseName]
+        checkValue = rowValue(rowData?.query, sourceField)
       }
     }
 
@@ -1229,10 +1234,9 @@ export function getPivotConditions(chart: Chart) {
   }
   const conditions = threshold.tableThreshold ?? []
 
-  const dimFields = [...chart.xAxis, ...chart.xAxisExt].map(i => i.dataeaseName)
   const allFields = [...chart.xAxis, ...chart.xAxisExt, ...chart.yAxis]
   const fieldIdToName = allFields.reduce((acc, f) => {
-    acc[f.id] = f.dataeaseName
+    acc[f.id] = resultKey(f)
     return acc
   }, {})
 
@@ -1270,9 +1274,9 @@ export function getPivotConditions(chart: Chart) {
 
 
     const targetRulesMap = {} // columnName -> Array<{ rule, sourceField }>
-    const xFields = chart.xAxis.map(f => f.dataeaseName)
-    const xExtFields = chart.xAxisExt.map(f => f.dataeaseName)
-    const yFields = chart.yAxis.map(f => f.dataeaseName)
+    const xFields = chart.xAxis.map(f => resultKey(f))
+    const xExtFields = chart.xAxisExt.map(f => resultKey(f))
+    const yFields = chart.yAxis.map(f => resultKey(f))
     for (let i = 0; i < conditions.length; i++) {
       const fieldItem = conditions[i]
       if (!fieldItem.conditions) continue;
@@ -1281,13 +1285,13 @@ export function getPivotConditions(chart: Chart) {
         const rule = fieldItem.conditions[j]
         let targets = []
         if (rule.target === 'total_row') {
-          if (xFields.includes(fieldItem.field.dataeaseName)) {
+          if (xFields.includes(resultKey(fieldItem.field)) || xFields.includes(fieldItem.field.dataeaseName)) {
             targets.push(...xFields)
             if (basicStyle.quotaPosition === 'row') {
               targets.push(EXTRA_FIELD)
             }
           }
-          if (xExtFields.includes(fieldItem.field.dataeaseName)) {
+          if (xExtFields.includes(resultKey(fieldItem.field)) || xExtFields.includes(fieldItem.field.dataeaseName)) {
             targets.push(...xExtFields)
             if (basicStyle.quotaPosition !== 'row') {
               targets.push(EXTRA_FIELD)
@@ -1298,7 +1302,11 @@ export function getPivotConditions(chart: Chart) {
           const targetName = fieldIdToName[rule.targetFieldId]
           if (targetName) targets = [targetName]
         } else {
-          targets = [fieldItem.field.dataeaseName]
+          targets = resultKeysForFieldId(
+            allFields,
+            fieldItem.field.id,
+            resultKey(fieldItem.field) || fieldItem.field.dataeaseName
+          )
         }
 
         targets.forEach(targetName => {
@@ -1382,10 +1390,10 @@ export function mappingPivotColor(value, defaultColor, rules, type, filedValueMa
     let targetValue, max, min
 
     let checkValue = value;
-    if (sourceField.dataeaseName) {
-      checkValue = rowData?.[sourceField.dataeaseName]
+    if (sourceField.dataeaseName || sourceField.fieldInstanceId || sourceField.metricInstanceId) {
+      checkValue = rowValue(rowData, sourceField)
       if (checkValue === undefined) {
-        checkValue = rowData?.query?.[sourceField.dataeaseName]
+        checkValue = rowValue(rowData?.query, sourceField)
       }
     }
 
@@ -1393,14 +1401,14 @@ export function mappingPivotColor(value, defaultColor, rules, type, filedValueMa
       if (rule.target !== 'total_row') {
         return null
       }
-      checkValue = rowData?.query?.[sourceField.dataeaseName]
+      checkValue = rowValue(rowData?.query, sourceField)
     }
 
     if (rowData.field === EXTRA_FIELD) {
       if (rule.target !== 'total_row') {
         return null
       }
-      checkValue = rowData?.query?.[sourceField.dataeaseName]
+      checkValue = rowValue(rowData?.query, sourceField)
     }
     if (checkValue === undefined) {
       return null
@@ -1609,10 +1617,10 @@ function getFieldValueMap(view) {
 function getValue(field, filedValueMap, rowData) {
   if (field.summary === 'value') {
     // 单元格数据
-    let value =  rowData?.[field.field?.dataeaseName]
+    let value = rowValue(rowData, field.field)
     // 表头数据
     if (value === undefined) {
-      value = rowData.query?.[field.field?.dataeaseName]
+      value = rowValue(rowData.query, field.field)
     }
     return value
   } else {
@@ -1630,8 +1638,18 @@ export function handleTableEmptyStrategy(chart: Chart) {
   }
   const emptyDataFieldCtrl = senior?.functionCfg?.emptyDataFieldCtrl
   if (emptyDataStrategy !== 'breakLine' && emptyDataFieldCtrl?.length && newData?.length) {
+    const axisFields = [...(chart.xAxis || []), ...(chart.xAxisExt || []), ...(chart.yAxis || [])]
+    const expandedCtrl = []
+    emptyDataFieldCtrl.forEach(name => {
+      expandedCtrl.push(name)
+      axisFields.forEach(f => {
+        if (f.dataeaseName === name || resultKey(f) === name) {
+          expandedCtrl.push(resultKey(f))
+        }
+      })
+    })
     const deNames = keys(newData[0])
-    intersectionArr = intersection(deNames, emptyDataFieldCtrl)
+    intersectionArr = intersection(deNames, expandedCtrl)
   }
   if (intersectionArr.length) {
     newData = cloneDeep(newData)
@@ -2148,8 +2166,9 @@ export async function exportGridPivot(instance: PivotSheet, chart: ChartObj) {
     }
   })
   const formatterMap = chart.yAxis.reduce((p, n) => {
-    if (n.dataeaseName) {
-      p[n.dataeaseName] = n.formatterCfg
+    const key = resultKey(n)
+    if (key) {
+      p[key] = n.formatterCfg
     }
     return p
   }, {})
@@ -2338,8 +2357,9 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
     }
   })
   const formatterMap = chart.yAxis.reduce((p, n) => {
-    if (n.dataeaseName) {
-      p[n.dataeaseName] = n.formatterCfg
+    const key = resultKey(n)
+    if (key) {
+      p[key] = n.formatterCfg
     }
     return p
   }, {})
@@ -2479,8 +2499,9 @@ export async function exportTreePivot(instance: PivotSheet, chart: ChartObj) {
     }
   })
   const formatterMap = chart.yAxis.reduce((p, n) => {
-    if (n.dataeaseName) {
-      p[n.dataeaseName] = n.formatterCfg
+    const key = resultKey(n)
+    if (key) {
+      p[key] = n.formatterCfg
     }
     return p
   }, {})
@@ -2621,8 +2642,9 @@ export async function exportRowQuotaTreePivot(instance: PivotSheet, chart: Chart
     }
   })
   const formatterMap = chart.yAxis.reduce((p, n) => {
-    if (n.dataeaseName) {
-      p[n.dataeaseName] = n.formatterCfg
+    const key = resultKey(n)
+    if (key) {
+      p[key] = n.formatterCfg
     }
     return p
   }, {})
@@ -2803,7 +2825,7 @@ export function configMergeCells(chart: Chart, options: S2Options, dataConfig: S
     const fields = chart.data.fields || []
     const fieldsMap =
       fields.reduce((p, n) => {
-        p[n.dataeaseName] = n
+        p[resultKey(n)] = n
         return p
       }, {}) || {}
     const quotaIndex = dataConfig.meta.findIndex(m => fieldsMap[m.field]?.groupType === 'q')
@@ -3270,8 +3292,12 @@ const getWrapTextHeight = (wrapText, textStyle, spreadsheet, maxLines) => {
 export function getSummaryRow(data, axis, sumCon = [], customSumResult = {}) {
   const summaryObj = { SUMMARY: true }
   for (let i = 0; i < axis.length; i++) {
-    const a = axis[i].dataeaseName
+    const a = resultKey(axis[i])
     let savedAxis = find(sumCon, s => s.field === a)
+    if (!savedAxis) {
+      const legacy = find(sumCon, s => s.field === axis[i].dataeaseName)
+      savedAxis = legacy ? { ...legacy, field: a } : null
+    }
     if (savedAxis) {
       if (savedAxis.summary == undefined) {
         savedAxis.summary = 'sum' // 默认汇总方式为求和
@@ -3352,7 +3378,7 @@ export function getSummaryRow(data, axis, sumCon = [], customSumResult = {}) {
         }
         break
       case 'custom':
-        summaryObj[a] = customSumResult[a]
+        summaryObj[a] = customSumResult[a] ?? customSumResult[axis[i].dataeaseName]
         break
     }
   }

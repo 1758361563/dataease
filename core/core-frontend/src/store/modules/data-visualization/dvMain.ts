@@ -592,7 +592,7 @@ export const dvMainStore = defineStore('dataVisualization', {
               titleLayout,
               layout,
               btnList: ['sure'],
-              fontSize: '14',
+              fontSize: '16',
               labelShow: true,
               fontWeight: '',
               fontStyle: '',
@@ -602,9 +602,9 @@ export const dvMainStore = defineStore('dataVisualization', {
               queryConditionWidth: 227,
               nameboxSpacing: 8,
               placeholderShow: true,
-              placeholderSize: 14,
+              placeholderSize: 16,
               queryConditionSpacing: 16,
-              queryConditionHeight: 32,
+              queryConditionHeight: 36,
               labelColorBtn: '#ffffff',
               btnColor: '#3370ff'
             }

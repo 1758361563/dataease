@@ -3,14 +3,43 @@
  *
  * One coordinate system per Tab content root:
  *   cell = root.clientWidth / cols   (cols = 36)
- *   left = (x - 1 + TAB_INNER_GUTTER_COLS) * cell
+ *   left = (x - 1) * cell
  *
  * Do NOT reuse main-canvas bashMatrix here — that mixes two containers and
  * breaks when the side tree opens/closes.
  */
 
-/** Explicit leading column gutter inside Tab content (responsive, not px). */
-export const TAB_INNER_GUTTER_COLS = 1
+import './applyDashboardDensityPhase1'
+
+/**
+ * Leading column gutter inside Tab content.
+ * Must stay 0: drag/resize (syncShapeItemStyle, movePlayer, resizePlayer) and the
+ * itemMaxX column budget all use the plain `x - 1` formula. A non-zero gutter here
+ * only shifts the rendered card, so the card drifts left while dragging and can be
+ * resized one cell past the Tab's right edge. Any inset belongs in CSS padding.
+ */
+export const TAB_INNER_GUTTER_COLS = 0
+
+/**
+ * Content-box size of a padded canvas root.
+ * `clientWidth` includes padding; grid items are laid out in the content box
+ * (CanvasCore `.editor` inside `.db-canvas`). Do not hardcode 16×2 = 32.
+ */
+export function measurePaddedContentBox(el: HTMLElement | null | undefined): {
+  width: number
+  height: number
+} {
+  if (!el) {
+    return { width: 1, height: 1 }
+  }
+  const cs = getComputedStyle(el)
+  const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+  const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+  return {
+    width: Math.max(el.clientWidth - padX, 1),
+    height: Math.max(el.clientHeight - padY, 1)
+  }
+}
 
 export type DashboardGridItemStyle = {
   padding: string

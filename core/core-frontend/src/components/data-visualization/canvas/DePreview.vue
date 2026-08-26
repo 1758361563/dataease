@@ -435,8 +435,7 @@ const getShapeItemShowStyle = item => {
         rootWidth,
         colsThatFit: rootWidth ? rootWidth / cellWidth.value : undefined,
         leftSlackPx: styleLeftPx,
-        rightSlackPx:
-          rootWidth != null ? rootWidth - styleLeftPx - styleWidthPx : undefined,
+        rightSlackPx: rootWidth != null ? rootWidth - styleLeftPx - styleWidthPx : undefined,
         domLeft: dom ? getComputedStyle(dom).left : undefined,
         domWidth: dom ? getComputedStyle(dom).width : undefined,
         offsetParentIsRoot: !!(dom && root && dom.offsetParent === root)
