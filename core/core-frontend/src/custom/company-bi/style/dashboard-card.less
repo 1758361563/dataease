@@ -8,22 +8,48 @@
  * - edit canvas root gets `.dashboard-editor` (CanvasCore, dashboard type only)
  * - preview root is `.canvas-container`; dataV preview adds `.datav-preview`
  * GroupArea is the marquee-selection helper, not a real component.
+ *
+ * Guandata-style chrome: keep a transparent 1px border so hover does not
+ * shift layout, but only paint the gray border + drop shadow on hover /
+ * selected / drag / resize. Inner controls (selects, date pickers) keep
+ * their own borders — this is the card shell only.
  */
+
+.bi-card-shell() {
+  border: 1px solid transparent;
+  border-radius: var(--bi-card-radius, var(--bi-radius-md));
+  box-shadow: none;
+  background: var(--bi-card-bg, var(--bi-bg-surface));
+  transition: border-color 0.08s ease, box-shadow 0.08s ease;
+}
+
+.bi-card-shell-chrome() {
+  border-color: var(--bi-card-border, var(--bi-border));
+  box-shadow: var(--bi-card-shadow, var(--bi-shadow-card));
+}
 
 .dashboard-editor {
   .shape:not(.shape-group-area) > .shape-outer > .shape-inner {
-    border: 1px solid var(--bi-card-border, var(--bi-border));
-    border-radius: var(--bi-card-radius, var(--bi-radius-md));
-    box-shadow: var(--bi-card-shadow, var(--bi-shadow-card));
-    background: var(--bi-card-bg, var(--bi-bg-surface));
+    .bi-card-shell();
+  }
+
+  // :has(.shape:hover) keeps a parent Tab/Group from lighting up when the
+  // pointer is actually on a nested card.
+  .shape:not(.shape-group-area) > .shape-outer:hover:not(:has(.shape:hover)) > .shape-inner,
+  .shape:not(.shape-group-area) > .shape-outer.active > .shape-inner,
+  .shape:not(.shape-group-area) > .shape-outer.shape-selected > .shape-inner,
+  .shape.shape-dragging:not(.shape-group-area) > .shape-outer > .shape-inner,
+  .shape.shape-resizing:not(.shape-group-area) > .shape-outer > .shape-inner {
+    .bi-card-shell-chrome();
   }
 }
 
 .canvas-container:not(.datav-preview) {
   .wrapper-outer:not([class*='-GroupArea']) > .wrapper-inner {
-    border: 1px solid var(--bi-card-border, var(--bi-border));
-    border-radius: var(--bi-card-radius, var(--bi-radius-md));
-    box-shadow: var(--bi-card-shadow, var(--bi-shadow-card));
-    background: var(--bi-card-bg, var(--bi-bg-surface));
+    .bi-card-shell();
+  }
+
+  .wrapper-outer:not([class*='-GroupArea']):hover:not(:has(.wrapper-outer:hover)) > .wrapper-inner {
+    .bi-card-shell-chrome();
   }
 }
