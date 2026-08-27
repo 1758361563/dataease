@@ -58,11 +58,20 @@ const props = defineProps({
     type: String as PropType<EditorTheme>,
     default: 'light'
   },
-  title: String
+  title: String,
+  dismissible: {
+    type: Boolean,
+    default: false
+  }
 })
 
 const { width, asidePosition, sideName, themeInfo, view, themes, element } = toRefs(props)
+const emit = defineEmits(['dismiss'])
 const collapseChange = () => {
+  if (props.dismissible) {
+    emit('dismiss')
+    return
+  }
   canvasCollapse.value[sideName.value] = !canvasCollapse.value[sideName.value]
 }
 const widthShow = computed(() => `${canvasCollapse.value[sideName.value] ? 36 : width.value}px`)
@@ -169,13 +178,14 @@ const onComponentNameChange = () => {
         </el-popover>
       </div>
       <el-icon
-        :title="title"
+        :title="props.dismissible ? t('visualization.close') : title"
         :class="['custom-icon-' + themeInfo, 'collapse-icon-' + themeInfo]"
         size="20px"
         @click="collapseChange"
       >
+        <Close v-if="props.dismissible" />
         <Expand
-          v-if="
+          v-else-if="
             (canvasCollapse[sideName] && asidePosition === 'left') ||
             (!canvasCollapse[sideName] && asidePosition === 'right')
           "

@@ -73,6 +73,8 @@ export const dvMainStore = defineStore('dataVisualization', {
       // componentEditorVisible is derived from this (see getters) so it can't drift out of sync.
       dashboardEditorMode: 'layout' as 'layout' | 'configure',
       configuringComponentId: null as string | null,
+      // company: dashboard-level DbCanvasAttr panel. Default hidden (no collapsed strip).
+      dashboardCanvasAttrVisible: false,
       curCanvasScaleMap: {},
       // 预览仪表板缩放信息
       previewCanvasScale: {
@@ -389,6 +391,7 @@ export const dvMainStore = defineStore('dataVisualization', {
     /** company: ⋯ → 配置 — enter configure mode for one component */
     enterConfigure(componentId: string) {
       if (!componentId) return
+      this.dashboardCanvasAttrVisible = false
       this.dashboardEditorMode = 'configure'
       this.configuringComponentId = componentId
     },
@@ -396,6 +399,29 @@ export const dvMainStore = defineStore('dataVisualization', {
     exitConfigure() {
       this.dashboardEditorMode = 'layout'
       this.configuringComponentId = null
+    },
+    /** company: top-bar dashboard settings — expand fully; never the 36px collapsed strip */
+    openDashboardCanvasAttr() {
+      this.exitConfigure()
+      this.setHiddenListStatus(false)
+      this.setCurComponent({ component: null, index: null })
+      this.canvasCollapse.canvas = false
+      this.dashboardCanvasAttrVisible = true
+    },
+    closeDashboardCanvasAttr() {
+      this.dashboardCanvasAttrVisible = false
+    },
+    toggleDashboardCanvasAttr() {
+      const showing =
+        this.dashboardCanvasAttrVisible &&
+        this.dashboardEditorMode !== 'configure' &&
+        !this.batchOptStatus &&
+        !this.hiddenListStatus
+      if (showing) {
+        this.closeDashboardCanvasAttr()
+        return
+      }
+      this.openDashboardCanvasAttr()
     },
     /** company: does componentId still exist anywhere in the tree (main canvas / Group / Tab children)? */
     componentExistsById(componentId, componentData = this.componentData) {
@@ -591,7 +617,7 @@ export const dvMainStore = defineStore('dataVisualization', {
               titleColor,
               titleLayout,
               layout,
-              btnList: ['sure'],
+              btnList: [],
               fontSize: '16',
               labelShow: true,
               fontWeight: '',

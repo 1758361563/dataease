@@ -74,7 +74,8 @@ const {
   batchOptStatus,
   targetLinkageInfo,
   curBatchOptComponents,
-  appData
+  appData,
+  dashboardCanvasAttrVisible
 } = storeToRefs(dvMainStore)
 const dvModel = 'dashboard'
 const multiplexingRef = ref(null)
@@ -368,8 +369,7 @@ onBeforeUnmount(() => {
   dvMainStore.setAppDataInfo(null)
 })
 const openDataBoardSetting = () => {
-  dvMainStore.setCurComponent({ component: null, index: null })
-  dvMainStore.setHiddenListStatus(false)
+  dvMainStore.toggleDashboardCanvasAttr()
 }
 
 const openHiddenList = () => {
@@ -669,6 +669,7 @@ const initOpenHandler = newWindow => {
           >
             <component-button
               :tips="t('components.dashboard_configuration')"
+              :active="dashboardCanvasAttrVisible && editMode !== 'preview'"
               @custom-click="openDataBoardSetting"
               :icon-name="dvDashboard"
             />

@@ -86,7 +86,7 @@ const defaultStyle = {
   background: '',
   text: '',
   layout: 'horizontal',
-  btnList: ['sure'],
+  btnList: [],
   titleLayout: 'left',
   titleShow: false,
   titleColor: '',
@@ -273,7 +273,7 @@ const setCustomStyle = val => {
   } = val
   customStyle.background = bgColor || ''
   customStyle.border = borderColor || ''
-  customStyle.btnList = [...btnList]
+  customStyle.btnList = [...(btnList || [])]
   customStyle.layout = layout
   customStyle.placeholderShow = placeholderShow ?? true
   customStyle.placeholderSize = placeholderSize ?? 16
@@ -879,7 +879,7 @@ watch(
 )
 
 const componentWithSure = computed(() => {
-  return customStyle.btnList.includes('sure')
+  return (customStyle.btnList || []).includes('sure')
 })
 
 watch(

@@ -46,7 +46,6 @@ const deCanvasRef = ref(null)
 // is enough since dashboardEditorMode/configuringComponentId are already global.)
 const onConfigureEsc = (e: KeyboardEvent) => {
   if (e.key !== 'Escape') return
-  if (dvMainStore.dashboardEditorMode !== 'configure') return
   const target = e.target as HTMLElement | null
   if (
     target?.closest?.(
@@ -55,8 +54,15 @@ const onConfigureEsc = (e: KeyboardEvent) => {
   ) {
     return
   }
-  e.stopPropagation()
-  dvMainStore.exitConfigure()
+  if (dvMainStore.dashboardEditorMode === 'configure') {
+    e.stopPropagation()
+    dvMainStore.exitConfigure()
+    return
+  }
+  if (dvMainStore.dashboardCanvasAttrVisible) {
+    e.stopPropagation()
+    dvMainStore.closeDashboardCanvasAttr()
+  }
 }
 const eventCheck = e => {
   if (e.key === 'panel-weight' && !compareStorage(e.oldValue, e.newValue)) {
@@ -82,7 +88,8 @@ const {
   hiddenListStatus,
   lastHiddenComponent,
   dvInfo,
-  componentEditorVisible
+  componentEditorVisible,
+  dashboardCanvasAttrVisible
 } = storeToRefs(dvMainStore)
 const dataInitState = ref(false)
 const appStore = useAppStoreWithOut()
@@ -133,8 +140,13 @@ const viewEditorShow = computed(() => {
 })
 
 const canvasAttrShow = computed(() => {
-  // company: keep canvas settings when a component is selected but not opened for config
-  return Boolean(!componentEditorVisible.value && !batchOptStatus.value && !hiddenListStatus.value)
+  // company: dashboard settings are opt-in via the top-bar button, not a persistent strip
+  return Boolean(
+    dashboardCanvasAttrVisible.value &&
+      !componentEditorVisible.value &&
+      !batchOptStatus.value &&
+      !hiddenListStatus.value
+  )
 })
 
 const checkPer = async resourceId => {
@@ -355,6 +367,7 @@ onUnmounted(() => {
   window.removeEventListener('storage', eventCheck)
   window.removeEventListener('message', winMsgHandle)
   window.removeEventListener('keydown', onConfigureEsc, true)
+  dvMainStore.closeDashboardCanvasAttr()
 })
 </script>
 
@@ -400,13 +413,15 @@ onUnmounted(() => {
         <component :is="findComponentAttr(curComponent)" :themes="'light'" />
       </dv-sidebar>
       <dv-sidebar
-        v-show="canvasAttrShow"
+        v-if="canvasAttrShow"
         :theme-info="'light'"
         :title="t('visualization.dashboard_configuration')"
         :width="420"
         aside-position="right"
         side-name="canvas"
         class="left-sidebar"
+        dismissible
+        @dismiss="dvMainStore.closeDashboardCanvasAttr()"
       >
         <DbCanvasAttr></DbCanvasAttr>
       </dv-sidebar>
