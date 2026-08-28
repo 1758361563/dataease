@@ -1,14 +1,16 @@
 import common from './config/common';
 import base from './config/base';
 import distributed from './config/distributed';
-import dev from './config/dev';
+import { createDevConfig } from './config/dev';
 import lib from './config/lib';
 import pages from './config/pages';
 import { defineConfig, mergeConfig } from 'vite'
 
 export default defineConfig(({mode}) => {
   if (mode === 'dev') {
-    return mergeConfig(common , mergeConfig(dev, pages))
+    const backend = process.env.DE_BACKEND_URL || 'http://localhost:8101'
+    console.log(`[company] Vite API target: ${backend}`)
+    return mergeConfig(common, mergeConfig(createDevConfig(backend), pages))
   }
 
   if (mode === 'lib') {

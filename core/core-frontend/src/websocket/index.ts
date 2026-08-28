@@ -4,9 +4,8 @@ import { useCache } from '@/hooks/web/useCache'
 import { useEmitt } from '@/hooks/web/useEmitt'
 const { wsCache } = useCache()
 let stompClient: Stomp.Client
-import dev from '../../config/dev'
 const env = import.meta.env
-const basePath = env.VITE_API_BASEPATH
+const devBackend = (env.VITE_DE_BACKEND_URL as string | undefined) || 'http://localhost:8101'
 
 export default {
   install() {
@@ -41,7 +40,7 @@ export default {
         // const href = window.location.href
         prefix = location.origin + location.pathname
         if (env.MODE === 'dev') {
-          prefix = dev.server.proxy[basePath].target + '/'
+          prefix = devBackend.replace(/\/$/, '') + '/'
         }
       }
       if (!prefix.endsWith('/')) {

@@ -4,6 +4,7 @@
   "version": "2.10.20",
   "scripts": {
     "dev:win": "set NODE_OPTIONS=--max_old_space_size=4096 && vite --mode dev --host 0.0.0.0",
+    "dev:official": "set DE_BACKEND_URL=http://localhost:8100&& set NODE_OPTIONS=--max_old_space_size=4096 && vite --mode dev --host 0.0.0.0",
     "dev": "NODE_OPTIONS=--max_old_space_size=4096 vite --mode dev --host 0.0.0.0",
     "build:flush": "cd ./flushbonading && rimraf ./demo.html && npm i && node ./index.js",
     "ts:check": "vue-tsc --noEmit",

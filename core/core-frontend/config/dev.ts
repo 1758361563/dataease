@@ -1,18 +1,22 @@
-export default {
-  server: {
-    proxy: {
-      '/api/f': {
-        target: 'http://localhost:8100',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/api\/f/, '')
-      },
-      // 使用 proxy 实例
-      '/api': {
-        target: 'http://localhost:8100',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/api/, 'de2api')
-      }
+export function createDevConfig(backend: string) {
+  return {
+    define: {
+      'import.meta.env.VITE_DE_BACKEND_URL': JSON.stringify(backend)
     },
-    port: 8080
+    server: {
+      proxy: {
+        '/api/f': {
+          target: backend,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api\/f/, '')
+        },
+        '/api': {
+          target: backend,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, 'de2api')
+        }
+      },
+      port: 8080
+    }
   }
 }
