@@ -500,7 +500,7 @@ const trackClick = trackAction => {
     dimensionList: state.pointParam.data.dimensionList,
     quotaList: state.pointParam.data.quotaList
   }
-  // 明细表 汇总表特殊处理 1.点击维度传递触发字段的值 2.点击指标传递的值非触发的维度字段值
+  // 明细表 / 汇总表联动按 Chart Placement Role（groupType）拆 dimension / quota，不再用 Dataset 默认角色。
   if (['table-info', 'table-normal'].includes(view.value.type)) {
     linkageParam.quotaList = []
     const dimensionIds = []

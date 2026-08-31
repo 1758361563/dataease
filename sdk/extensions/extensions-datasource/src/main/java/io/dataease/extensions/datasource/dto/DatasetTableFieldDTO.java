@@ -68,7 +68,9 @@ public class DatasetTableFieldDTO implements Serializable {
     private String dataeaseName;
 
     /**
-     * 维度/指标标识 d:维度，q:指标
+     * Dataset Default Role。d:维度，q:指标。
+     * 只表示这个字段在 Dataset 层默认更像 Dimension 还是 Measure，
+     * 不是 Chart Placement 的不可覆盖身份。图表实际角色见 ChartViewFieldDTO.groupType。
      */
     private String groupType;
 

@@ -64,6 +64,12 @@ import { useDraggable } from '@vueuse/core'
 import { PluginComponent } from '@/components/plugin'
 import { Field, getFieldByDQ, copyChartField, deleteChartField } from '@/api/chart'
 import { instanceKey } from '@/views/chart/components/js/chartFieldInstance'
+import {
+  applyAxisRoleAssignment,
+  checkPlacementEligibility,
+  resolveAxisRolePolicy,
+  resolveTargetRole
+} from '@/views/chart/components/js/axisRolePolicy'
 import ChartTemplateInfo from '@/views/chart/components/editor/common/ChartTemplateInfo.vue'
 import { XpackComponent } from '@/components/plugin'
 import { useEmbedded } from '@/store/modules/embedded'
@@ -619,24 +625,29 @@ const onMove = e => {
   state.moveId = e.draggedContext.element.id
   return true
 }
-// drag
-const dragCheckType = (list, type) => {
-  if (list && list.length > 0) {
-    let valid = true
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].groupType !== type) {
-        list.splice(i, 1)
-        valid = false
-      }
-    }
-    if (!valid) {
-      ElMessage({
-        message: type === 'd' ? t('chart.error_q_2_d') : t('chart.error_d_2_q'),
-        type: 'warning'
-      })
-    }
-    return valid
+/**
+ * Dataset groupType = default role；Chart placement groupType = actual role。
+ * 拖入轴时按 Axis Role Policy 赋值，不再要求 Dataset 默认角色与轴 type 相等。
+ */
+const applyPlacementRoleOnDrop = (list, index, axis: AxisType) => {
+  if (!list || index == null || !list[index]) {
+    return true
   }
+  const axisSpec = chartViewInstance.value?.axisConfig?.[axis]
+  const policy = resolveAxisRolePolicy(view.value.type, axis, axisSpec)
+  const item = list[index]
+  const targetRole = resolveTargetRole(policy, item)
+  const eligibility = checkPlacementEligibility(item, targetRole)
+  if (!eligibility.ok) {
+    list.splice(index, 1)
+    ElMessage({
+      message: t('chart.' + eligibility.reason),
+      type: 'warning'
+    })
+    return false
+  }
+  applyAxisRoleAssignment(item, policy)
+  return true
 }
 const dragMoveDuplicate = (list, e, mode) => {
   if (mode === 'ds') {
@@ -651,17 +662,6 @@ const dragMoveDuplicate = (list, e, mode) => {
     }
   }
 }
-const dragRemoveAggField = (list, e) => {
-  const dup = list.filter(function (m) {
-    return m.id === state.moveId
-  })
-  if (dup && dup.length > 0) {
-    if (dup[0].summary === '') {
-      list.splice(e.newDraggableIndex, 1)
-    }
-  }
-}
-
 const showAggregate = computed<boolean>(() => {
   if (view.value.type === 'bar-range') {
     const tempYAxis = view.value.yAxis[0]
@@ -731,11 +731,12 @@ const addAxis = (e, axis: AxisType) => {
   if (!axisSpec) {
     return
   }
-  const { type, limit, duplicate } = axisSpec
-  let typeValid, dup
+  const { limit, duplicate } = axisSpec
+  let typeValid = applyPlacementRoleOnDrop(view.value[axis], e.newDraggableIndex, axis)
+  let dup
 
-  if (view.value.type === 'bar-range' && (axis === 'yAxis' || axis === 'yAxisExt')) {
-    //区间条形图先排除非时间纬度或者指标的情况
+  if (typeValid && view.value.type === 'bar-range' && (axis === 'yAxis' || axis === 'yAxisExt')) {
+    // Preserve 轴：允许指标或时间维度，不能强制 ASSIGN_Q
     const list = view.value[axis]
     if (list && list.length > 0) {
       let valid = true
@@ -756,8 +757,8 @@ const addAxis = (e, axis: AxisType) => {
       }
       typeValid = valid
     }
-  } else if (view.value.type === 'multi-scatter' && axis === 'xAxis') {
-    // 多维散点图 xAxis 只接受指标或时间维度
+  } else if (typeValid && view.value.type === 'multi-scatter' && axis === 'xAxis') {
+    // Preserve 轴：允许指标或时间维度
     const list = view.value[axis]
     if (list && list.length > 0) {
       let valid = true
@@ -780,33 +781,10 @@ const addAxis = (e, axis: AxisType) => {
     (view.value.type === 'flow-map' && (axis === 'xAxis' || axis === 'xAxisExt'))
   ) {
     typeValid = dragCheckMapType(view.value[axis])
-  } else if (type) {
-    typeValid = dragCheckType(view.value[axis], type)
   }
 
-  // 针对指标卡/复合指标卡进行数值类型判断
-  if (
-    typeValid &&
-    type === 'q' &&
-    (view.value.type === 'indicator' || view.value.type === 'indicator-combo')
-  ) {
-    const list = view.value[axis]
-    if (list && list.length > 0) {
-      let valid = true
-      for (let i = 0; i < list.length; i++) {
-        if (list[i].deType !== 2 && list[i].deType !== 3) {
-          list.splice(i, 1)
-          valid = false
-        }
-      }
-      typeValid = valid
-      if (!typeValid) {
-        ElMessage({
-          message: t('chart.error_not_number'),
-          type: 'warning'
-        })
-      }
-    }
+  if (!typeValid) {
+    return
   }
 
   if (!duplicate) {
@@ -949,9 +927,8 @@ const addExtBubble = e => {
 
 const addDrill = e => {
   recordSnapshotInfo('calcData')
-  dragCheckType(view.value.drillFields, 'd')
+  applyPlacementRoleOnDrop(view.value.drillFields, e.newDraggableIndex, 'drillFields')
   dragMoveDuplicate(view.value.drillFields, e, '')
-  dragRemoveAggField(view.value.drillFields, e)
 }
 
 const addFlowMapStartName = e => {
@@ -1059,14 +1036,16 @@ const onTypeChange = (render, type) => {
         return
       }
       const axisSpec = axisConfig[axis]
-      const { type, limit } = axisSpec
+      const { limit } = axisSpec
       const removedAxis = []
-      // check type
-      if (type) {
+      // O1：切图不是 role assignment。角色不兼容则移除，不自动 d↔q。
+      const policy = resolveAxisRolePolicy(view.value.type, axis, axisSpec)
+      if (policy === 'ASSIGN_D' || policy === 'ASSIGN_Q') {
+        const required = policy === 'ASSIGN_D' ? 'd' : 'q'
         for (let i = axisArr.length - 1; i >= 0; i--) {
-          if (axisArr[i].groupType !== type) {
-            const [axis] = axisArr.splice(i, 1)
-            removedAxis.push(axis)
+          if (axisArr[i].groupType !== required) {
+            const [removed] = axisArr.splice(i, 1)
+            removedAxis.push(removed)
           }
         }
       }

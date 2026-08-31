@@ -1809,8 +1809,9 @@ export default {
     addition: 'Condition',
     drill_field_error: 'The drill-down start field must be in the dimension',
     error_not_number: 'Drag of non-numeric indicators is not supported',
-    error_q_2_d: 'Drag of indicators to dimensions is not supported',
-    error_d_2_q: 'Drag of dimensions to indicators is not supported',
+    error_record_count_as_dimension: 'The record-count field cannot be used as a dimension',
+    error_agg_field_as_dimension: 'Aggregated calculated fields cannot be used as dimensions',
+    error_url_as_measure: 'URL fields cannot be used as measures',
     error_d_not_time_2_q: 'Drag of non-time dimensions is not supported',
     error_bar_range_axis_type_not_equal:
       'The start value and end value must be set to the same type',

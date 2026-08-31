@@ -29,6 +29,11 @@ public class ChartViewFieldDTO extends ChartViewFieldBaseDTO implements Serializ
 
     private boolean hide;
 
+    /**
+     * Actual Placement Role。d:Dimension，q:Measure。
+     * 这一次图表 placement 实际扮演的角色，与 Dataset Default Role 解耦。
+     * Dataset 默认角色见 DatasetTableFieldDTO.groupType。
+     */
     private String groupType;
 
     /**

@@ -483,9 +483,20 @@ public class Det2AppDatasetRebindV1Manage {
         }
     }
 
+    /**
+     * Dataset field groupType is a default role.
+     * Chart placement groupType is the actual placement role.
+     *
+     * Rebind updates physical field binding from the target dataset,
+     * but preserves placement-level analysis intent from the source chart.
+     *
+     * copyBean(targetField) is only for physical metadata (id / originName / deType / ...).
+     * Do not let target Dataset default role overwrite source placement role.
+     */
     ChartViewFieldDTO rebuildChartField(ChartViewFieldDTO sourcePlacement, DatasetTableFieldDTO targetField) {
         ChartViewFieldDTO rebuilt = new ChartViewFieldDTO();
         BeanUtils.copyBean(rebuilt, targetField);
+        rebuilt.setGroupType(sourcePlacement.getGroupType());
         rebuilt.setSummary(sourcePlacement.getSummary());
         rebuilt.setSort(sourcePlacement.getSort());
         rebuilt.setFieldInstanceId(sourcePlacement.getFieldInstanceId());
@@ -670,7 +681,8 @@ public class Det2AppDatasetRebindV1Manage {
         if (StringUtils.equalsIgnoreCase(sourceGroupType, targetGroupType)) {
             return true;
         }
-        // 宽表同一物理列在 Source/Target 上 d/q 标注不一致时，以 Target metadata 为准，不阻断
+        // Dataset groupType is a default role, not physical identity.
+        // d↔q mismatch must not block matching. Placement role is restored in rebuildChartField.
         if (StringUtils.equalsIgnoreCase(sourceGroupType, "d") && StringUtils.equalsIgnoreCase(targetGroupType, "q")) {
             return true;
         }

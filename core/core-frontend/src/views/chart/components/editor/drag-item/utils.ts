@@ -1,76 +1,44 @@
 import { getCSSVariable } from '@/utils/color'
 
+/**
+ * 轴上字段标签颜色 / 有效性。
+ *
+ * Dataset field groupType = default role（只决定字段在左侧哪一栏）
+ * Chart placement groupType = actual role（决定标签颜色）
+ *
+ * 红色只表示物理字段缺失或 deType 不一致，
+ * 不再表示 Dataset default role 与 Chart placement role 不一致。
+ */
 export function getItemType(dimensionData, quotaData, item) {
   // Check whether the current view is in template status
   // ( dimensionData and quotaData have no data). If yes, return 'success' directly
   if (dimensionData.length === 0 && quotaData.length === 0) {
-    return getCSSVariable()
-  }
-  // 将item的字段在数据集维度、指标字段中查询一遍，如果遇到id不存在、字段类型不一致、维度指标不一致，则提示
-  const status = item.groupType
-  let checked = false
-  if (status === 'd') {
-    for (let i = 0; i < dimensionData.length; i++) {
-      const ele = dimensionData[i]
-      if (item.chartId) {
-        if (
-          ele.originName === item.originName &&
-          ele.dataeaseName === item.dataeaseName &&
-          ele.deType === item.deType &&
-          ele.groupType === item.groupType
-        ) {
-          checked = true
-          break
-        }
-      } else {
-        if (
-          ele.id === item.id &&
-          ele.originName === item.originName &&
-          ele.deType === item.deType &&
-          ele.groupType === item.groupType
-        ) {
-          checked = true
-          break
-        }
-      }
-    }
-  }
-  if (status === 'q') {
-    for (let i = 0; i < quotaData.length; i++) {
-      const ele = quotaData[i]
-      if (item.chartId) {
-        if (
-          ele.originName === item.originName &&
-          ele.dataeaseName === item.dataeaseName &&
-          ele.deType === item.deType &&
-          ele.groupType === item.groupType
-        ) {
-          checked = true
-          break
-        }
-      } else {
-        if (
-          ele.id === item.id &&
-          ele.originName === item.originName &&
-          ele.deType === item.deType &&
-          ele.groupType === item.groupType
-        ) {
-          checked = true
-          break
-        }
-      }
-    }
+    return item?.groupType === 'q' ? '#04b49c' : getCSSVariable()
   }
 
-  if (checked) {
-    if (status === 'd') {
-      return getCSSVariable()
-    } else if (status === 'q') {
-      return '#04b49c'
-    }
-  } else {
+  const source = [...(dimensionData || []), ...(quotaData || [])]
+  const checked = source.some(ele => physicalFieldMatches(ele, item))
+
+  if (!checked) {
     return '#F54A45'
   }
+  if (item.groupType === 'q') {
+    return '#04b49c'
+  }
+  return getCSSVariable()
+}
+
+function physicalFieldMatches(ele, item): boolean {
+  if (!ele || !item) {
+    return false
+  }
+  if (ele.deType !== item.deType) {
+    return false
+  }
+  if (item.chartId) {
+    return ele.originName === item.originName && ele.dataeaseName === item.dataeaseName
+  }
+  return ele.id === item.id && ele.originName === item.originName
 }
 
 export function getOriginFieldName(dimensionList, quotaList, field) {

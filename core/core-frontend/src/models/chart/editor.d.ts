@@ -78,7 +78,10 @@ declare type AxisSpec = {
    */
   name: string
   /**
-   * 轴类型限制, 没有表示不限制
+   * Placement Role Assignment。
+   * d / q 表示字段放入此轴后的实际角色，不是「只接受 Dataset 默认角色为 d/q 的字段」。
+   * 没有 type 表示 PRESERVE（混合语义或角色中性）。
+   * bar-range.yAxis / multi-scatter.xAxis 等即使声明了 type 也必须走 PRESERVE，见 resolveAxisRolePolicy。
    */
   type?: 'q' | 'd'
   /**

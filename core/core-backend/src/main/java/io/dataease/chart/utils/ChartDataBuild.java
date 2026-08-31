@@ -1518,6 +1518,17 @@ public class ChartDataBuild {
         return desensitizationStr;
     }
 
+    /**
+     * COUNT / COUNT DISTINCT on a Measure placement is a numeric result,
+     * even when the physical field deType is text / time / geo.
+     */
+    public static boolean isCountLikeNumericMeasure(ChartViewFieldDTO field) {
+        if (field == null || !StringUtils.equalsIgnoreCase(field.getGroupType(), "q")) {
+            return false;
+        }
+        return StringUtils.equalsAnyIgnoreCase(field.getSummary(), "count", "count_distinct");
+    }
+
     public static Map<String, Object> transTableNormal(List<ChartViewFieldDTO> fields, ChartViewDTO view, List<String[]> data, Map<String, ColumnPermissionItem> desensitizationList) {
         Map<String, Object> map = new TreeMap<>();
         List<Map<String, Object>> tableRow = new ArrayList<>();
@@ -1533,7 +1544,9 @@ public class ChartDataBuild {
                     continue;
                 }
                 if (i == ele.length) break;
-                if (chartViewFieldDTO.getDeType() == 0 || chartViewFieldDTO.getDeType() == 1 || chartViewFieldDTO.getDeType() == 5 || chartViewFieldDTO.getDeType() == 7) {
+                if (isCountLikeNumericMeasure(chartViewFieldDTO)) {
+                    d.put(resultKey, StringUtils.isEmpty(ele[i]) ? null : new BigDecimal(ele[i]).setScale(8, RoundingMode.HALF_UP));
+                } else if (chartViewFieldDTO.getDeType() == 0 || chartViewFieldDTO.getDeType() == 1 || chartViewFieldDTO.getDeType() == 5 || chartViewFieldDTO.getDeType() == 7) {
                     d.put(resultKey, ele[i]);
                 } else if (chartViewFieldDTO.getDeType() == 2 || chartViewFieldDTO.getDeType() == 3 || chartViewFieldDTO.getDeType() == 4) {
                     // 如果是在维度中展示，导出excel时展示为字符串，其它情况展示为数值类型

@@ -8,6 +8,7 @@ import io.dataease.api.chart.request.ChartExcelRequestInner;
 import io.dataease.auth.DeLinkPermit;
 import io.dataease.chart.constant.ChartConstants;
 import io.dataease.chart.manage.ChartDataManage;
+import io.dataease.chart.utils.ChartDataBuild;
 import io.dataease.constant.*;
 import io.dataease.dataset.manage.PermissionManage;
 import io.dataease.dataset.server.DatasetFieldServer;
@@ -385,7 +386,7 @@ public class ChartDataServer implements ChartDataApi {
         if (StringUtils.equalsAnyIgnoreCase(viewInfo.getType(), "table-normal", "table-info")) {
             exportFields = exportFields.stream().filter(tmpAxis -> !tmpAxis.isHide()).toList();
             for (ChartViewFieldDTO tmpAxis : exportFields) {
-                if (tmpAxis.getDeType().equals(DeTypeConstants.DE_INT) || tmpAxis.getDeType().equals(DeTypeConstants.DE_FLOAT)) {
+                if (isNumericExcelField(tmpAxis)) {
                     FormatterCfgDTO formatterCfg = tmpAxis.getFormatterCfg();
                     CellStyle formatterCellStyle = formatterCfg != null && "auto".equalsIgnoreCase(formatterCfg.getType())
                             ? null
@@ -540,7 +541,7 @@ public class ChartDataServer implements ChartDataApi {
                             try {
                                 if (StringUtils.equalsAnyIgnoreCase(viewInfo.getType(), "table-info", "table-normal")
                                         && j < exportFields.size()
-                                        && Arrays.asList(DeTypeConstants.DE_INT, DeTypeConstants.DE_FLOAT).contains(exportFields.get(j).getDeType())) {
+                                        && isNumericExcelField(exportFields.get(j))) {
                                     try {
                                         FormatterCfgDTO formatterCfgDTO = exportFields.get(j).getFormatterCfg() == null ? new FormatterCfgDTO().setUnitLanguage(Lang.isChinese() ? "ch" : "en") : exportFields.get(j).getFormatterCfg();
                                         String exportNumericValue = cellValue(formatterCfgDTO, new BigDecimal(cellValObj.toString()));
@@ -592,6 +593,18 @@ public class ChartDataServer implements ChartDataApi {
                 mergeConfig.forEach(detailsSheet::addMergedRegionUnsafe);
             }
         }
+    }
+
+    private static boolean isNumericExcelField(ChartViewFieldDTO field) {
+        if (field == null) {
+            return false;
+        }
+        if (ChartDataBuild.isCountLikeNumericMeasure(field)) {
+            return true;
+        }
+        return field.getDeType() != null
+                && (Objects.equals(field.getDeType(), DeTypeConstants.DE_INT)
+                || Objects.equals(field.getDeType(), DeTypeConstants.DE_FLOAT));
     }
 
     private static Integer getExcelType(int columnIndex, Integer[] excelTypes, List<ChartViewFieldDTO> exportFields, ChartViewDTO viewInfo) {
