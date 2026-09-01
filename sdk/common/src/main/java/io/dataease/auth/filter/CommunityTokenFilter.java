@@ -35,17 +35,7 @@ public class CommunityTokenFilter implements Filter {
         String token = ServletUtils.getToken();
         TokenUserBO userBO = null;
         if (StringUtils.isNotBlank(token) && ObjectUtils.isNotEmpty(userBO = AuthUtils.getUser()) && ObjectUtils.isNotEmpty(userId = userBO.getUserId()) && !LicenseUtil.licenseValid()) {
-            String secret = null;
-            if (ObjectUtils.isEmpty(CommonBeanFactory.getBean("loginServer"))) {
-                secret = SubstituleLoginConfig.getTokenSecret();
-            } else {
-                Object apisixCacheManage = CommonBeanFactory.getBean("apisixCacheManage");
-                Method method = DeReflectUtil.findMethod(apisixCacheManage.getClass(), "userCacheBO");
-                Object o = ReflectionUtils.invokeMethod(method, apisixCacheManage, userId);
-                Method pwdMethod = DeReflectUtil.findMethod(o.getClass(), "getSecret");
-                Object pwdObj = ReflectionUtils.invokeMethod(pwdMethod, o);
-                secret = pwdObj.toString();
-            }
+            String secret = resolveVerifySecret(userId);
             try {
                 Algorithm algorithm = Algorithm.HMAC256(secret);
                 Verification verification = JWT.require(algorithm).withClaim("uid", userId).withClaim("oid", userBO.getDefaultOid());
@@ -65,6 +55,27 @@ public class CommunityTokenFilter implements Filter {
         }
 
         filterChain.doFilter(servletRequest, servletResponse);
+    }
+
+    /**
+     * Company loginServer has no apisixCacheManage. Prefer companyTokenSecret when present.
+     */
+    private String resolveVerifySecret(Long userId) {
+        Object companySecret = CommonBeanFactory.getBean("companyTokenSecret");
+        if (ObjectUtils.isNotEmpty(companySecret)) {
+            Method getSecret = DeReflectUtil.findMethod(companySecret.getClass(), "getSecret");
+            Object secretObj = ReflectionUtils.invokeMethod(getSecret, companySecret);
+            return secretObj == null ? null : secretObj.toString();
+        }
+        if (ObjectUtils.isEmpty(CommonBeanFactory.getBean("loginServer"))) {
+            return SubstituleLoginConfig.getTokenSecret();
+        }
+        Object apisixCacheManage = CommonBeanFactory.getBean("apisixCacheManage");
+        Method method = DeReflectUtil.findMethod(apisixCacheManage.getClass(), "userCacheBO");
+        Object o = ReflectionUtils.invokeMethod(method, apisixCacheManage, userId);
+        Method pwdMethod = DeReflectUtil.findMethod(o.getClass(), "getSecret");
+        Object pwdObj = ReflectionUtils.invokeMethod(pwdMethod, o);
+        return pwdObj == null ? null : pwdObj.toString();
     }
 
     private void sendResponseEntity(HttpServletResponse httpResponse, ResponseEntity<String> responseEntity) throws IOException {
