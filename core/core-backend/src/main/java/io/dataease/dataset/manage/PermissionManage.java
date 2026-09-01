@@ -153,6 +153,9 @@ public class PermissionManage {
         if (AuthUtils.isSysAdmin(userId)) {
             return datasetRowPermissions;
         }
+        if (getRowPermissionsApi() == null) {
+            return datasetRowPermissions;
+        }
         UserFormVO userEntity = getRowPermissionsApi().getUserById(userId);
         List<Long> roleIds = userEntity.getRoleIds().stream().map(x -> Long.valueOf(x)).collect(Collectors.toList());
         DatasetRowPermissionsTreeRequest dataSetRowPermissionsDTO = new DatasetRowPermissionsTreeRequest();

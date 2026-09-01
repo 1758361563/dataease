@@ -1,5 +1,6 @@
 package io.dataease.company.bi.auth;
 
+import io.dataease.company.bi.permission.CompanyDatasetAclBootstrapper;
 import io.dataease.company.bi.user.CompanyBiUserService;
 import io.dataease.utils.LogUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -22,10 +23,16 @@ import java.sql.Statement;
 @ConditionalOnProperty(name = CompanyAuthSupport.ENABLED_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class CompanyBiSchemaInitializer implements ApplicationRunner {
 
-    private static final String SCHEMA_LOCATION = "db/company/company_bi_user.sql";
+    private static final String[] SCHEMA_LOCATIONS = {
+            "db/company/company_bi_user.sql",
+            "db/company/company_bi_group.sql",
+            "db/company/company_bi_group_member.sql",
+            "db/company/company_bi_resource_acl.sql"
+    };
 
     private final DataSource dataSource;
     private final CompanyBiBootstrapper bootstrapper;
+    private final CompanyDatasetAclBootstrapper datasetAclBootstrapper;
 
     @Value("${company.bi.bootstrap-username:admin}")
     private String bootstrapUsername;
@@ -38,29 +45,34 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
 
     public CompanyBiSchemaInitializer(DataSource dataSource,
                                       CompanyBiUserService userService,
-                                      CompanyPasswordHasher passwordHasher) {
+                                      CompanyPasswordHasher passwordHasher,
+                                      CompanyDatasetAclBootstrapper datasetAclBootstrapper) {
         this.dataSource = dataSource;
         this.bootstrapper = new CompanyBiBootstrapper(userService, passwordHasher);
+        this.datasetAclBootstrapper = datasetAclBootstrapper;
     }
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
         applySchema();
         bootstrapper.ensureBootstrapAdmin(bootstrapUsername, bootstrapDisplayName, bootstrapPassword);
+        datasetAclBootstrapper.seedBootstrapAdminExistingDatasets();
     }
 
     private void applySchema() throws Exception {
-        ClassPathResource resource = new ClassPathResource(SCHEMA_LOCATION);
-        String sql;
-        try (var in = resource.getInputStream()) {
-            sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
-        if (StringUtils.isBlank(sql)) {
-            throw new IllegalStateException("Empty schema script: " + SCHEMA_LOCATION);
-        }
         try (Connection conn = dataSource.getConnection(); Statement stmt = conn.createStatement()) {
-            stmt.execute(sql);
+            for (String location : SCHEMA_LOCATIONS) {
+                ClassPathResource resource = new ClassPathResource(location);
+                String sql;
+                try (var in = resource.getInputStream()) {
+                    sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                }
+                if (StringUtils.isBlank(sql)) {
+                    throw new IllegalStateException("Empty schema script: " + location);
+                }
+                stmt.execute(sql);
+                LogUtil.info("Applied company schema if missing: " + location);
+            }
         }
-        LogUtil.info("Applied company_bi_user schema if missing");
     }
 }

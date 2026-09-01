@@ -1131,6 +1131,15 @@ public class DatasetDataManage {
         List<DatasetTableFieldDTO> allFields = new ArrayList<>();
         DatasetTableFieldDTO field = datasetTableFieldManage.selectById(ids.getFirst());
         Long datasetGroupId = field.getDatasetGroupId();
+
+        BusiPerCheckDTO dto = new BusiPerCheckDTO();
+        dto.setId(datasetGroupId);
+        dto.setAuthEnum(AuthEnum.READ);
+        boolean checked = corePermissionManage.checkAuth(dto);
+        if (!checked) {
+            DEException.throwException(Translator.get("i18n_no_dataset_permission"));
+        }
+
         if (field.getChartId() != null) {
             allFields.addAll(datasetTableFieldManage.getChartCalcFields(field.getChartId()));
         }

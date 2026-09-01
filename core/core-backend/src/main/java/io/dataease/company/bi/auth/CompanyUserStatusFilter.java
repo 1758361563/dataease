@@ -1,6 +1,7 @@
 package io.dataease.company.bi.auth;
 
 import io.dataease.auth.bo.TokenUserBO;
+import io.dataease.company.bi.permission.CompanyResourceTypeLookup;
 import io.dataease.exception.DEException;
 import io.dataease.utils.AuthUtils;
 import io.dataease.utils.LogUtil;
@@ -32,23 +33,27 @@ public class CompanyUserStatusFilter implements Filter {
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain)
             throws IOException, ServletException {
-        TokenUserBO user = AuthUtils.getUser();
-        if (user == null || user.getUserId() == null) {
-            filterChain.doFilter(servletRequest, servletResponse);
-            return;
-        }
         try {
-            statusGuard.requireActive(user.getUserId());
-        } catch (DEException e) {
-            LogUtil.error(e.getMessage(), e);
-            HttpServletResponse res = (HttpServletResponse) servletResponse;
-            String msg = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8).replace("+", "%20");
-            HttpHeaders headers = new HttpHeaders();
-            headers.add(HEAD_NAME, msg);
-            sendResponseEntity(res, new ResponseEntity<>(e.getMessage(), headers, HttpStatus.UNAUTHORIZED));
-            return;
+            TokenUserBO user = AuthUtils.getUser();
+            if (user == null || user.getUserId() == null) {
+                filterChain.doFilter(servletRequest, servletResponse);
+                return;
+            }
+            try {
+                statusGuard.requireActive(user.getUserId());
+            } catch (DEException e) {
+                LogUtil.error(e.getMessage(), e);
+                HttpServletResponse res = (HttpServletResponse) servletResponse;
+                String msg = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8).replace("+", "%20");
+                HttpHeaders headers = new HttpHeaders();
+                headers.add(HEAD_NAME, msg);
+                sendResponseEntity(res, new ResponseEntity<>(e.getMessage(), headers, HttpStatus.UNAUTHORIZED));
+                return;
+            }
+            filterChain.doFilter(servletRequest, servletResponse);
+        } finally {
+            CompanyResourceTypeLookup.clearRequestCache();
         }
-        filterChain.doFilter(servletRequest, servletResponse);
     }
 
     private void sendResponseEntity(HttpServletResponse httpResponse, ResponseEntity<String> responseEntity) throws IOException {
