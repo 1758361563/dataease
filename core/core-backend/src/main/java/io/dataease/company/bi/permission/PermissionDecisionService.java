@@ -80,6 +80,32 @@ public class PermissionDecisionService {
         return resolveDashboardRelation(userId, dashboardId).hasAccess();
     }
 
+    public CompanyResourceRelation resolveFolderRelation(Long userId, Long folderId) {
+        if (dashboardPermissionResolver == null) {
+            return CompanyResourceRelation.NONE;
+        }
+        CompanyBiUser user = enabledUser(userId);
+        if (user == null) {
+            return CompanyResourceRelation.NONE;
+        }
+        return dashboardPermissionResolver.resolveFolderRelation(user, folderId);
+    }
+
+    public boolean hasFolderAccess(Long userId, Long folderId) {
+        return resolveFolderRelation(userId, folderId).hasAccess();
+    }
+
+    public boolean isFolder(Long id) {
+        return dashboardPermissionResolver != null && dashboardPermissionResolver.isFolder(id);
+    }
+
+    public VisualizationHierarchy hierarchy() {
+        if (dashboardPermissionResolver == null) {
+            return VisualizationHierarchy.empty();
+        }
+        return dashboardPermissionResolver.hierarchy();
+    }
+
     public boolean canViewDashboard(Long userId, Long dashboardId) {
         return hasDashboardAccess(userId, dashboardId)
                 && hasCapability(userId, CompanyCapability.DASHBOARD_VIEW);
@@ -113,6 +139,23 @@ public class PermissionDecisionService {
         return hasCapability(userId, CompanyCapability.DASHBOARD_EDIT);
     }
 
+    public boolean canViewFolder(Long userId, Long folderId) {
+        return hasFolderAccess(userId, folderId)
+                && hasCapability(userId, CompanyCapability.DASHBOARD_VIEW);
+    }
+
+    public boolean canEditFolder(Long userId, Long folderId) {
+        return hasFolderAccess(userId, folderId)
+                && hasCapability(userId, CompanyCapability.DASHBOARD_EDIT);
+    }
+
+    public boolean canCreateInFolder(Long userId, Long pid) {
+        if (!canCreateDashboard(userId)) {
+            return false;
+        }
+        return VisualizationHierarchy.isRootPid(pid) || hasFolderAccess(userId, pid);
+    }
+
     public DashboardPermissionProjection projectDashboard(Long userId, Long dashboardId) {
         if (projectionService == null) {
             return new DashboardPermissionProjection(0, 0);
@@ -128,6 +171,13 @@ public class PermissionDecisionService {
             return java.util.Set.of();
         }
         return dashboardPermissionResolver.accessibleDashboardIds(userId);
+    }
+
+    public java.util.Set<Long> accessibleFolderIds(Long userId) {
+        if (dashboardPermissionResolver == null || enabledUser(userId) == null) {
+            return java.util.Set.of();
+        }
+        return dashboardPermissionResolver.accessibleFolderIds(userId);
     }
 
     private CompanyBiUser enabledUser(Long userId) {

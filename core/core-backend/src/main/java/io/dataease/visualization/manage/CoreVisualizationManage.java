@@ -103,7 +103,7 @@ public class CoreVisualizationManage {
         }
         QueryWrapper<Object> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("delete_flag", false);
-        queryWrapper.ne("pid", -1);
+        queryWrapper.ne("pid", "-1");
         queryWrapper.eq(ObjectUtils.isNotEmpty(request.getLeaf()), "node_type", ObjectUtils.isNotEmpty(request.getLeaf()) && request.getLeaf() ? "leaf" : "folder");
         queryWrapper.eq("type", request.getBusiFlag());
         String info = CommunityUtils.getInfo();

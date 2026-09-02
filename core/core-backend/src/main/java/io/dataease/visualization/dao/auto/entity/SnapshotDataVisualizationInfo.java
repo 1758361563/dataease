@@ -1,6 +1,10 @@
 package io.dataease.visualization.dao.auto.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
+import io.dataease.visualization.jdbc.VarcharLongTypeHandler;
+import org.apache.ibatis.type.JdbcType;
+
 import java.io.Serializable;
 
 /**
@@ -11,7 +15,7 @@ import java.io.Serializable;
  * @author fit2cloud
  * @since 2025-03-24
  */
-@TableName("snapshot_data_visualization_info")
+@TableName(value = "snapshot_data_visualization_info", autoResultMap = true)
 public class SnapshotDataVisualizationInfo implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -19,6 +23,7 @@ public class SnapshotDataVisualizationInfo implements Serializable {
     /**
      * 主键
      */
+    @TableField(jdbcType = JdbcType.VARCHAR, typeHandler = VarcharLongTypeHandler.class)
     private Long id;
 
     /**
@@ -29,6 +34,7 @@ public class SnapshotDataVisualizationInfo implements Serializable {
     /**
      * 父id
      */
+    @TableField(jdbcType = JdbcType.VARCHAR, typeHandler = VarcharLongTypeHandler.class)
     private Long pid;
 
     /**

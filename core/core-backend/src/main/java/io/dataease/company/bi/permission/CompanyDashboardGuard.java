@@ -18,9 +18,15 @@ public class CompanyDashboardGuard {
         this.permissionDecisionService = permissionDecisionService;
     }
 
-    public void requireView(Long dashboardId) {
+    public void requireView(Long resourceId) {
         Long userId = currentUserId();
-        if (!permissionDecisionService.canViewDashboard(userId, dashboardId)) {
+        if (permissionDecisionService.isFolder(resourceId)) {
+            if (!permissionDecisionService.canViewFolder(userId, resourceId)) {
+                deny();
+            }
+            return;
+        }
+        if (!permissionDecisionService.canViewDashboard(userId, resourceId)) {
             deny();
         }
     }
@@ -32,9 +38,30 @@ public class CompanyDashboardGuard {
         }
     }
 
+    public void requireFolderAccess(Long folderId) {
+        Long userId = currentUserId();
+        if (!permissionDecisionService.hasFolderAccess(userId, folderId)) {
+            deny();
+        }
+    }
+
+    public void requireFolderEdit(Long folderId) {
+        Long userId = currentUserId();
+        if (!permissionDecisionService.canEditFolder(userId, folderId)) {
+            deny();
+        }
+    }
+
     public void requireCreate() {
         Long userId = currentUserId();
         if (!permissionDecisionService.canCreateDashboard(userId)) {
+            deny();
+        }
+    }
+
+    public void requireCreateIn(Long pid) {
+        Long userId = currentUserId();
+        if (!permissionDecisionService.canCreateInFolder(userId, pid)) {
             deny();
         }
     }

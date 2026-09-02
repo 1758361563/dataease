@@ -164,4 +164,75 @@ public class CompanyAclRepository {
         List<CompanyBiResourceAcl> rows = mapper.selectList(wrapper);
         return rows == null ? List.of() : rows;
     }
+
+    public boolean insertIfAbsentUserFolderVisitor(Long userId, Long folderId, Long createdBy) {
+        return insertIfAbsentFolder(CompanySubjectType.USER, userId, folderId, CompanyRelationLevel.VISITOR, createdBy);
+    }
+
+    public boolean insertIfAbsentFolder(CompanySubjectType subjectType, Long subjectId, Long folderId,
+                                        CompanyRelationLevel relationLevel, Long createdBy) {
+        if (subjectType == null || subjectId == null || folderId == null || relationLevel == null) {
+            return false;
+        }
+        if (existsFolderAcl(subjectType, subjectId, folderId)) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        CompanyBiResourceAcl row = new CompanyBiResourceAcl();
+        row.setSubjectType(subjectType.name());
+        row.setSubjectId(subjectId);
+        row.setResourceType(CompanyResourceType.DASHBOARD_FOLDER.name());
+        row.setResourceId(folderId);
+        row.setRelationLevel(relationLevel.name());
+        row.setCreatedAt(now);
+        row.setCreatedBy(createdBy);
+        row.setUpdatedAt(now);
+        row.setUpdatedBy(createdBy);
+        try {
+            mapper.insert(row);
+            return true;
+        } catch (DuplicateKeyException ignored) {
+            return false;
+        }
+    }
+
+    public boolean existsFolderAcl(CompanySubjectType subjectType, Long subjectId, Long folderId) {
+        if (subjectType == null || subjectId == null || folderId == null) {
+            return false;
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("subject_type", subjectType.name())
+                .eq("subject_id", subjectId)
+                .eq("resource_type", CompanyResourceType.DASHBOARD_FOLDER.name())
+                .eq("resource_id", folderId)
+                .last("LIMIT 1");
+        return mapper.selectCount(wrapper) > 0;
+    }
+
+    public List<CompanyBiResourceAcl> listFolderAcls(Long userId, Collection<Long> groupIds) {
+        if (userId == null) {
+            return List.of();
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("resource_type", CompanyResourceType.DASHBOARD_FOLDER.name());
+        if (groupIds == null || groupIds.isEmpty()) {
+            wrapper.eq("subject_type", CompanySubjectType.USER.name()).eq("subject_id", userId);
+        } else {
+            List<Long> groups = new ArrayList<>(groupIds);
+            wrapper.and(w -> w.nested(u -> u.eq("subject_type", CompanySubjectType.USER.name()).eq("subject_id", userId))
+                    .or(g -> g.eq("subject_type", CompanySubjectType.GROUP.name()).in("subject_id", groups)));
+        }
+        List<CompanyBiResourceAcl> rows = mapper.selectList(wrapper);
+        return rows == null ? List.of() : rows;
+    }
+
+    public void deleteAclsForResources(Collection<Long> resourceIds) {
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            return;
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.in("resource_type", CompanyResourceType.DASHBOARD.name(), CompanyResourceType.DASHBOARD_FOLDER.name())
+                .in("resource_id", resourceIds);
+        mapper.delete(wrapper);
+    }
 }

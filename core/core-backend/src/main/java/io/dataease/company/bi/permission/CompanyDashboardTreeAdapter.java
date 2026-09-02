@@ -36,9 +36,16 @@ public class CompanyDashboardTreeAdapter {
         }
         Long userId = tokenUser.getUserId();
         Set<Long> accessible = permissionDecisionService.accessibleDashboardIds(userId);
+        Set<Long> folders = permissionDecisionService.accessibleFolderIds(userId);
         CompanyAccountRole role = roleOf(userId);
         DashboardPermissionProjection leaf = projectionService.project(role, true);
-        return CompanyDashboardTreePruner.prune(tree, accessible, leaf, projectionService.folderShell());
+        return CompanyDashboardTreePruner.prune(
+                tree,
+                accessible,
+                folders,
+                leaf,
+                projectionService.authorizedFolder(role),
+                projectionService.folderShell());
     }
 
     private CompanyAccountRole roleOf(Long userId) {

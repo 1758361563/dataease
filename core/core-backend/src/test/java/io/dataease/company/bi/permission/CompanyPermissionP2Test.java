@@ -436,17 +436,58 @@ class CompanyPermissionP2Test {
         @Override
         public List<CompanyBiResourceAcl> listDashboardAcls(Long userId, Collection<Long> groupIds) {
             List<CompanyBiResourceAcl> out = new ArrayList<>();
-            collect(out, CompanySubjectType.USER, userId);
+            collect(out, CompanySubjectType.USER, userId, CompanyResourceType.DASHBOARD);
             if (groupIds != null) {
                 for (Long groupId : groupIds) {
-                    collect(out, CompanySubjectType.GROUP, groupId);
+                    collect(out, CompanySubjectType.GROUP, groupId, CompanyResourceType.DASHBOARD);
                 }
             }
             return out;
         }
 
-        private void collect(List<CompanyBiResourceAcl> out, CompanySubjectType subjectType, Long subjectId) {
-            String prefix = subjectType + ":" + subjectId + ":" + CompanyResourceType.DASHBOARD + ":";
+        @Override
+        public List<CompanyBiResourceAcl> listFolderAcls(Long userId, Collection<Long> groupIds) {
+            List<CompanyBiResourceAcl> out = new ArrayList<>();
+            collect(out, CompanySubjectType.USER, userId, CompanyResourceType.DASHBOARD_FOLDER);
+            if (groupIds != null) {
+                for (Long groupId : groupIds) {
+                    collect(out, CompanySubjectType.GROUP, groupId, CompanyResourceType.DASHBOARD_FOLDER);
+                }
+            }
+            return out;
+        }
+
+        @Override
+        public boolean insertIfAbsentFolder(CompanySubjectType subjectType, Long subjectId, Long folderId,
+                                            CompanyRelationLevel relationLevel, Long createdBy) {
+            String k = key(subjectType, subjectId, CompanyResourceType.DASHBOARD_FOLDER, folderId);
+            if (rows.containsKey(k)) {
+                return false;
+            }
+            rows.put(k, relationLevel.name());
+            return true;
+        }
+
+        @Override
+        public boolean insertIfAbsentUserFolderVisitor(Long userId, Long folderId, Long createdBy) {
+            return insertIfAbsentFolder(CompanySubjectType.USER, userId, folderId, CompanyRelationLevel.VISITOR, createdBy);
+        }
+
+        @Override
+        public void deleteAclsForResources(Collection<Long> resourceIds) {
+            if (resourceIds == null) {
+                return;
+            }
+            rows.keySet().removeIf(k -> {
+                int last = k.lastIndexOf(':');
+                Long id = Long.valueOf(k.substring(last + 1));
+                return resourceIds.contains(id);
+            });
+        }
+
+        private void collect(List<CompanyBiResourceAcl> out, CompanySubjectType subjectType, Long subjectId,
+                             CompanyResourceType resourceType) {
+            String prefix = subjectType + ":" + subjectId + ":" + resourceType + ":";
             for (Map.Entry<String, String> entry : rows.entrySet()) {
                 if (!entry.getKey().startsWith(prefix)) {
                     continue;
@@ -455,7 +496,7 @@ class CompanyPermissionP2Test {
                 CompanyBiResourceAcl row = new CompanyBiResourceAcl();
                 row.setSubjectType(subjectType.name());
                 row.setSubjectId(subjectId);
-                row.setResourceType(CompanyResourceType.DASHBOARD.name());
+                row.setResourceType(resourceType.name());
                 row.setResourceId(resourceId);
                 row.setRelationLevel(entry.getValue());
                 out.add(row);

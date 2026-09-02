@@ -152,7 +152,7 @@
                `delete_time`,
                `delete_by`
         from data_visualization_info dvInfo
-        where dvInfo.id = #{sourceDvId}
+        where dvInfo.id = #{sourceDvId, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}
     </insert>
     <select id="findViewInfoByCopyId" resultType="io.dataease.chart.dao.auto.entity.CoreChartView">
         select id, copy_from
@@ -196,7 +196,7 @@
                 </otherwise>
            </choose>
         where dvi.delete_flag = 0
-          and dvi.id = #{dvId}
+          and dvi.id = #{dvId, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}
           <if test="dvType">
             and dvi.type = #{dvType}
           </if>
@@ -492,7 +492,7 @@
         WHERE
             dvi.id IN
             <foreach collection="ids" item="id" index="index" open="(" close=")" separator=",">
-              #{id}
+              #{id, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}
             </foreach>
     </delete>
     <delete id="deleteViewsBatch">
@@ -587,7 +587,7 @@
         FROM
             data_visualization_info
         WHERE
-            id = #{dvId}
+            id = #{dvId, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}
      </insert>
 
      <insert id="snapshotViews">
@@ -954,7 +954,7 @@
        FROM
        	snapshot_data_visualization_info
        WHERE
-       	id =  #{dvId}
+       	id =  #{dvId, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}
      </insert>
 
      <insert id="restoreViews">

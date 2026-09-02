@@ -19,14 +19,14 @@ public interface CoreVisualiationExtMapper {
             """)
     List<VisualizationNodePO> queryNodes(@Param("ew") QueryWrapper<Object> queryWrapper);
 
-    @Select("select id from data_visualization_info where pid = #{pid} and delete_flag = 0")
+    @Select("select id from data_visualization_info where pid = #{pid, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler} and delete_flag = 0")
     List<Long> queryChildrenId(@Param("pid") Long pid);
 
     @Update("""
             <script>
             update data_visualization_info set delete_flag = 1, delete_time = #{time}, delete_by = #{uid} where id in
             <foreach item='id' index='index' collection='ids' open='(' separator=',' close=')'>
-            #{id}
+            #{id, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}
             </foreach>
             </script>
             """)

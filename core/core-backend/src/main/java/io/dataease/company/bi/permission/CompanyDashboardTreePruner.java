@@ -14,13 +14,23 @@ public final class CompanyDashboardTreePruner {
     public static List<BusiNodeVO> prune(List<BusiNodeVO> tree, Set<Long> accessibleDashboardIds,
                                          DashboardPermissionProjection leafProjection,
                                          DashboardPermissionProjection folderShell) {
+        return prune(tree, accessibleDashboardIds, Set.of(), leafProjection, folderShell, folderShell);
+    }
+
+    public static List<BusiNodeVO> prune(List<BusiNodeVO> tree,
+                                         Set<Long> accessibleDashboardIds,
+                                         Set<Long> authorizedFolderIds,
+                                         DashboardPermissionProjection leafProjection,
+                                         DashboardPermissionProjection authorizedFolder,
+                                         DashboardPermissionProjection folderShell) {
         if (tree == null || tree.isEmpty()) {
             return List.of();
         }
         Set<Long> accessible = accessibleDashboardIds == null ? Set.of() : accessibleDashboardIds;
+        Set<Long> folders = authorizedFolderIds == null ? Set.of() : authorizedFolderIds;
         List<BusiNodeVO> kept = new ArrayList<>();
         for (BusiNodeVO node : tree) {
-            BusiNodeVO next = pruneNode(node, accessible, leafProjection, folderShell);
+            BusiNodeVO next = pruneNode(node, accessible, folders, leafProjection, authorizedFolder, folderShell);
             if (next != null) {
                 kept.add(next);
             }
@@ -28,8 +38,9 @@ public final class CompanyDashboardTreePruner {
         return kept;
     }
 
-    private static BusiNodeVO pruneNode(BusiNodeVO node, Set<Long> accessible,
+    private static BusiNodeVO pruneNode(BusiNodeVO node, Set<Long> accessible, Set<Long> authorizedFolders,
                                         DashboardPermissionProjection leafProjection,
+                                        DashboardPermissionProjection authorizedFolder,
                                         DashboardPermissionProjection folderShell) {
         if (node == null) {
             return null;
@@ -47,19 +58,20 @@ public final class CompanyDashboardTreePruner {
         List<BusiNodeVO> keptChildren = new ArrayList<>();
         if (children != null) {
             for (BusiNodeVO child : children) {
-                BusiNodeVO next = pruneNode(child, accessible, leafProjection, folderShell);
+                BusiNodeVO next = pruneNode(child, accessible, authorizedFolders, leafProjection, authorizedFolder, folderShell);
                 if (next != null) {
                     keptChildren.add(next);
                 }
             }
         }
         boolean root = node.getId() != null && node.getId() == 0L;
-        if (keptChildren.isEmpty() && !root) {
+        boolean authorized = node.getId() != null && authorizedFolders.contains(node.getId());
+        if (keptChildren.isEmpty() && !root && !authorized) {
             return null;
         }
         node.setChildren(keptChildren);
         if (!root) {
-            apply(node, folderShell);
+            apply(node, authorized ? authorizedFolder : folderShell);
         }
         return node;
     }

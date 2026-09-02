@@ -31,4 +31,11 @@ public class DashboardPermissionProjectionService {
     public DashboardPermissionProjection folderShell() {
         return new DashboardPermissionProjection(FOLDER_SHELL_WEIGHT, 0);
     }
+
+    public DashboardPermissionProjection authorizedFolder(CompanyAccountRole role) {
+        if (role == CompanyAccountRole.ADMIN) {
+            return new DashboardPermissionProjection(9, 0);
+        }
+        return new DashboardPermissionProjection(FOLDER_SHELL_WEIGHT, 0);
+    }
 }

@@ -28,7 +28,7 @@ public interface ExtDataVisualizationMapper {
             "\tdata_visualization_info where delete_flag=0 <when test='nodeType !=null'> and node_type = #{nodeType} </when>  <when test='type !=null'> and type = #{type} </when> order by node_type desc </script>")
     List<DataVisualizationBaseVO> findBashInfo(@Param("nodeType") String nodeType, @Param("type") String type);
 
-    @Select("select type from data_visualization_info where id = #{dvId}")
+    @Select("select type from data_visualization_info where id = #{dvId, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}")
     String findDvType(@Param("dvId") Long dvId);
 
     void dvCopy(@Param("sourceDvId") Long sourceDvId,@Param("newDvId") Long newDvId,@Param("copyId") Long copyId);
@@ -101,9 +101,9 @@ public interface ExtDataVisualizationMapper {
 
     void restoreOuterParams(@Param("dvId") Long dvId);
 
-    @Select("select status from data_visualization_info where id = #{dvId}")
+    @Select("select status from data_visualization_info where id = #{dvId, typeHandler=io.dataease.visualization.jdbc.VarcharLongTypeHandler}")
     Integer findDvInfoStats(@Param("dvId") Long dvId);
 
-    @Select("select id from data_visualization_info where pid = -1")
+    @Select("select id from data_visualization_info where pid = '-1'")
     List<Long> findCopyResource();
 }

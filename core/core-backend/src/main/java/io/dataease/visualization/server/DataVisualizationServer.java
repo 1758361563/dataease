@@ -68,6 +68,7 @@ import io.dataease.visualization.manage.CoreBusiManage;
 import io.dataease.visualization.manage.CoreVisualizationManage;
 import io.dataease.visualization.manage.Det2AppDatasetRebindV1Manage;
 import io.dataease.visualization.manage.ResourcePermissionManage;
+import io.dataease.visualization.jdbc.VisualizationIds;
 import io.dataease.visualization.utils.VisualizationUtils;
 import io.dataease.company.bi.permission.CompanyDashboardGuard;
 import io.dataease.company.bi.permission.CompanyDashboardMutationSupport;
@@ -224,7 +225,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
         // 如果是编辑查询 则进行镜像检查
         if (DataVisualizationConstants.QUERY_SOURCE.MAIN_EDIT.equals(request.getSource())) {
             QueryWrapper<SnapshotDataVisualizationInfo> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("id", dvId);
+            queryWrapper.eq("id", VisualizationIds.exact(dvId));
             queryWrapper.in("status", Arrays.asList(CommonConstants.DV_STATUS.UNPUBLISHED, CommonConstants.DV_STATUS.SAVED_UNPUBLISHED)); // 状态为0 未发布 和 2 已保存未发布的 不需要重置镜像
             if (!snapshotMapper.exists(queryWrapper)) {
                 coreVisualizationManage.dvSnapshotRecover(dvId);
@@ -368,9 +369,14 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Override
     @Transactional
     public String saveCanvas(DataVisualizationBaseRequest request) throws Exception {
-        CompanyDashboardGuard createGuard = companyDashboardGuard.getIfAvailable();
-        if (createGuard != null) {
-            createGuard.requireCreate();
+        CompanyDashboardMutationSupport createMutation = companyDashboardMutationSupport.getIfAvailable();
+        if (createMutation != null) {
+            createMutation.requireCreateIn(request.getPid());
+        } else {
+            CompanyDashboardGuard createGuard = companyDashboardGuard.getIfAvailable();
+            if (createGuard != null) {
+                createGuard.requireCreate();
+            }
         }
         /*
          * 发布兼容逻辑
@@ -766,7 +772,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
         // 内容ID校验
         QueryWrapper<DataVisualizationInfo> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("content_id", request.getContentId());
-        queryWrapper.eq("id", dvId);
+        queryWrapper.eq("id", VisualizationIds.exact(dvId));
         if (!visualizationInfoMapper.exists(queryWrapper)) {
             return "Repeat";
         }
@@ -799,9 +805,12 @@ public class DataVisualizationServer implements DataVisualizationApi {
         // 检查当前节点的pid是否一致如果不一致 需要调用move 接口(预存 可能会出现pid =-1的情况)
         if (request.getPid() != -1) {
             QueryWrapper<DataVisualizationInfo> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("pid", request.getPid());
-            queryWrapper.eq("id", dvId);
+            queryWrapper.eq("pid", VisualizationIds.exact(request.getPid()));
+            queryWrapper.eq("id", VisualizationIds.exact(dvId));
             if (!visualizationInfoMapper.exists(queryWrapper)) {
+                if (mutation != null) {
+                    mutation.requireMove(dvId, request.getPid());
+                }
                 request.setMoveFromUpdate(true);
                 coreVisualizationManage.move(request);
             }
@@ -890,7 +899,11 @@ public class DataVisualizationServer implements DataVisualizationApi {
         if (mutation != null) {
             mutation.requireEditResource(dvId);
         }
+        java.util.Set<Long> cleanupIds = mutation == null ? java.util.Set.of(dvId) : mutation.subtreeResourceIds(dvId);
         coreVisualizationManage.delete(dvId);
+        if (mutation != null) {
+            mutation.cleanupAcls(cleanupIds);
+        }
     }
 
     private void resourceTreeTypeAdaptor(List<BusiNodeVO> tree, String type) {
@@ -957,7 +970,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
     public void move(DataVisualizationBaseRequest request) {
         CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
         if (mutation != null) {
-            mutation.requireEditResource(request.getId());
+            mutation.requireMove(request.getId(), request.getPid());
         }
         coreVisualizationManage.move(request);
     }
@@ -986,7 +999,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
         Long sourceDvId = request.getId(); //源仪表板ID
         CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
         if (mutation != null) {
-            mutation.requireEditResource(sourceDvId);
+            mutation.requireCopy(sourceDvId, request.getPid());
         }
         Long newDvId = IDUtils.snowID(); //目标仪表板ID
         Long copyId = IDUtils.snowID() / 100; // 本次复制执行ID
@@ -1053,9 +1066,14 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
     @Override
     public DataVisualizationVO decompression(DataVisualizationBaseRequest request) throws Exception {
-        CompanyDashboardGuard createGuard = companyDashboardGuard.getIfAvailable();
-        if (createGuard != null) {
-            createGuard.requireCreate();
+        CompanyDashboardMutationSupport createMutation = companyDashboardMutationSupport.getIfAvailable();
+        if (createMutation != null) {
+            createMutation.requireCreateIn(request.getPid());
+        } else {
+            CompanyDashboardGuard createGuard = companyDashboardGuard.getIfAvailable();
+            if (createGuard != null) {
+                createGuard.requireCreate();
+            }
         }
         try {
             Long newDvId = IDUtils.snowID();
@@ -1281,12 +1299,12 @@ public class DataVisualizationServer implements DataVisualizationApi {
                 request.setPid(result.getPid());
             }
             if (DataVisualizationConstants.RESOURCE_OPT_TYPE.MOVE.equals(request.getOpt()) || DataVisualizationConstants.RESOURCE_OPT_TYPE.RENAME.equals(request.getOpt()) || DataVisualizationConstants.RESOURCE_OPT_TYPE.EDIT.equals(request.getOpt())) {
-                wrapper.ne("id", request.getId());
+                wrapper.ne("id", VisualizationIds.exact(request.getId()));
             }
         }
         wrapper.eq("delete_flag", 0);
-        wrapper.eq("pid", request.getPid());
-        wrapper.ne("pid", -1);
+        wrapper.eq("pid", VisualizationIds.exact(request.getPid()));
+        wrapper.ne("pid", "-1");
         wrapper.eq("name", request.getName().trim());
         wrapper.eq("node_type", request.getNodeType());
         wrapper.eq("type", request.getType());
