@@ -27,6 +27,15 @@ import io.dataease.visualization.dao.ext.mapper.*;
 import io.dataease.visualization.dao.ext.po.VisualizationNodePO;
 import io.dataease.visualization.dao.ext.po.VisualizationResourcePO;
 import io.dataease.visualization.dto.VisualizationNodeBO;
+import io.dataease.company.bi.permission.CompanyDashboardTreeAdapter;
+import io.dataease.company.bi.permission.DashboardPermissionProjection;
+import io.dataease.company.bi.permission.DashboardPermissionProjectionService;
+import io.dataease.company.bi.permission.PermissionDecisionService;
+import io.dataease.company.bi.user.CompanyAccountRole;
+import io.dataease.company.bi.user.CompanyBiUser;
+import io.dataease.company.bi.user.CompanyBiUserService;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -74,6 +83,18 @@ public class CoreVisualizationManage {
     @Resource
     private XpackShareManage xpackShareManage;
 
+    @Autowired
+    private ObjectProvider<CompanyDashboardTreeAdapter> companyDashboardTreeAdapter;
+
+    @Autowired
+    private ObjectProvider<PermissionDecisionService> permissionDecisionService;
+
+    @Autowired
+    private ObjectProvider<DashboardPermissionProjectionService> dashboardProjectionService;
+
+    @Autowired
+    private ObjectProvider<CompanyBiUserService> companyBiUserService;
+
     @XpackInteract(value = "visualizationResourceTree", replace = true, invalid = true)
     public List<BusiNodeVO> tree(BusiNodeRequest request) {
         List<VisualizationNodeBO> nodes = new ArrayList<>();
@@ -98,7 +119,12 @@ public class CoreVisualizationManage {
         if (CollectionUtils.isNotEmpty(pos)) {
             nodes.addAll(pos.stream().map(this::convert).toList());
         }
-        return TreeUtils.mergeTree(nodes, BusiNodeVO.class, false);
+        List<BusiNodeVO> tree = TreeUtils.mergeTree(nodes, BusiNodeVO.class, false);
+        CompanyDashboardTreeAdapter adapter = companyDashboardTreeAdapter.getIfAvailable();
+        if (adapter != null) {
+            return adapter.filterAndProject(tree);
+        }
+        return tree;
     }
 
     public void dataVisualizationInit() {
@@ -251,11 +277,17 @@ public class CoreVisualizationManage {
         if (CollectionUtils.isEmpty(pos)) {
             return new ArrayList<>();
         }
-        return pos.stream().map(po ->
-                new VisualizationResourceVO(
+        return pos.stream().map(po -> {
+            int weight = 9;
+            DashboardPermissionProjection projection = dashboardProjection(po.getType());
+            if (projection != null) {
+                weight = projection.weight();
+            }
+            return new VisualizationResourceVO(
                         po.getId(), po.getResourceId(), po.getName(),
                         po.getType(), String.valueOf(po.getCreator()), String.valueOf(po.getLastEditor()), po.getLastEditTime(),
-                        po.getFavorite(), 9, po.getExtFlag())).toList();
+                        po.getFavorite(), weight, po.getExtFlag());
+        }).toList();
     }
 
     public IPage<VisualizationResourcePO> queryVisualizationPage(int goPage, int pageSize, VisualizationWorkbranchQueryRequest request) {
@@ -273,8 +305,32 @@ public class CoreVisualizationManage {
             params.put("info", info);
         }
         params.put("isAsc", request.isAsc());
+        PermissionDecisionService decision = permissionDecisionService.getIfAvailable();
+        if (decision != null && AuthUtils.getUser() != null && AuthUtils.getUser().getUserId() != null) {
+            params.put("dashboardIds", new ArrayList<>(decision.accessibleDashboardIds(AuthUtils.getUser().getUserId())));
+        }
         Page<VisualizationResourcePO> page = new Page<>(goPage, pageSize);
         return extDataVisualizationMapper.findRecent(page, uid, request.getKeyword(), params);
+    }
+
+    private DashboardPermissionProjection dashboardProjection(String type) {
+        if (!StringUtils.equalsAnyIgnoreCase(type, "panel", "screen")) {
+            return null;
+        }
+        DashboardPermissionProjectionService projectionService = dashboardProjectionService.getIfAvailable();
+        CompanyBiUserService userService = companyBiUserService.getIfAvailable();
+        if (projectionService == null || userService == null || AuthUtils.getUser() == null) {
+            return null;
+        }
+        CompanyBiUser user = userService.findById(AuthUtils.getUser().getUserId());
+        if (user == null || user.getAccountRole() == null) {
+            return null;
+        }
+        try {
+            return projectionService.project(CompanyAccountRole.valueOf(user.getAccountRole()), true);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     @Transactional

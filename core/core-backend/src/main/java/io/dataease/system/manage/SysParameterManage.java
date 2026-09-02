@@ -14,10 +14,13 @@ import io.dataease.utils.BeanUtils;
 import io.dataease.utils.CommonBeanFactory;
 import io.dataease.utils.IDUtils;
 import io.dataease.utils.SystemSettingUtils;
+import io.dataease.company.bi.permission.CompanyShareGuard;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +46,9 @@ public class SysParameterManage {
     private ExtCoreSysSettingMapper extCoreSysSettingMapper;
     @Resource
     private DatasourceServer datasourceServer;
+
+    @Autowired
+    private ObjectProvider<CompanyShareGuard> companyShareGuard;
 
     public String singleVal(String key) {
         QueryWrapper<CoreSysSetting> queryWrapper = new QueryWrapper<>();
@@ -240,6 +246,10 @@ public class SysParameterManage {
     }
 
     public ShareBaseVO shareBase() {
+        CompanyShareGuard shareGuard = companyShareGuard.getIfAvailable();
+        if (shareGuard != null) {
+            return shareGuard.disabledShareBase();
+        }
         String disableText = singleVal("basic.shareDisable");
         String requireText = singleVal("basic.sharePeRequire");
         ShareBaseVO vo = new ShareBaseVO();

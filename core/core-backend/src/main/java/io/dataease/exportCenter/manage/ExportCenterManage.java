@@ -35,6 +35,8 @@ import io.dataease.visualization.dao.auto.entity.VisualizationWatermark;
 import io.dataease.visualization.dao.auto.mapper.VisualizationWatermarkMapper;
 import io.dataease.visualization.dao.ext.mapper.ExtDataVisualizationMapper;
 import io.dataease.visualization.server.DataVisualizationServer;
+import io.dataease.company.bi.permission.CompanyDashboardExportGuard;
+import org.springframework.beans.factory.ObjectProvider;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
@@ -70,6 +72,9 @@ public class ExportCenterManage implements BaseExportApi {
     private CoreExportDownloadTaskMapper coreExportDownloadTaskMapper;
     @Resource
     private ExportTaskExtMapper exportTaskExtMapper;
+
+    @Autowired
+    private ObjectProvider<CompanyDashboardExportGuard> companyDashboardExportGuard;
     @Resource
     private DatasetGroupManage datasetGroupManage;
     @Resource
@@ -255,6 +260,10 @@ public class ExportCenterManage implements BaseExportApi {
     }
 
     public void addTask(String exportFrom, String exportFromType, ChartExcelRequest request, String busiFlag) {
+        CompanyDashboardExportGuard exportGuard = companyDashboardExportGuard.getIfAvailable();
+        if (exportGuard != null) {
+            exportGuard.requireChartExport(request);
+        }
         Long currentUserId = currentUserId();
         CoreExportTask exportTask = new CoreExportTask();
         exportTask.setId(IDUtils.snowID().toString());

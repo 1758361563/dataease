@@ -268,6 +268,16 @@
              <if test="ew.info != null">
                 AND NOT EXISTS(select 1 from per_busi_resource community where core_opt_recent.resource_id = community.id)
              </if>
+             <if test="ew.dashboardIds != null and ew.dashboardIds.size() &gt; 0">
+                AND (dvResource.type NOT IN ('panel', 'screen') OR dvResource.resource_id IN
+                <foreach collection="ew.dashboardIds" item="dashboardId" open="(" separator="," close=")">
+                    #{dashboardId}
+                </foreach>
+                )
+             </if>
+             <if test="ew.dashboardIds != null and ew.dashboardIds.size() == 0">
+                AND dvResource.type NOT IN ('panel', 'screen')
+             </if>
              <choose>
                 <when test="ew.isAsc">
                   order by core_opt_recent.time asc

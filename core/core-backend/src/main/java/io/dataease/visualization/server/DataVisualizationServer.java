@@ -69,6 +69,12 @@ import io.dataease.visualization.manage.CoreVisualizationManage;
 import io.dataease.visualization.manage.Det2AppDatasetRebindV1Manage;
 import io.dataease.visualization.manage.ResourcePermissionManage;
 import io.dataease.visualization.utils.VisualizationUtils;
+import io.dataease.company.bi.permission.CompanyDashboardGuard;
+import io.dataease.company.bi.permission.CompanyDashboardMutationSupport;
+import io.dataease.company.bi.permission.CompanyExportKind;
+import io.dataease.company.bi.permission.DashboardPermissionProjection;
+import io.dataease.company.bi.permission.PermissionDecisionService;
+import org.springframework.beans.factory.ObjectProvider;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -182,6 +188,15 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Resource
     private SnapshotVisualizationLinkJumpTargetViewInfoMapper snapshotVisualizationLinkJumpTargetViewInfoMapper;
 
+    @Autowired
+    private ObjectProvider<CompanyDashboardGuard> companyDashboardGuard;
+
+    @Autowired
+    private ObjectProvider<CompanyDashboardMutationSupport> companyDashboardMutationSupport;
+
+    @Autowired
+    private ObjectProvider<PermissionDecisionService> permissionDecisionService;
+
 
 
     @Override
@@ -200,6 +215,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @XpackInteract(value = "dataVisualizationServer", original = true)
     public DataVisualizationVO findById(DataVisualizationBaseRequest request) {
         Long dvId = request.getId();
+        CompanyDashboardGuard viewGuard = companyDashboardGuard.getIfAvailable();
+        if (viewGuard != null) {
+            viewGuard.requireView(dvId);
+        }
         String busiFlag = request.getBusiFlag();
         String resourceTable = request.getResourceTable();
         // 如果是编辑查询 则进行镜像检查
@@ -250,6 +269,12 @@ public class DataVisualizationServer implements DataVisualizationApi {
                 }
             }
             result.setWeight(9);
+            PermissionDecisionService decision = permissionDecisionService.getIfAvailable();
+            if (decision != null && AuthUtils.getUser() != null) {
+                DashboardPermissionProjection projection = decision.projectDashboard(AuthUtils.getUser().getUserId(), dvId);
+                result.setWeight(projection.weight());
+                result.setExt(projection.ext());
+            }
             return result;
         } else {
             DEException.throwException(Translator.get("i18n_resource_not_exists"));
@@ -343,6 +368,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Override
     @Transactional
     public String saveCanvas(DataVisualizationBaseRequest request) throws Exception {
+        CompanyDashboardGuard createGuard = companyDashboardGuard.getIfAvailable();
+        if (createGuard != null) {
+            createGuard.requireCreate();
+        }
         /*
          * 发布兼容逻辑
          * saveCanvas 为初次保存 包括 模板 应用 普通创建 所有变更操作都走snapshot表
@@ -585,6 +614,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
         visualizationInfo.setStatus(DataVisualizationConstants.NODE_TYPE.FOLDER.equals(visualizationInfo.getNodeType()) ? CommonConstants.DV_STATUS.PUBLISHED : CommonConstants.DV_STATUS.UNPUBLISHED);
         Long newDvId = coreVisualizationManage.innerSave(visualizationInfo);
         request.setId(newDvId);
+        CompanyDashboardMutationSupport created = companyDashboardMutationSupport.getIfAvailable();
+        if (created != null) {
+            created.afterCreate(newDvId, visualizationInfo.getNodeType());
+        }
         // 还原ID信息
         Map<Long, ChartViewDTO> canvasViews = request.getCanvasViewInfo();
         if (isAppSave) {
@@ -723,6 +756,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Override
     public String checkCanvasChange(DataVisualizationBaseRequest request) {
         Long dvId = request.getId();
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(dvId);
+        }
         if (dvId == null) {
             DEException.throwException("ID can not be null");
         }
@@ -740,6 +777,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Override
     @Transactional
     public DataVisualizationVO updateCanvas(DataVisualizationBaseRequest request) {
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(request.getId());
+        }
         for (Map.Entry<Long, ChartViewDTO> ele : request.getCanvasViewInfo().entrySet()) {
             DatasetUtils.viewDecode(ele.getValue());
         }
@@ -778,6 +819,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Override
     @Transactional
     public void updatePublishStatus(DataVisualizationBaseRequest request) {
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(request.getId());
+        }
         /**
          * 如果当前传入状态是1（已发布），则原始状态0（未发布）-》1（已发布）；2（已保存未发布）-》1（已发布）
          * 统一处理为1.删除主表数据，2.将镜像表数据统一copy到主表 不删除镜像数据（发布状态后镜像数据和主表数据是保持一致的）
@@ -803,6 +848,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
     @Override
     public void recoverToPublished(DataVisualizationBaseRequest request) {
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(request.getId());
+        }
         coreVisualizationManage.dvSnapshotRecover(request.getId());
         DataVisualizationInfo visualizationInfo = new DataVisualizationInfo();
         visualizationInfo.setId(request.getId());
@@ -819,6 +868,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Override
     @Transactional
     public void updateBase(DataVisualizationBaseRequest request) {
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(request.getId());
+        }
         if (request.getId() != null) {
             coreVisualizationManage.innerEdit(BeanUtils.copyBean(new DataVisualizationInfo(), request));
         } else {
@@ -833,6 +886,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Transactional
     @Override
     public void deleteLogic(Long dvId, String busiFlag) {
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(dvId);
+        }
         coreVisualizationManage.delete(dvId);
     }
 
@@ -898,6 +955,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Transactional
     @Override
     public void move(DataVisualizationBaseRequest request) {
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(request.getId());
+        }
         coreVisualizationManage.move(request);
     }
 
@@ -923,6 +984,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
     @Override
     public String copy(DataVisualizationBaseRequest request) {
         Long sourceDvId = request.getId(); //源仪表板ID
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(sourceDvId);
+        }
         Long newDvId = IDUtils.snowID(); //目标仪表板ID
         Long copyId = IDUtils.snowID() / 100; // 本次复制执行ID
         // 复制仪表板
@@ -954,11 +1019,18 @@ public class DataVisualizationServer implements DataVisualizationApi {
         BeanUtils.copyBean(visualizationInfoTarget, newDv);
         visualizationInfoTarget.setPid(-1L);
         coreVisualizationManage.preInnerSave(visualizationInfoTarget);
+        if (mutation != null) {
+            mutation.afterCreate(newDvId, visualizationInfoTarget.getNodeType());
+        }
         return String.valueOf(newDvId);
     }
 
     @Override
     public String findDvType(Long dvId) {
+        CompanyDashboardGuard viewGuard = companyDashboardGuard.getIfAvailable();
+        if (viewGuard != null) {
+            viewGuard.requireView(dvId);
+        }
         String result = extDataVisualizationMapper.findDvType(dvId);
         if (StringUtils.isEmpty(result)) {
             DEException.throwException(Translator.get("i18n_resource_not_exists"));
@@ -968,6 +1040,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
     @Override
     public String updateCheckVersion(Long dvId) {
+        CompanyDashboardMutationSupport mutation = companyDashboardMutationSupport.getIfAvailable();
+        if (mutation != null) {
+            mutation.requireEditResource(dvId);
+        }
         DataVisualizationInfo updateInfo = new DataVisualizationInfo();
         updateInfo.setId(dvId);
         updateInfo.setCheckVersion(coreLicManage.getVersion());
@@ -977,6 +1053,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
     @Override
     public DataVisualizationVO decompression(DataVisualizationBaseRequest request) throws Exception {
+        CompanyDashboardGuard createGuard = companyDashboardGuard.getIfAvailable();
+        if (createGuard != null) {
+            createGuard.requireCreate();
+        }
         try {
             Long newDvId = IDUtils.snowID();
             String newFrom = request.getNewFrom();
@@ -1099,11 +1179,19 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
     @Override
     public DataVisualizationVO decompressionLocalFile(MultipartFile file) {
+        CompanyDashboardGuard createGuard = companyDashboardGuard.getIfAvailable();
+        if (createGuard != null) {
+            createGuard.requireCreate();
+        }
         return null;
     }
 
     @Override
     public List<VisualizationViewTableDTO> detailList(Long dvId) {
+        CompanyDashboardGuard viewGuard = companyDashboardGuard.getIfAvailable();
+        if (viewGuard != null) {
+            viewGuard.requireView(dvId);
+        }
         List<VisualizationViewTableDTO> result = extDataVisualizationMapper.getVisualizationViewDetails(dvId);
         SnapshotDataVisualizationInfo dvInfo = snapshotMapper.selectById(dvId);
         if (dvInfo != null && !CollectionUtils.isEmpty(result)) {
@@ -1116,6 +1204,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
     @Override
     public VisualizationExport2AppVO export2AppCheck(VisualizationAppExportRequest appExportRequest) {
+        CompanyDashboardGuard exportGuard = companyDashboardGuard.getIfAvailable();
+        if (exportGuard != null) {
+            exportGuard.requireExport(appExportRequest.getDvId(), CompanyExportKind.IMAGE_PDF_TEMPLATE);
+        }
         List<Long> viewIds = appExportRequest.getViewIds();
         List<Long> dsIds = appExportRequest.getDsIds();
         Long dvId = appExportRequest.getDvId();
@@ -1154,22 +1246,29 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
     @DeLog(id = "#p0.id", ot = LogOT.APP_TEMPLATE_EXPORT, stExp = "#p0.type")
     public void exportLogApp(DataVisualizationBaseRequest request) {
-
+        requireDashboardExport(request, CompanyExportKind.IMAGE_PDF_TEMPLATE);
     }
 
     @DeLog(id = "#p0.id", ot = LogOT.TEMPLATE_EXPORT, stExp = "#p0.type")
     public void exportLogTemplate(DataVisualizationBaseRequest request) {
-
+        requireDashboardExport(request, CompanyExportKind.IMAGE_PDF_TEMPLATE);
     }
 
     @DeLog(id = "#p0.id", ot = LogOT.PDF_EXPORT, stExp = "#p0.type")
     public void exportLogPDF(DataVisualizationBaseRequest request) {
-
+        requireDashboardExport(request, CompanyExportKind.IMAGE_PDF_TEMPLATE);
     }
 
     @DeLog(id = "#p0.id", ot = LogOT.IMG_EXPORT, stExp = "#p0.type")
     public void exportLogImg(DataVisualizationBaseRequest request) {
+        requireDashboardExport(request, CompanyExportKind.IMAGE_PDF_TEMPLATE);
+    }
 
+    private void requireDashboardExport(DataVisualizationBaseRequest request, CompanyExportKind kind) {
+        CompanyDashboardGuard exportGuard = companyDashboardGuard.getIfAvailable();
+        if (exportGuard != null && request != null) {
+            exportGuard.requireExport(request.getId(), kind);
+        }
     }
 
 

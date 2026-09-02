@@ -1,5 +1,6 @@
 package io.dataease.company.bi.auth;
 
+import io.dataease.company.bi.permission.CompanyDashboardAclBootstrapper;
 import io.dataease.company.bi.permission.CompanyDatasetAclBootstrapper;
 import io.dataease.company.bi.user.CompanyBiUserService;
 import io.dataease.utils.LogUtil;
@@ -27,12 +28,14 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             "db/company/company_bi_user.sql",
             "db/company/company_bi_group.sql",
             "db/company/company_bi_group_member.sql",
-            "db/company/company_bi_resource_acl.sql"
+            "db/company/company_bi_resource_acl.sql",
+            "db/company/company_bi_compat_seed.sql"
     };
 
     private final DataSource dataSource;
     private final CompanyBiBootstrapper bootstrapper;
     private final CompanyDatasetAclBootstrapper datasetAclBootstrapper;
+    private final CompanyDashboardAclBootstrapper dashboardAclBootstrapper;
 
     @Value("${company.bi.bootstrap-username:admin}")
     private String bootstrapUsername;
@@ -46,10 +49,12 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
     public CompanyBiSchemaInitializer(DataSource dataSource,
                                       CompanyBiUserService userService,
                                       CompanyPasswordHasher passwordHasher,
-                                      CompanyDatasetAclBootstrapper datasetAclBootstrapper) {
+                                      CompanyDatasetAclBootstrapper datasetAclBootstrapper,
+                                      CompanyDashboardAclBootstrapper dashboardAclBootstrapper) {
         this.dataSource = dataSource;
         this.bootstrapper = new CompanyBiBootstrapper(userService, passwordHasher);
         this.datasetAclBootstrapper = datasetAclBootstrapper;
+        this.dashboardAclBootstrapper = dashboardAclBootstrapper;
     }
 
     @Override
@@ -57,6 +62,7 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
         applySchema();
         bootstrapper.ensureBootstrapAdmin(bootstrapUsername, bootstrapDisplayName, bootstrapPassword);
         datasetAclBootstrapper.seedBootstrapAdminExistingDatasets();
+        dashboardAclBootstrapper.seedBootstrapAdminExistingDashboards();
     }
 
     private void applySchema() throws Exception {

@@ -169,6 +169,11 @@ class CompanyPermissionP1Test {
         assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/create", "/de2api/datasetTree/create"));
         assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/get/985189053949415424", null));
         assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/delete/1", "/de2api/datasetTree/delete/1"));
+        assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetField/save", "/de2api/datasetField/save"));
+        assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetField/delete/1", "/de2api/datasetField/delete/1"));
+        assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetField/deleteByChartId/1", "/de2api/datasetField/deleteByChartId/1"));
+        assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetField/get/1", "/de2api/datasetField/get/1"));
+        assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/chart/deleteField/1", "/de2api/chart/deleteField/1"));
         assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetData/enumValue", "/de2api/datasetData/enumValue"));
         assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetData/getFieldTree", "/de2api/datasetData/getFieldTree"));
         assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/getSqlParams", "/de2api/datasetTree/getSqlParams"));
@@ -208,6 +213,10 @@ class CompanyPermissionP1Test {
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/create"));
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/rename"));
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/get/1"));
+        assertTrue(CompanyDatasetDesignFilter.matches("/datasetField/save"));
+        assertTrue(CompanyDatasetDesignFilter.matches("/datasetField/delete/900000000000000201"));
+        assertTrue(CompanyDatasetDesignFilter.matches("/datasetField/deleteByChartId/7498642797587599360"));
+        assertFalse(CompanyDatasetDesignFilter.matches("/datasetField/get/1"));
     }
 
     @Test

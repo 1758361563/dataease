@@ -29,13 +29,16 @@ public class CompanyDatasetDesignFilter implements Filter {
             "/datasetTree/create",
             "/datasetTree/rename",
             "/datasetTree/move",
-            "/datasetTree/exportDataset"
+            "/datasetTree/exportDataset",
+            "/datasetField/save"
     );
 
     static final List<String> DESIGN_PREFIX = List.of(
             "/datasetTree/delete/",
             "/datasetTree/perDelete/",
-            "/datasetTree/get/"
+            "/datasetTree/get/",
+            "/datasetField/delete/",
+            "/datasetField/deleteByChartId/"
     );
 
     private final CompanyDatasetDesignGuard guard;

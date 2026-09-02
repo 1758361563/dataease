@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import io.dataease.company.bi.auth.CompanyAuthSupport;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -89,5 +90,78 @@ public class CompanyAclRepository {
         QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
         wrapper.eq("resource_type", resourceType.name()).eq("resource_id", resourceId);
         return mapper.selectList(wrapper);
+    }
+
+    public boolean insertIfAbsentUserDashboardVisitor(Long userId, Long dashboardId, Long createdBy) {
+        return insertIfAbsentDashboard(CompanySubjectType.USER, userId, dashboardId, CompanyRelationLevel.VISITOR, createdBy);
+    }
+
+    public boolean insertIfAbsentDashboard(CompanySubjectType subjectType, Long subjectId, Long dashboardId,
+                                           CompanyRelationLevel relationLevel, Long createdBy) {
+        if (subjectType == null || subjectId == null || dashboardId == null || relationLevel == null) {
+            return false;
+        }
+        if (existsDashboardAcl(subjectType, subjectId, dashboardId)) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        CompanyBiResourceAcl row = new CompanyBiResourceAcl();
+        row.setSubjectType(subjectType.name());
+        row.setSubjectId(subjectId);
+        row.setResourceType(CompanyResourceType.DASHBOARD.name());
+        row.setResourceId(dashboardId);
+        row.setRelationLevel(relationLevel.name());
+        row.setCreatedAt(now);
+        row.setCreatedBy(createdBy);
+        row.setUpdatedAt(now);
+        row.setUpdatedBy(createdBy);
+        try {
+            mapper.insert(row);
+            return true;
+        } catch (DuplicateKeyException ignored) {
+            return false;
+        }
+    }
+
+    public boolean existsDashboardAcl(CompanySubjectType subjectType, Long subjectId, Long dashboardId) {
+        if (subjectType == null || subjectId == null || dashboardId == null) {
+            return false;
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("subject_type", subjectType.name())
+                .eq("subject_id", subjectId)
+                .eq("resource_type", CompanyResourceType.DASHBOARD.name())
+                .eq("resource_id", dashboardId)
+                .last("LIMIT 1");
+        return mapper.selectCount(wrapper) > 0;
+    }
+
+    public void deleteDashboardAcl(CompanySubjectType subjectType, Long subjectId, Long dashboardId) {
+        if (subjectType == null || subjectId == null || dashboardId == null) {
+            return;
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("subject_type", subjectType.name())
+                .eq("subject_id", subjectId)
+                .eq("resource_type", CompanyResourceType.DASHBOARD.name())
+                .eq("resource_id", dashboardId);
+        mapper.delete(wrapper);
+    }
+
+    public List<CompanyBiResourceAcl> listDashboardAcls(Long userId, Collection<Long> groupIds) {
+        if (userId == null) {
+            return List.of();
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("resource_type", CompanyResourceType.DASHBOARD.name());
+        if (groupIds == null || groupIds.isEmpty()) {
+            wrapper.eq("subject_type", CompanySubjectType.USER.name()).eq("subject_id", userId);
+        } else {
+            List<Long> groups = new ArrayList<>(groupIds);
+            wrapper.and(w -> w.nested(u -> u.eq("subject_type", CompanySubjectType.USER.name()).eq("subject_id", userId))
+                    .or(g -> g.eq("subject_type", CompanySubjectType.GROUP.name()).in("subject_id", groups)));
+        }
+        List<CompanyBiResourceAcl> rows = mapper.selectList(wrapper);
+        return rows == null ? List.of() : rows;
     }
 }

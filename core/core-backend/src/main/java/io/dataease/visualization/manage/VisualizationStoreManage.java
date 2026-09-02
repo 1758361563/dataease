@@ -17,6 +17,14 @@ import io.dataease.visualization.dao.auto.entity.CoreStore;
 import io.dataease.visualization.dao.auto.mapper.CoreStoreMapper;
 import io.dataease.visualization.dao.ext.mapper.CoreStoreExtMapper;
 import io.dataease.visualization.dao.ext.po.StorePO;
+import io.dataease.company.bi.permission.DashboardPermissionProjection;
+import io.dataease.company.bi.permission.DashboardPermissionProjectionService;
+import io.dataease.company.bi.permission.PermissionDecisionService;
+import io.dataease.company.bi.user.CompanyAccountRole;
+import io.dataease.company.bi.user.CompanyBiUser;
+import io.dataease.company.bi.user.CompanyBiUserService;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -35,8 +43,23 @@ public class VisualizationStoreManage {
     @Resource
     private CoreStoreExtMapper coreStoreExtMapper;
 
+    @Autowired
+    private ObjectProvider<PermissionDecisionService> permissionDecisionService;
+
+    @Autowired
+    private ObjectProvider<DashboardPermissionProjectionService> dashboardProjectionService;
+
+    @Autowired
+    private ObjectProvider<CompanyBiUserService> companyBiUserService;
+
     public void execute(VisualizationStoreRequest request) {
         Long resourceId = request.getId();
+        PermissionDecisionService decision = permissionDecisionService.getIfAvailable();
+        if (decision != null && AuthUtils.getUser() != null) {
+            if (!decision.canViewDashboard(AuthUtils.getUser().getUserId(), resourceId)) {
+                io.dataease.company.bi.permission.CompanyDashboardGuard.deny();
+            }
+        }
         Long uid = AuthUtils.getUser().getUserId();
         if (favorited(resourceId)) {
             QueryWrapper<CoreStore> queryWrapper = new QueryWrapper<>();
@@ -86,11 +109,26 @@ public class VisualizationStoreManage {
 
     public List<VisualizationStoreVO> formatResult(List<StorePO> pos) {
         if (CollectionUtils.isEmpty(pos)) return new ArrayList<>();
-        return pos.stream().map(po ->
-                new VisualizationStoreVO(
+        return pos.stream().map(po -> {
+            int weight = 9;
+            DashboardPermissionProjectionService projectionService = dashboardProjectionService.getIfAvailable();
+            CompanyBiUserService userService = companyBiUserService.getIfAvailable();
+            if (projectionService != null && userService != null && AuthUtils.getUser() != null) {
+                CompanyBiUser user = userService.findById(AuthUtils.getUser().getUserId());
+                if (user != null && user.getAccountRole() != null) {
+                    try {
+                        DashboardPermissionProjection projection = projectionService.project(
+                                CompanyAccountRole.valueOf(user.getAccountRole()), true);
+                        weight = projection.weight();
+                    } catch (RuntimeException ignored) {
+                    }
+                }
+            }
+            return new VisualizationStoreVO(
                         po.getStoreId(), po.getResourceId(), po.getName(),
                         po.getType(), String.valueOf(po.getCreator()), ObjectUtils.isEmpty(po.getEditor()) ? null : String.valueOf(po.getEditor()),
-                        po.getEditTime(), 9, po.getExtFlag(), po.getExtFlag1())).toList();
+                        po.getEditTime(), weight, po.getExtFlag(), po.getExtFlag1());
+        }).toList();
     }
 
     public IPage<StorePO> queryStorePage(int goPage, int pageSize, VisualizationWorkbranchQueryRequest request) {
@@ -113,6 +151,15 @@ public class VisualizationStoreManage {
             queryWrapper.notExists(String.format(info, "s.resource_id"));
         }
         queryWrapper.orderBy(true, request.isAsc(), "v.update_time");
+        PermissionDecisionService decision = permissionDecisionService.getIfAvailable();
+        if (decision != null && AuthUtils.getUser() != null && AuthUtils.getUser().getUserId() != null) {
+            java.util.Set<Long> ids = decision.accessibleDashboardIds(AuthUtils.getUser().getUserId());
+            if (ids.isEmpty()) {
+                queryWrapper.eq("s.resource_id", -1L);
+            } else {
+                queryWrapper.in("s.resource_id", ids);
+            }
+        }
         Page<StorePO> page = new Page<>(goPage, pageSize);
         return coreStoreExtMapper.query(page, queryWrapper);
     }

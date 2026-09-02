@@ -10,6 +10,9 @@ import io.dataease.constant.StaticResourceConstants;
 import io.dataease.constant.XpackSettingConstants;
 import io.dataease.system.dao.auto.entity.CoreSysSetting;
 import io.dataease.system.manage.SysParameterManage;
+import io.dataease.company.bi.permission.CompanyShareGuard;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -29,6 +32,9 @@ public class SysParameterServer implements SysParameterApi {
 
     @Resource
     private SysParameterManage sysParameterManage;
+
+    @Autowired
+    private ObjectProvider<CompanyShareGuard> companyShareGuard;
 
     @Override
     public String singleVal(String key) {
@@ -107,6 +113,10 @@ public class SysParameterServer implements SysParameterApi {
 
     @Override
     public ShareBaseVO shareBase() {
+        CompanyShareGuard shareGuard = companyShareGuard.getIfAvailable();
+        if (shareGuard != null) {
+            return shareGuard.disabledShareBase();
+        }
         return sysParameterManage.shareBase();
     }
 

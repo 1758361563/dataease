@@ -9,6 +9,9 @@ import io.dataease.api.xpack.share.vo.XpackShareVO;
 import io.dataease.utils.BeanUtils;
 import io.dataease.share.dao.auto.entity.XpackShare;
 import io.dataease.share.manage.XpackShareManage;
+import io.dataease.company.bi.permission.CompanyShareGuard;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,28 +27,40 @@ public class XpackShareServer implements XpackShareApi {
 
     @Resource(name = "xpackShareManage")
     private XpackShareManage xpackShareManage;
+
+    @Autowired
+    private ObjectProvider<CompanyShareGuard> companyShareGuard;
     @Override
     public boolean status(Long resourceId) {
+        if (companyShareGuard.getIfAvailable() != null) {
+            return false;
+        }
         return ObjectUtils.isNotEmpty(xpackShareManage.queryByResource(resourceId));
     }
 
     @Override
     public void switcher(Long resourceId) {
+        denyShareMutation();
         xpackShareManage.switcher(resourceId);
     }
 
     @Override
     public void editExp(XpackShareExpRequest request) {
+        denyShareMutation();
         xpackShareManage.editExp(request.getResourceId(), request.getExp());
     }
 
     @Override
     public void editPwd(XpackSharePwdRequest request) {
+        denyShareMutation();
         xpackShareManage.editPwd(request.getResourceId(), request.getPwd(), request.getAutoPwd());
     }
 
     @Override
     public XpackShareVO detail(Long resourceId) {
+        if (companyShareGuard.getIfAvailable() != null) {
+            return null;
+        }
         XpackShare xpackShare = xpackShareManage.queryByResource(resourceId);
         if (ObjectUtils.isEmpty(xpackShare)) return null;
         return BeanUtils.copyBean(new XpackShareVO(), xpackShare);
@@ -53,6 +68,9 @@ public class XpackShareServer implements XpackShareApi {
 
     @Override
     public List<XpackShareGridVO> query(VisualizationWorkbranchQueryRequest request) {
+        if (companyShareGuard.getIfAvailable() != null) {
+            return List.of();
+        }
         return xpackShareManage.query(1, 20, request).getRecords();
     }
 
@@ -73,6 +91,14 @@ public class XpackShareServer implements XpackShareApi {
 
     @Override
     public String editUuid(XpackShareUuidEditor editor) {
+        denyShareMutation();
         return xpackShareManage.editUuid(editor);
+    }
+
+    private void denyShareMutation() {
+        CompanyShareGuard shareGuard = companyShareGuard.getIfAvailable();
+        if (shareGuard != null) {
+            shareGuard.denyMutations();
+        }
     }
 }

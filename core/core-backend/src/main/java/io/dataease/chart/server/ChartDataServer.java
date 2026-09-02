@@ -29,6 +29,9 @@ import io.dataease.utils.JsonUtil;
 import io.dataease.utils.LogUtil;
 import io.dataease.visualization.manage.VisualizationTemplateExtendDataManage;
 import jakarta.annotation.Resource;
+import io.dataease.company.bi.permission.CompanyDashboardExportGuard;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.collections4.CollectionUtils;
@@ -65,6 +68,9 @@ public class ChartDataServer implements ChartDataApi {
     private ChartDataManage chartDataManage;
     @Resource
     private ExportCenterManage exportCenterManage;
+
+    @Autowired
+    private ObjectProvider<CompanyDashboardExportGuard> companyDashboardExportGuard;
 
     @Resource
     private VisualizationTemplateExtendDataManage extendDataManage;
@@ -244,6 +250,10 @@ public class ChartDataServer implements ChartDataApi {
     @DeLinkPermit("#p0.dvId")
     @Override
     public void innerExportDetails(ChartExcelRequest request, HttpServletResponse response) throws Exception {
+        CompanyDashboardExportGuard exportGuard = companyDashboardExportGuard.getIfAvailable();
+        if (exportGuard != null) {
+            exportGuard.requireChartExport(request);
+        }
         HttpServletRequest httpServletRequest = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
         String linkToken = httpServletRequest.getHeader(AuthConstant.LINK_TOKEN_KEY);
         LogUtil.info(request.getViewInfo().getId() + " " + StringUtils.isNotEmpty(linkToken) + " " + request.isDataEaseBi());
