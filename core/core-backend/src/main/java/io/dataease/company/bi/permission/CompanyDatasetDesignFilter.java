@@ -29,16 +29,25 @@ public class CompanyDatasetDesignFilter implements Filter {
             "/datasetTree/create",
             "/datasetTree/rename",
             "/datasetTree/move",
+            "/datasetTree/tree",
             "/datasetTree/exportDataset",
-            "/datasetField/save"
+            "/datasetField/save",
+            "/datasetField/getFunction",
+            "/datasetTableSqlLog/save",
+            "/datasetTableSqlLog/listByTableId"
     );
 
     static final List<String> DESIGN_PREFIX = List.of(
             "/datasetTree/delete/",
             "/datasetTree/perDelete/",
             "/datasetTree/get/",
+            "/datasetTree/details/",
+            "/datasetTree/barInfo/",
             "/datasetField/delete/",
-            "/datasetField/deleteByChartId/"
+            "/datasetField/deleteByChartId/",
+            "/datasetField/listByDQ/",
+            "/datasetField/copilotFields/",
+            "/datasetTableSqlLog/deleteByTableId/"
     );
 
     private final CompanyDatasetDesignGuard guard;
@@ -110,7 +119,7 @@ public class CompanyDatasetDesignFilter implements Filter {
         return false;
     }
 
-    static String stripQuery(String path) {
+    public static String stripQuery(String path) {
         if (path == null) {
             return "";
         }
@@ -118,7 +127,7 @@ public class CompanyDatasetDesignFilter implements Filter {
         return q >= 0 ? path.substring(0, q) : path;
     }
 
-    static String stripContext(String path) {
+    public static String stripContext(String path) {
         if (path == null || path.isEmpty()) {
             return "";
         }

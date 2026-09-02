@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -61,5 +62,69 @@ public class CompanyGroupRepository {
         QueryWrapper<CompanyBiGroupMember> wrapper = new QueryWrapper<>();
         wrapper.eq("user_id", userId).eq("group_id", groupId);
         memberMapper.delete(wrapper);
+    }
+
+    public CompanyBiGroup findById(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return groupMapper.selectById(id);
+    }
+
+    public CompanyBiGroup findByName(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        QueryWrapper<CompanyBiGroup> wrapper = new QueryWrapper<>();
+        wrapper.eq("name", name).last("LIMIT 1");
+        return groupMapper.selectOne(wrapper);
+    }
+
+    public List<CompanyBiGroup> listAll() {
+        QueryWrapper<CompanyBiGroup> wrapper = new QueryWrapper<>();
+        wrapper.orderByAsc("id");
+        List<CompanyBiGroup> rows = groupMapper.selectList(wrapper);
+        return rows == null ? List.of() : rows;
+    }
+
+    public List<CompanyBiGroup> listByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<CompanyBiGroup> rows = groupMapper.selectBatchIds(ids);
+        return rows == null ? List.of() : rows;
+    }
+
+    public void updateById(CompanyBiGroup group) {
+        groupMapper.updateById(group);
+    }
+
+    public boolean existsMember(Long userId, Long groupId) {
+        if (userId == null || groupId == null) {
+            return false;
+        }
+        QueryWrapper<CompanyBiGroupMember> wrapper = new QueryWrapper<>();
+        wrapper.eq("user_id", userId).eq("group_id", groupId).last("LIMIT 1");
+        return memberMapper.selectCount(wrapper) > 0;
+    }
+
+    public List<CompanyBiGroupMember> listMembers(Long groupId) {
+        if (groupId == null) {
+            return List.of();
+        }
+        QueryWrapper<CompanyBiGroupMember> wrapper = new QueryWrapper<>();
+        wrapper.eq("group_id", groupId).orderByAsc("id");
+        List<CompanyBiGroupMember> rows = memberMapper.selectList(wrapper);
+        return rows == null ? List.of() : rows;
+    }
+
+    public List<CompanyBiGroupMember> listMemberships(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        QueryWrapper<CompanyBiGroupMember> wrapper = new QueryWrapper<>();
+        wrapper.eq("user_id", userId);
+        List<CompanyBiGroupMember> rows = memberMapper.selectList(wrapper);
+        return rows == null ? List.of() : rows;
     }
 }

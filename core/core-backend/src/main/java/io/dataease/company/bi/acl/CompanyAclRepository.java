@@ -235,4 +235,99 @@ public class CompanyAclRepository {
                 .in("resource_id", resourceIds);
         mapper.delete(wrapper);
     }
+
+    public CompanyBiResourceAcl find(CompanySubjectType subjectType, Long subjectId,
+                                     CompanyResourceType resourceType, Long resourceId) {
+        if (subjectType == null || subjectId == null || resourceType == null || resourceId == null) {
+            return null;
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("subject_type", subjectType.name())
+                .eq("subject_id", subjectId)
+                .eq("resource_type", resourceType.name())
+                .eq("resource_id", resourceId)
+                .last("LIMIT 1");
+        return mapper.selectOne(wrapper);
+    }
+
+    public List<CompanyBiResourceAcl> listDirectBySubject(CompanySubjectType subjectType, Long subjectId) {
+        if (subjectType == null || subjectId == null) {
+            return List.of();
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("subject_type", subjectType.name()).eq("subject_id", subjectId)
+                .orderByAsc("resource_type", "resource_id");
+        List<CompanyBiResourceAcl> rows = mapper.selectList(wrapper);
+        return rows == null ? List.of() : rows;
+    }
+
+    public AclWriteResult upsert(CompanySubjectType subjectType, Long subjectId,
+                                 CompanyResourceType resourceType, Long resourceId,
+                                 CompanyRelationLevel relationLevel, Long operatorUserId) {
+        if (subjectType == null || subjectId == null || resourceType == null || resourceId == null || relationLevel == null) {
+            return AclWriteResult.REJECTED;
+        }
+        CompanyBiResourceAcl existing = find(subjectType, subjectId, resourceType, resourceId);
+        long now = System.currentTimeMillis();
+        if (existing == null) {
+            CompanyBiResourceAcl row = new CompanyBiResourceAcl();
+            row.setSubjectType(subjectType.name());
+            row.setSubjectId(subjectId);
+            row.setResourceType(resourceType.name());
+            row.setResourceId(resourceId);
+            row.setRelationLevel(relationLevel.name());
+            row.setCreatedAt(now);
+            row.setCreatedBy(operatorUserId);
+            row.setUpdatedAt(now);
+            row.setUpdatedBy(operatorUserId);
+            try {
+                mapper.insert(row);
+                return AclWriteResult.GRANTED;
+            } catch (DuplicateKeyException ignored) {
+                CompanyBiResourceAcl raced = find(subjectType, subjectId, resourceType, resourceId);
+                if (raced != null && relationLevel.name().equals(raced.getRelationLevel())) {
+                    return AclWriteResult.UNCHANGED;
+                }
+                if (raced != null) {
+                    raced.setRelationLevel(relationLevel.name());
+                    raced.setUpdatedAt(now);
+                    raced.setUpdatedBy(operatorUserId);
+                    mapper.updateById(raced);
+                    return AclWriteResult.CHANGED;
+                }
+                return AclWriteResult.UNCHANGED;
+            }
+        }
+        if (relationLevel.name().equals(existing.getRelationLevel())) {
+            return AclWriteResult.UNCHANGED;
+        }
+        existing.setRelationLevel(relationLevel.name());
+        existing.setUpdatedAt(now);
+        existing.setUpdatedBy(operatorUserId);
+        mapper.updateById(existing);
+        return AclWriteResult.CHANGED;
+    }
+
+    public AclWriteResult revoke(CompanySubjectType subjectType, Long subjectId,
+                                 CompanyResourceType resourceType, Long resourceId) {
+        CompanyBiResourceAcl existing = find(subjectType, subjectId, resourceType, resourceId);
+        if (existing == null) {
+            return AclWriteResult.UNCHANGED;
+        }
+        QueryWrapper<CompanyBiResourceAcl> wrapper = new QueryWrapper<>();
+        wrapper.eq("subject_type", subjectType.name())
+                .eq("subject_id", subjectId)
+                .eq("resource_type", resourceType.name())
+                .eq("resource_id", resourceId);
+        mapper.delete(wrapper);
+        return AclWriteResult.REVOKED;
+    }
+
+    public enum AclWriteResult {
+        GRANTED,
+        CHANGED,
+        UNCHANGED,
+        REVOKED,
+        REJECTED
+    }
 }

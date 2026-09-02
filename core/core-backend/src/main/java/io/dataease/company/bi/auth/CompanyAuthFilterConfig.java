@@ -1,11 +1,17 @@
 package io.dataease.company.bi.auth;
 
+import io.dataease.company.bi.admin.CompanyAdminApiFilter;
+import io.dataease.company.bi.permission.CompanyCapability;
+import io.dataease.company.bi.permission.CompanyCapabilityPathFilter;
 import io.dataease.company.bi.permission.CompanyDatasetDesignFilter;
 import io.dataease.company.bi.permission.CompanyDatasetDesignGuard;
+import io.dataease.company.bi.permission.PermissionDecisionService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Configuration
 @ConditionalOnProperty(name = CompanyAuthSupport.ENABLED_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -28,6 +34,41 @@ public class CompanyAuthFilterConfig {
         filter.setFilter(new CompanyDatasetDesignFilter(guard));
         filter.addUrlPatterns("/*");
         filter.setOrder(7);
+        return filter;
+    }
+
+    @Bean
+    public FilterRegistrationBean<CompanyCapabilityPathFilter> companyDatasourceAdminFilter(
+            PermissionDecisionService permissionDecisionService) {
+        FilterRegistrationBean<CompanyCapabilityPathFilter> filter = new FilterRegistrationBean<>();
+        filter.setName("companyDatasourceAdminFilter");
+        filter.setFilter(new CompanyCapabilityPathFilter(permissionDecisionService,
+                CompanyCapability.DATASOURCE_ACCESS, List.of("/datasource", "/engine")));
+        filter.addUrlPatterns("/*");
+        filter.setOrder(8);
+        return filter;
+    }
+
+    @Bean
+    public FilterRegistrationBean<CompanyCapabilityPathFilter> companyEtlAdminFilter(
+            PermissionDecisionService permissionDecisionService) {
+        FilterRegistrationBean<CompanyCapabilityPathFilter> filter = new FilterRegistrationBean<>();
+        filter.setName("companyEtlAdminFilter");
+        filter.setFilter(new CompanyCapabilityPathFilter(permissionDecisionService,
+                CompanyCapability.ETL_ACCESS, List.of("/sync")));
+        filter.addUrlPatterns("/*");
+        filter.setOrder(9);
+        return filter;
+    }
+
+    @Bean
+    public FilterRegistrationBean<CompanyAdminApiFilter> companyAdminApiFilter(
+            PermissionDecisionService permissionDecisionService) {
+        FilterRegistrationBean<CompanyAdminApiFilter> filter = new FilterRegistrationBean<>();
+        filter.setName("companyAdminApiFilter");
+        filter.setFilter(new CompanyAdminApiFilter(permissionDecisionService));
+        filter.addUrlPatterns("/*");
+        filter.setOrder(10);
         return filter;
     }
 }

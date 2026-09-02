@@ -29,6 +29,7 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             "db/company/company_bi_group.sql",
             "db/company/company_bi_group_member.sql",
             "db/company/company_bi_resource_acl.sql",
+            "db/company/company_bi_audit_log.sql",
             "db/company/company_bi_compat_seed.sql"
     };
 

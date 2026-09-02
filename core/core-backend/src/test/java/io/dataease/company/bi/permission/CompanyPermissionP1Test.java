@@ -177,7 +177,9 @@ class CompanyPermissionP1Test {
         assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetData/enumValue", "/de2api/datasetData/enumValue"));
         assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetData/getFieldTree", "/de2api/datasetData/getFieldTree"));
         assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/getSqlParams", "/de2api/datasetTree/getSqlParams"));
-        assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/details/1", "/de2api/datasetTree/details/1"));
+        assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/details/1", "/de2api/datasetTree/details/1"));
+        assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/tree", "/de2api/datasetTree/tree"));
+        assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/datasetTree/barInfo/1", "/de2api/datasetTree/barInfo/1"));
         assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/de2api/datasetData/getDatasetTotal", "/de2api/datasetData/getDatasetTotal"));
         assertTrue(CompanyDatasetDesignFilter.isDesignEndpoint("/de2api/datasetTree/get/1", "/de2api/datasetTree/get/1"));
         assertFalse(CompanyDatasetDesignFilter.isDesignEndpoint("/de2api/datasetTree/getSqlParams", "/de2api/datasetTree/getSqlParams"));
@@ -213,6 +215,8 @@ class CompanyPermissionP1Test {
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/create"));
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/rename"));
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/get/1"));
+        assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/tree"));
+        assertTrue(CompanyDatasetDesignFilter.matches("/datasetTree/details/1"));
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetField/save"));
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetField/delete/900000000000000201"));
         assertTrue(CompanyDatasetDesignFilter.matches("/datasetField/deleteByChartId/7498642797587599360"));
