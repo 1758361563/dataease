@@ -7,6 +7,8 @@ import { useNProgress } from '@/hooks/web/useNProgress'
 import { usePermissionStoreWithOut, pathValid, getFirstAuthMenu } from '@/store/modules/permission'
 import { usePageLoading } from '@/hooks/web/usePageLoading'
 import { getRoleRouters } from '@/api/common'
+import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
+import { applyCompanyCapabilityToMenus, canVisitCompanyPath } from '@/utils/companyNav'
 import { useCache } from '@/hooks/web/useCache'
 import { isMobile, checkPlatform, isLarkPlatform, isPlatformClient } from '@/utils/utils'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
@@ -20,6 +22,7 @@ const permissionStore = usePermissionStoreWithOut()
 const interactiveStore = interactiveStoreWithOut()
 const userStore = useUserStoreWithOut()
 const appStore = useAppStoreWithOut()
+const companyPermissionStore = useCompanyPermissionStoreWithOut()
 
 const { start, done } = useNProgress()
 const { open } = useLoading()
@@ -90,6 +93,13 @@ router.beforeEach(async (to, from, next) => {
     if (!userStore.getUid) {
       await userStore.setUser()
     }
+    if (!companyPermissionStore.loaded) {
+      try {
+        await companyPermissionStore.refreshCapabilities()
+      } catch {
+        companyPermissionStore.loaded = true
+      }
+    }
     if (to.path === '/login') {
       next({ path: '/workbranch/index' })
     } else {
@@ -118,6 +128,10 @@ router.beforeEach(async (to, from, next) => {
           next({ path: firstPath || '/404' })
           return
         }
+        if (!canVisitCompanyPath(to.path, companyPermissionStore.capabilities)) {
+          next({ path: getFirstAuthMenu() || '/workbranch/index' })
+          return
+        }
         next()
         return
       }
@@ -126,6 +140,7 @@ router.beforeEach(async (to, from, next) => {
       if (isDesktop) {
         roleRouters = roleRouters.filter(item => item.name !== 'system')
       }
+      roleRouters = applyCompanyCapabilityToMenus(roleRouters, companyPermissionStore.capabilities)
       const routers: any[] = roleRouters as AppCustomRouteRecordRaw[]
       routers.forEach(item => (item['top'] = true))
       await permissionStore.generateRoutes(routers as AppCustomRouteRecordRaw[])
@@ -147,6 +162,10 @@ router.beforeEach(async (to, from, next) => {
         }
         const firstPath = getFirstAuthMenu()
         next({ path: firstPath || '/404' })
+        return
+      }
+      if (!canVisitCompanyPath(to.path, companyPermissionStore.capabilities)) {
+        next({ path: getFirstAuthMenu() || '/workbranch/index' })
         return
       }
       next(nextData)

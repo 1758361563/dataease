@@ -455,6 +455,44 @@ class CompanyPermissionP4AdminTest {
         assertFalse(decision.hasCapability(USER_NORMAL, CompanyCapability.ETL_ACCESS));
     }
 
+    @Test
+    void p4T33MeAdminCapabilitiesFromDecision() {
+        List<CompanyCapability> caps = decision.listCapabilities(USER_ADMIN);
+        assertTrue(caps.contains(CompanyCapability.USER_MANAGE));
+        assertTrue(caps.contains(CompanyCapability.GROUP_MANAGE));
+        assertTrue(caps.contains(CompanyCapability.ACL_MANAGE));
+        assertTrue(caps.contains(CompanyCapability.AUDIT_VIEW));
+        assertTrue(caps.contains(CompanyCapability.DATASET_DESIGN));
+        assertTrue(caps.contains(CompanyCapability.DATASOURCE_ACCESS));
+        assertTrue(caps.contains(CompanyCapability.ETL_ACCESS));
+    }
+
+    @Test
+    void p4T34MeNormalOnlyDashboardView() {
+        List<CompanyCapability> caps = decision.listCapabilities(USER_NORMAL);
+        assertEquals(List.of(CompanyCapability.DASHBOARD_VIEW), caps);
+        assertFalse(caps.contains(CompanyCapability.USER_MANAGE));
+        assertFalse(caps.contains(CompanyCapability.DATASET_DESIGN));
+        List<CompanyCapability> readonly = decision.listCapabilities(USER_READONLY);
+        assertEquals(List.of(CompanyCapability.DASHBOARD_VIEW), readonly);
+    }
+
+    @Test
+    void p4T35MeVoHasNoPasswordFields() {
+        for (Field field : io.dataease.company.bi.me.CompanyMeVO.class.getDeclaredFields()) {
+            String name = field.getName().toLowerCase();
+            assertFalse(name.contains("password"));
+            assertFalse(name.contains("hash"));
+            assertFalse(name.contains("token"));
+            assertFalse(name.contains("acl"));
+        }
+    }
+
+    @Test
+    void p4T36MePathIsNotAdminCapabilityFilter() {
+        assertEquals(null, CompanyAdminApiFilter.requiredCapability("/company/bi/me", "/de2api/company/bi/me"));
+    }
+
     private CompanyAdminAuditContext ctx() {
         return new CompanyAdminAuditContext(USER_ADMIN, "127.0.0.1", "req-1");
     }

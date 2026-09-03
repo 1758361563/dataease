@@ -12,10 +12,19 @@ import { XpackComponent } from '@/components/plugin'
 import { useI18n } from '@/hooks/web/useI18n'
 const route = useRoute()
 const systemMenu = computed(() => route.path.includes('system'))
+const companyAdminMenu = computed(() => route.path.includes('company-admin'))
 const settingMenu = computed(() => route.path.includes('sys-setting'))
 const marketMenu = computed(() => route.path.includes('template-market'))
 const toolboxMenu = computed(() => route.path.includes('toolbox'))
 const msgFillMenu = computed(() => route.path.includes('msg-fill'))
+const showSider = computed(
+  () =>
+    systemMenu.value ||
+    settingMenu.value ||
+    toolboxMenu.value ||
+    msgFillMenu.value ||
+    companyAdminMenu.value
+)
 const isCollapse = ref(false)
 const setCollapse = () => {
   isCollapse.value = !isCollapse.value
@@ -39,32 +48,37 @@ const { t } = useI18n()
     />
     <Header v-else></Header>
     <el-container class="layout-container">
-      <template v-if="systemMenu || settingMenu || toolboxMenu || msgFillMenu">
+      <template v-if="showSider">
         <Sidebar v-if="!isCollapse" class="layout-sidebar">
           <div
             @click="setCollapse"
-            v-if="(systemMenu || msgFillMenu) && !isCollapse"
+            v-if="(systemMenu || msgFillMenu || companyAdminMenu) && !isCollapse"
             class="org-config-center"
           >
-            {{ msgFillMenu ? t('v_query.msg_center') : t('toolbox.org_center') }}
+            {{
+              companyAdminMenu
+                ? '权限管理'
+                : msgFillMenu
+                ? t('v_query.msg_center')
+                : t('toolbox.org_center')
+            }}
           </div>
           <Menu
-            :style="{ height: systemMenu || msgFillMenu ? 'calc(100% - 48px)' : '100%' }"
+            :style="{
+              height: systemMenu || msgFillMenu || companyAdminMenu ? 'calc(100% - 48px)' : '100%'
+            }"
           ></Menu>
         </Sidebar>
         <el-aside class="layout-sidebar layout-sidebar-collapse" v-else>
           <Menu
             :collapse="isCollapse"
-            :style="{ height: systemMenu ? 'calc(100% - 48px)' : '100%' }"
+            :style="{ height: systemMenu || companyAdminMenu ? 'calc(100% - 48px)' : '100%' }"
           ></Menu>
         </el-aside>
         <CollapseBar @setCollapse="setCollapse" :isCollapse="isCollapse"></CollapseBar>
       </template>
 
-      <Main
-        class="layout-main"
-        :class="{ 'with-sider': systemMenu || settingMenu || toolboxMenu }"
-      ></Main>
+      <Main class="layout-main" :class="{ 'with-sider': showSider }"></Main>
     </el-container>
   </div>
   <XpackComponent jsname="L2NvbXBvbmVudC9sb2dpbi9Qd2RJbnZhbGlkVGlwcw==" />

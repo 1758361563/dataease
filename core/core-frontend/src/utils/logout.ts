@@ -3,11 +3,13 @@ import router from '@/router'
 import { usePermissionStoreWithOut } from '@/store/modules/permission'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { useCache } from '@/hooks/web/useCache'
+import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
 
 const { wsCache } = useCache()
 const permissionStore = usePermissionStoreWithOut()
 const userStore = useUserStoreWithOut()
 const interactiveStore = interactiveStoreWithOut()
+const companyPermissionStore = useCompanyPermissionStoreWithOut()
 
 export const logoutHandler = (justClean?: boolean, save_platform_status = false) => {
   userStore.clear()
@@ -16,6 +18,8 @@ export const logoutHandler = (justClean?: boolean, save_platform_status = false)
   permissionStore.$reset()
   interactiveStore.clear()
   interactiveStore.$reset()
+  companyPermissionStore.clear()
+  companyPermissionStore.$reset()
   removeCache()
   let queryRedirectPath = '/workbranch/index'
   // 如果redirect参数中有值

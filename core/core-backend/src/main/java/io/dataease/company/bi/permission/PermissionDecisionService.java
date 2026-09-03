@@ -180,6 +180,16 @@ public class PermissionDecisionService {
         return dashboardPermissionResolver.accessibleFolderIds(userId);
     }
 
+    public java.util.List<CompanyCapability> listCapabilities(Long userId) {
+        java.util.List<CompanyCapability> result = new java.util.ArrayList<>();
+        for (CompanyCapability capability : CompanyCapability.values()) {
+            if (hasCapability(userId, capability)) {
+                result.add(capability);
+            }
+        }
+        return result;
+    }
+
     private CompanyBiUser enabledUser(Long userId) {
         if (userId == null) {
             return null;

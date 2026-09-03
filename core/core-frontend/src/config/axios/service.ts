@@ -31,6 +31,7 @@ type InternalAxiosRequestConfigWidthLoading<T> = T & {
 
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import router from '@/router'
+import { isCompanyAdminApi } from '@/utils/companyNav'
 
 const { result_code } = config
 import { useCache } from '@/hooks/web/useCache'
@@ -179,6 +180,14 @@ service.interceptors.response.use(
     if (response.config.responseType === 'blob') {
       // 如果是文件流，直接过
       return response
+    } else if (response.data.code === 70001 && isCompanyAdminApi(response.config?.url)) {
+      ElMessage({
+        type: 'error',
+        message: '无访问权限',
+        showClose: true
+      })
+      import('@/utils/companyAdminForbidden').then(mod => mod.handleCompanyAdminForbidden())
+      return Promise.reject(response.data.msg || '无访问权限')
     } else if (response.data.code === result_code || response.data.code === 50002) {
       return response.data
     } else if (response.config.url.match(/^\/map|geo\/\d{3}\/\d+\.json$/)) {
@@ -235,6 +244,17 @@ service.interceptors.response.use(
 
     if (!error?.response) {
       return Promise.reject(error)
+    }
+
+    if (error?.response.status === 403 && isCompanyAdminApi(error.config?.url)) {
+      ElMessage({
+        type: 'error',
+        message: '无访问权限',
+        showClose: true
+      })
+      import('@/utils/companyAdminForbidden').then(mod => mod.handleCompanyAdminForbidden())
+      error.config.loading && tryHideLoading(permissionStore.getCurrentPath)
+      return Promise.reject(error.response?.data?.msg || '无访问权限')
     }
 
     if (error?.response.status === 413) {

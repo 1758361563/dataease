@@ -25,8 +25,10 @@ import { useAppStoreWithOut } from '@/store/modules/app'
 import { useShareStoreWithOut } from '@/store/modules/share'
 import { queryShareBaseApi } from '@/api/visualization/dataVisualization'
 import { cloneDeep } from 'lodash'
+import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
 
 const shareStore = useShareStoreWithOut()
+const companyPermissionStore = useCompanyPermissionStoreWithOut()
 
 const userStore = useUserStoreWithOut()
 const interactiveStore = interactiveStoreWithOut()
@@ -84,6 +86,16 @@ const havePanelAuth = computed(() => {
 const haveScreenAuth = computed(() => {
   return quickCreationList.value[1]['menuAuth'] && quickCreationList.value[1]['anyManage']
 })
+
+const canQuickCreate = (name: string) => {
+  if (name === 'dataset') {
+    return companyPermissionStore.hasCapability('DATASET_DESIGN')
+  }
+  if (name === 'datasource') {
+    return companyPermissionStore.hasCapability('DATASOURCE_ACCESS')
+  }
+  return true
+}
 
 const activeTabChange = value => {
   activeTabBtn.value = value
@@ -328,7 +340,9 @@ loadShareBase()
         </div>
         <div
           class="item"
-          :class="{ 'de-item-hidden': !item['menuAuth'] }"
+          :class="{
+            'de-item-hidden': !item['menuAuth'] || !canQuickCreate(quickCreationList[index].name)
+          }"
           v-for="(item, index) in busiCountCardList"
           :key="index"
         >
@@ -349,6 +363,7 @@ loadShareBase()
               'quick-create-disabled': !ele['menuAuth'] || !ele['anyManage']
             }"
             v-for="(ele, index) in quickCreationList"
+            v-show="canQuickCreate(ele.name)"
             @click="quickCreate(index, ele['menuAuth'] && ele['anyManage'])"
           >
             <el-tooltip
