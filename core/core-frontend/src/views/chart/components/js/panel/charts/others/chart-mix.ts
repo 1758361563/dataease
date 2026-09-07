@@ -45,6 +45,7 @@ import type { Options } from '@antv/g2plot/esm'
 import { Group } from '@antv/g-canvas'
 import { extremumEvt } from '@/views/chart/components/js/extremumUitl'
 import { getMixTooltipFormatter } from './chart-mix-tooltip'
+import { alignMixCategories } from './chart-mix-data'
 
 const { t } = useI18n()
 const DEFAULT_DATA = []
@@ -641,6 +642,18 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
     return { ...options, annotations }
   }
 
+  protected configCategoryOrder(_chart: Chart, options: DualAxesOptions): DualAxesOptions {
+    const { data, values } = alignMixCategories(options.data[0], options.data[1])
+    return {
+      ...options,
+      data,
+      meta: {
+        ...options.meta,
+        field: { ...options.meta?.field, type: 'cat', sync: true, values }
+      }
+    }
+  }
+
   protected setupOptions(chart: Chart, options: DualAxesOptions): DualAxesOptions {
     return flow(
       this.configTheme,
@@ -653,7 +666,8 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
       this.configXAxis,
       this.configYAxis,
       this.configAnalyse,
-      this.configEmptyDataStrategy
+      this.configEmptyDataStrategy,
+      this.configCategoryOrder
     )(chart, options, {}, this)
   }
 
@@ -882,27 +896,6 @@ export class StackColumnLineMix extends ColumnLineMix {
       })
     }
     return result
-  }
-
-  protected configData(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    if (chart.extStack?.[0]?.sort === 'none') {
-      return options
-    }
-    // 把右轴的主轴数据顺序和左轴保持一致
-    const leftData = options.data?.[0] ?? []
-    const rightData = options.data?.[1] ?? []
-    const leftOrder = leftData.map(d => d.field)
-    rightData.sort((a, b) => {
-      const aIndex = leftOrder.indexOf(a.field)
-      const bIndex = leftOrder.indexOf(b.field)
-      return aIndex - bIndex
-    })
-    return options
-  }
-
-  protected setupOptions(chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const tmpOptions = flow(this.configData)(chart, options, {}, this)
-    return super.setupOptions(chart, tmpOptions)
   }
 
   constructor(name = 'chart-mix-stack') {
