@@ -1,4 +1,5 @@
 <script lang="tsx" setup>
+import { clearOtherMixSorts } from '../../js/panel/charts/others/chart-mix-sort'
 import icon_sortAToZ_outlined from '@/assets/svg/icon_sort-a-to-z_outlined.svg'
 import icon_sortZToA_outlined from '@/assets/svg/icon_sort-z-to-a_outlined.svg'
 import icon_sort_outlined from '@/assets/svg/icon_sort_outlined.svg'
@@ -119,6 +120,7 @@ const beforeClickItem = type => {
 }
 
 const sort = param => {
+  clearOtherMixSorts(props.chart, item.value, param.type)
   if (param.type === 'custom_sort') {
     const item = {
       index: props.index,

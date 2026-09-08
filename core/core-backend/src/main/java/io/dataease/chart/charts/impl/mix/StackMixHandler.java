@@ -29,11 +29,7 @@ public class StackMixHandler extends MixHandler {
         //右轴指标
         axisMap.put(ChartAxis.yAxisExt, view.getYAxisExt());
         //去除除了x轴以外的排序
-        axisMap.forEach((k, v) -> {
-            if (!ChartAxis.extStack.equals(k)) {
-                v.forEach(x -> x.setSort("none"));
-            }
-        });
+        axisMap.replaceAll((k, v) -> ChartAxis.extStack.equals(k) ? v : MixMetricSort.withoutSort(v));
         axisMap.put(ChartAxis.extLabel, view.getExtLabel());
         axisMap.put(ChartAxis.extTooltip, view.getExtTooltip());
         //图表整体主维度

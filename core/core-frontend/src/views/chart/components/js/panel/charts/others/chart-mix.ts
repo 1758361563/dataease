@@ -642,8 +642,12 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
     return { ...options, annotations }
   }
 
-  protected configCategoryOrder(_chart: Chart, options: DualAxesOptions): DualAxesOptions {
-    const { data, values } = alignMixCategories(options.data[0], options.data[1])
+  protected configCategoryOrder(chart: Chart, options: DualAxesOptions): DualAxesOptions {
+    const { data, values } = alignMixCategories(
+      options.data[0],
+      options.data[1],
+      chart.data?.categoryOrder
+    )
     return {
       ...options,
       data,

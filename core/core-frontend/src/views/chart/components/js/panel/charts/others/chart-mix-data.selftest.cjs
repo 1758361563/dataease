@@ -16,6 +16,7 @@ function loadTs(name) {
 }
 const { alignMixCategories } = loadTs('chart-mix-data.ts')
 const { getMixTooltipFormatter } = loadTs('chart-mix-tooltip.ts')
+const { clearOtherMixSorts, supportsMixMetricSort } = loadTs('chart-mix-sort.ts')
 
 // G2 Geometry.processData translates categories before View.paint synchronizes scales.
 // Exercise the installed scale implementation, including sparse domains.
@@ -86,6 +87,37 @@ for (const input of cases) {
 }
 assert.deepEqual(alignMixCategories(left, [right[0], row('D', 2)]).values, ['A', 'B', 'C', 'D'])
 const formatters = { 'same-field-yAxis': 'bar', 'same-field-yAxisExt': 'line' }
+const ranked = alignMixCategories(left, right, ['B', 'C', 'A'])
+assert.deepEqual(ranked.values, ['B', 'C', 'A'])
+assert.deepEqual(renderedLabels(ranked.data, ranked.values), [
+  ['B', 'C', 'A'],
+  ['B', 'C', 'A']
+])
+const sparseRanked = alignMixCategories([row('B', 3)], [row('D', 100), row('B', 90)], ['D', 'B'])
+assert.deepEqual(renderedLabels(sparseRanked.data, sparseRanked.values), [['B'], ['D', 'B']])
+const sortChart = {
+  type: 'chart-mix',
+  xAxis: [{ sort: 'asc' }],
+  yAxis: [{ id: 'same', fieldInstanceId: 'sum', summary: 'sum', sort: 'none' }],
+  yAxisExt: [{ id: 'same', fieldInstanceId: 'avg', summary: 'avg', sort: 'none' }]
+}
+assert.ok(supportsMixMetricSort(sortChart))
+clearOtherMixSorts(sortChart, sortChart.yAxisExt[0], 'desc')
+sortChart.yAxisExt[0].sort = 'desc'
+assert.equal(sortChart.xAxis[0].sort, 'none')
+assert.equal(sortChart.yAxis[0].sort, 'none')
+const reloaded = JSON.parse(JSON.stringify(sortChart))
+assert.equal(reloaded.yAxisExt[0].sort, 'desc')
+clearOtherMixSorts(reloaded, reloaded.yAxis[0], 'asc')
+reloaded.yAxis[0].sort = 'asc'
+assert.equal(reloaded.yAxisExt[0].sort, 'none')
+clearOtherMixSorts(reloaded, reloaded.xAxis[0], 'asc')
+assert.equal(reloaded.yAxis[0].sort, 'none')
+assert.equal(reloaded.yAxisExt[0].summary, 'avg')
+assert.ok(!supportsMixMetricSort({ ...sortChart, extBubble: [{}] }))
+console.log(
+  'PASS: S2 server category order, sparse axes, placement sort switching and serialization'
+)
 assert.equal(getMixTooltipFormatter(formatters, { data: left[0] }), 'bar')
 assert.equal(getMixTooltipFormatter(formatters, { data: { ...right[0], valueExt: 10 } }), 'line')
 console.log(

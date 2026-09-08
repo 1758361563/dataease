@@ -41,9 +41,7 @@ public class MixHandler extends YoyChartHandler {
         //右轴指标
         axisMap.put(ChartAxis.yAxisExt, view.getYAxisExt());
         //去除除了x轴以外的排序
-        axisMap.forEach((k, v) -> {
-            v.forEach(x -> x.setSort("none"));
-        });
+        axisMap.replaceAll((k, v) -> MixMetricSort.withoutSort(v));
         axisMap.put(ChartAxis.extLabel, view.getExtLabel());
         axisMap.put(ChartAxis.extTooltip, view.getExtTooltip());
         //图表整体主维度
@@ -77,6 +75,18 @@ public class MixHandler extends YoyChartHandler {
 
     @Override
     public <T extends ChartCalcDataResult> T calcChartResult(ChartViewDTO view, AxisFormatResult formatResult, CustomFilterResult filterResult, Map<String, Object> sqlMap, SQLMeta sqlMeta, Provider provider) {
+        var selection = MixMetricSort.selection(view);
+        var queryView = MixMetricSort.fullResultView(view);
+        if (selection == null) queryView.setResultMode(view.getResultMode());
+        T result = calcMixResult(queryView, formatResult, filterResult, sqlMap, sqlMeta, provider);
+        if (selection != null) {
+            var rightAxis = (Map<ChartAxis, List<ChartViewFieldDTO>>) formatResult.getContext().get("subAxisMap");
+            MixMetricSort.apply(view, result, selection, formatResult.getAxisMap().get(ChartAxis.xAxis).size(), rightAxis.get(ChartAxis.xAxis).size());
+        }
+        return result;
+    }
+
+    private <T extends ChartCalcDataResult> T calcMixResult(ChartViewDTO view, AxisFormatResult formatResult, CustomFilterResult filterResult, Map<String, Object> sqlMap, SQLMeta sqlMeta, Provider provider) {
         //计算左轴, 包含 xAxis, yAxis
         var dsMap = (Map<Long, DatasourceSchemaDTO>) sqlMap.get("dsMap");
         List<String> dsList = new ArrayList<>();
@@ -231,6 +241,9 @@ public class MixHandler extends YoyChartHandler {
         Map<String, Object> chartData = new TreeMap<>();
         chartData.put("left", leftData);
         chartData.put("right", rightData);
+        if (calcResult.getData().containsKey("categoryOrder")) {
+            chartData.put("categoryOrder", calcResult.getData().get("categoryOrder"));
+        }
 
         var drillFilters = filterResult.getFilterList().stream().filter(f -> f.getFilterType() == 1).collect(Collectors.toList());
         // 日期下钻替换回去

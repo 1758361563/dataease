@@ -1,9 +1,11 @@
 /** Use one category domain before G2 translates either view's data to positions. */
 export function alignMixCategories<T extends { field?: string }>(
   left: readonly T[],
-  right: readonly T[]
+  right: readonly T[],
+  categoryOrder: readonly string[] = []
 ) {
-  const values = [...new Set([...left, ...right].map(row => row.field))]
+  const present = new Set([...left, ...right].map(row => row.field))
+  const values = [...new Set([...categoryOrder.filter(key => present.has(key)), ...present])]
   const order = new Map(values.map((field, index) => [field, index]))
   const sort = (rows: readonly T[]) =>
     [...rows].sort((a, b) => order.get(a.field) - order.get(b.field))
