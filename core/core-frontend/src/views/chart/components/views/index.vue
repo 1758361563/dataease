@@ -738,10 +738,12 @@ const checkFieldIsAllowEmpty = (allField?) => {
         break
       }
 
-      // 如果有限制长度，且字段长度不足，标记为空并跳出
+      // limit 同时被编辑器用作最大数量。少数图表允许 1～N 个字段，需用 min 单独声明最少数量。
+      // 未声明 min 的图表继续沿用 limit 作为最少数量，避免改变既有的定长轴语义。
+      const minFieldCount = value['min'] ?? value['limit']
       if (
-        value['limit'] &&
-        (!view.value?.[key] || view.value?.[key]?.length < parseInt(value['limit']))
+        minFieldCount &&
+        (!view.value?.[key] || view.value?.[key]?.length < parseInt(minFieldCount))
       ) {
         showEmpty.value = true
         break

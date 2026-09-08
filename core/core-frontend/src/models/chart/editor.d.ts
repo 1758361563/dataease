@@ -89,6 +89,10 @@ declare type AxisSpec = {
    */
   limit?: number
   /**
+   * 轴维度/指标最少数量；未设置时沿用 limit 作为最少数量，以兼容现有图表
+   */
+  min?: number
+  /**
    * 轴是否允许重复
    */
   duplicate?: boolean

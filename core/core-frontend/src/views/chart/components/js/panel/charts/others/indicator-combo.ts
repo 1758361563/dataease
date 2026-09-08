@@ -70,6 +70,7 @@ export class IndicatorComboChartView extends AbstractChartView {
   axisConfig: AxisConfig = {
     yAxis: {
       name: `${t('chart.quota')}`,
+      min: 1,
       limit: 3,
       // 允许同一数据集字段重复拖入；实例身份靠 metricInstanceId
       duplicate: true

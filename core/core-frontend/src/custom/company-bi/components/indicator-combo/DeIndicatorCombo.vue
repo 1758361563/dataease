@@ -147,7 +147,7 @@ const resultName = computed(() => {
 
 const result = computed(() => {
   let _result = firstValueOf(0)
-  if (_result === null || _result === undefined) {
+  if (_result === null || _result === undefined || _result === '') {
     if (view.value.senior && view.value.senior?.functionCfg?.emptyDataStrategy === 'setZero') {
       _result = 0
     } else {
@@ -416,6 +416,7 @@ const calcData = (viewArg, callback) => {
   if (viewArg.tableId || viewArg['dataFrom'] === 'template') {
     state.loading = true
     isError.value = false
+    errMsg.value = ''
 
     const base = JSON.parse(JSON.stringify(viewArg))
     base.type = 'indicator'
@@ -530,7 +531,9 @@ const calcData = (viewArg, callback) => {
         renderChart(viewArg)
         callback?.()
       })
-      .catch(() => {
+      .catch(error => {
+        isError.value = true
+        errMsg.value = error?.message || String(error || '')
         drillFilters.value = []
         callback?.()
       })
@@ -694,33 +697,37 @@ defineExpose({ calcData, renderChart, trackMenu })
     :style="contentStyle"
     @mouseup="onPointClick"
   >
-    <view-track-bar
-      ref="viewTrack"
-      :track-menu="trackMenu"
-      :font-family="fontFamily"
-      class="track-bar"
-      :style="state.trackBarStyle"
-      @trackClick="trackClick"
-      :is-data-v-mobile="dataVMobile"
-    />
+    <chart-error v-if="isError" :err-msg="errMsg" />
 
-    <indicator-main-block
-      :label="resultName"
-      :value="formattedResult"
-      :suffix="suffixContent"
-      :show-label="indicatorNameShow"
-      :show-suffix="showSuffix"
-      :label-style="indicatorNameClass"
-      :value-style="indicatorClass"
-      :suffix-style="indicatorSuffixClass"
-    />
+    <template v-else>
+      <view-track-bar
+        ref="viewTrack"
+        :track-menu="trackMenu"
+        :font-family="fontFamily"
+        class="track-bar"
+        :style="state.trackBarStyle"
+        @trackClick="trackClick"
+        :is-data-v-mobile="dataVMobile"
+      />
 
-    <indicator-comparison-section
-      :items="comparePills"
-      :layout="layoutCfg.layout"
-      :align="layoutCfg.align"
-      :show-divider="layoutCfg.showDivider"
-    />
+      <indicator-main-block
+        :label="resultName"
+        :value="formattedResult"
+        :suffix="suffixContent"
+        :show-label="indicatorNameShow"
+        :show-suffix="showSuffix"
+        :label-style="indicatorNameClass"
+        :value-style="indicatorClass"
+        :suffix-style="indicatorSuffixClass"
+      />
+
+      <indicator-comparison-section
+        :items="comparePills"
+        :layout="layoutCfg.layout"
+        :align="layoutCfg.align"
+        :show-divider="layoutCfg.showDivider"
+      />
+    </template>
   </div>
 </template>
 
