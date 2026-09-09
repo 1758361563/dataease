@@ -96,6 +96,10 @@ public class CompanyAclRepository {
         return insertIfAbsentDashboard(CompanySubjectType.USER, userId, dashboardId, CompanyRelationLevel.VISITOR, createdBy);
     }
 
+    public boolean insertIfAbsentUserDashboardOwner(Long userId, Long dashboardId, Long createdBy) {
+        return insertIfAbsentDashboard(CompanySubjectType.USER, userId, dashboardId, CompanyRelationLevel.OWNER, createdBy);
+    }
+
     public boolean insertIfAbsentDashboard(CompanySubjectType subjectType, Long subjectId, Long dashboardId,
                                            CompanyRelationLevel relationLevel, Long createdBy) {
         if (subjectType == null || subjectId == null || dashboardId == null || relationLevel == null) {
@@ -167,6 +171,10 @@ public class CompanyAclRepository {
 
     public boolean insertIfAbsentUserFolderVisitor(Long userId, Long folderId, Long createdBy) {
         return insertIfAbsentFolder(CompanySubjectType.USER, userId, folderId, CompanyRelationLevel.VISITOR, createdBy);
+    }
+
+    public boolean insertIfAbsentUserFolderOwner(Long userId, Long folderId, Long createdBy) {
+        return insertIfAbsentFolder(CompanySubjectType.USER, userId, folderId, CompanyRelationLevel.OWNER, createdBy);
     }
 
     public boolean insertIfAbsentFolder(CompanySubjectType subjectType, Long subjectId, Long folderId,

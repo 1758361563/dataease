@@ -7,6 +7,7 @@ import io.dataease.api.dataset.union.UnionDTO;
 import io.dataease.api.dataset.vo.DataSetBarVO;
 import io.dataease.api.permissions.relation.api.RelationApi;
 import io.dataease.commons.constants.OptConstants;
+import io.dataease.company.bi.permission.CompanyDatasetMutationSupport;
 import io.dataease.dataset.dao.auto.entity.CoreDatasetGroup;
 import io.dataease.dataset.dao.auto.entity.CoreDatasetTable;
 import io.dataease.dataset.dao.auto.mapper.CoreDatasetGroupMapper;
@@ -86,6 +87,8 @@ public class DatasetGroupManage {
     private RelationApi relationManage;
     @Autowired(required = false)
     private PluginManageApi pluginManage;
+    @Autowired(required = false)
+    private CompanyDatasetMutationSupport companyDatasetMutationSupport;
 
     private static final String leafType = "dataset";
 
@@ -175,6 +178,9 @@ public class DatasetGroupManage {
         CoreDatasetGroup coreDatasetGroup = BeanUtils.copyBean(new CoreDatasetGroup(), datasetGroupInfoDTO);
         coreDatasetGroupMapper.insert(coreDatasetGroup);
         coreOptRecentManage.saveOpt(coreDatasetGroup.getId(), OptConstants.OPT_RESOURCE_TYPE.DATASET, OptConstants.OPT_TYPE.NEW);
+        if (companyDatasetMutationSupport != null) {
+            companyDatasetMutationSupport.afterCreate(coreDatasetGroup.getId(), coreDatasetGroup.getNodeType());
+        }
     }
 
     @XpackInteract(value = "authResourceTree", before = false)

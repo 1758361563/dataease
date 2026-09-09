@@ -63,10 +63,10 @@ public class CompanyDashboardMutationSupport {
             return;
         }
         if ("folder".equals(nodeType)) {
-            aclRepository.insertIfAbsentUserFolderVisitor(userId, resourceId, userId);
+            aclRepository.insertIfAbsentUserFolderOwner(userId, resourceId, userId);
             return;
         }
-        aclRepository.insertIfAbsentUserDashboardVisitor(userId, resourceId, userId);
+        aclRepository.insertIfAbsentUserDashboardOwner(userId, resourceId, userId);
     }
 
     public Set<Long> subtreeResourceIds(Long id) {

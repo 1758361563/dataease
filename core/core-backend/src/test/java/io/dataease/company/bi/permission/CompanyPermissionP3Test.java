@@ -52,6 +52,7 @@ class CompanyPermissionP3Test {
     private PermissionDecisionService decision;
     private CompanyDashboardGuard guard;
     private CompanyDashboardMutationSupport mutation;
+    private CompanyDatasetMutationSupport datasetMutation;
     private DashboardPermissionProjectionService projectionService;
 
     @BeforeEach
@@ -71,6 +72,7 @@ class CompanyPermissionP3Test {
         decision = new PermissionDecisionService(users, datasetResolver, dashboardResolver, projectionService, exportPolicy);
         guard = new CompanyDashboardGuard(decision);
         mutation = new CompanyDashboardMutationSupport(guard, decision, acl);
+        datasetMutation = new CompanyDatasetMutationSupport(acl);
         users.put(enabled(USER_U, CompanyAccountRole.NORMAL));
         users.put(enabled(USER_ADMIN, CompanyAccountRole.ADMIN));
     }
@@ -231,13 +233,14 @@ class CompanyPermissionP3Test {
     }
 
     @Test
-    void p3T18CreateDashboardInAuthorizedFolderGrantsCreatorVisitor() {
+    void p3T18CreateDashboardInAuthorizedFolderGrantsCreatorOwner() {
         acl.grantFolder(CompanySubjectType.USER, USER_ADMIN, FOLDER_A, CompanyRelationLevel.VISITOR);
         AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
         mutation.requireCreateIn(FOLDER_A);
         long created = 8301L;
         mutation.afterCreate(created, "leaf");
         assertTrue(acl.existsDashboardAcl(CompanySubjectType.USER, USER_ADMIN, created));
+        assertEquals(CompanyResourceRelation.OWNER, decision.resolveDashboardRelation(USER_ADMIN, created));
     }
 
     @Test
@@ -256,6 +259,23 @@ class CompanyPermissionP3Test {
         assertTrue(acl.existsDashboardAcl(CompanySubjectType.USER, USER_ADMIN, created));
         mutation.afterCreate(8303L, "folder");
         assertTrue(acl.existsFolderAcl(CompanySubjectType.USER, USER_ADMIN, 8303L));
+        assertEquals(CompanyResourceRelation.OWNER, decision.resolveDashboardRelation(USER_ADMIN, created));
+        assertEquals(CompanyResourceRelation.OWNER, decision.resolveFolderRelation(USER_ADMIN, 8303L));
+    }
+
+    @Test
+    void p3T24CreatorAclInitializationIsIdempotentAndDatasetFoldersStayOutsideAcl() {
+        AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
+        mutation.afterCreate(8304L, "leaf");
+        mutation.afterCreate(8304L, "leaf");
+        assertEquals(CompanyResourceRelation.OWNER, decision.resolveDashboardRelation(USER_ADMIN, 8304L));
+
+        datasetMutation.afterCreate(DATASET_Y, "dataset");
+        datasetMutation.afterCreate(DATASET_Y, "dataset");
+        assertTrue(decision.hasDatasetRead(USER_ADMIN, DATASET_Y));
+
+        datasetMutation.afterCreate(9302L, "folder");
+        assertFalse(acl.existsDatasetAcl(CompanySubjectType.USER, USER_ADMIN, 9302L));
     }
 
     @Test
@@ -463,6 +483,16 @@ class CompanyPermissionP3Test {
         @Override
         public boolean existsDatasetAclForGroups(Collection<Long> groupIds, Long datasetId) {
             return false;
+        }
+
+        @Override
+        public boolean insertIfAbsent(CompanySubjectType subjectType, Long subjectId, Long datasetId, Long createdBy) {
+            String k = key(subjectType, subjectId, CompanyResourceType.DATASET, datasetId);
+            if (rows.containsKey(k)) {
+                return false;
+            }
+            rows.put(k, CompanyRelationLevel.VISITOR.name());
+            return true;
         }
 
         @Override
