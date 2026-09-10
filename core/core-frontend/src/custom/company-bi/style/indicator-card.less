@@ -74,6 +74,27 @@
   color: var(--bi-text-secondary, #646a73);
 }
 
+.bi-indicator-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  align-content: center;
+  gap: 12px;
+  width: 100%;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.bi-indicator-breakdown__card {
+  min-width: 0;
+  padding: 14px 12px;
+  border: 1px solid var(--bi-card-divider, #e7e9ee);
+  border-radius: 8px;
+
+  .bi-indicator-main__value {
+    font-size: clamp(26px, 5cqi, 36px);
+  }
+}
+
 .bi-indicator-divider {
   flex: none;
   width: min(72%, 420px);

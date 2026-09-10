@@ -1213,6 +1213,25 @@ export default {
     load_data: 'Load Data'
   },
   chart: {
+    dateCompare: {
+      retry: 'Retry',
+      zero: 'Previous value is zero; growth rate is undefined',
+      noData: 'Current or comparison period has no valid data',
+      mode: 'Based on date filters',
+      current: 'Current (UTC+08:00)',
+      previous: 'Comparison (UTC+08:00)',
+      missing: 'Bind a bounded date filter to the same date field',
+      empty: 'Date filters have no overlap',
+      unsupported: 'Unsupported date conditions; comparison unavailable',
+      invalid: 'Invalid or unbounded date range',
+      day_mom: 'Previous day',
+      week_yoy: 'Same period last week',
+      week_mom: 'Same period last week',
+      month_yoy: 'Same period last month',
+      month_mom: 'Same period last month',
+      year_yoy: 'Same period last year',
+      year_mom: 'Same period last year'
+    },
     self: 'Self',
     total_row: 'Entire Row',
     custom: 'Custom',
@@ -1646,6 +1665,7 @@ export default {
     chart_indicator: 'Indicator card',
     chart_indicator_combo: 'Comparison indicator card',
     indicator_combo_layout: 'Layout',
+    indicator_combo_breakdown: 'Breakdown',
     indicator_combo_layout_columns: 'Equal columns',
     indicator_combo_layout_row: 'Compact row',
     indicator_combo_layout_list: 'Vertical list',

@@ -1,6 +1,11 @@
 <script lang="tsx" setup>
 import { useI18n } from '@/hooks/web/useI18n'
 import { computed, reactive, toRefs, watch } from 'vue'
+import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
+import {
+  resolveDateComparison,
+  formatComparisonPeriod as formatPeriod
+} from '@/custom/company-bi/components/indicator-combo/guandataDateFilterCompare'
 import {
   compareYearList,
   compareMonthList,
@@ -56,6 +61,7 @@ const changeDateFormatter = () => {
 }
 
 const initDateFormatter = () => {
+  if (isIndicatorCombo.value) return
   const timeType = compareItem.value.compareCalc.custom?.timeType
   if (isIndicator.value && timeType) {
     state.dateFormatter = timeType
@@ -187,6 +193,18 @@ const isIndicator = computed(() => {
 
 const isIndicatorCombo = computed(() => chart.value.type === 'indicator-combo')
 
+const datePreview = computed(() =>
+  resolveDateComparison(
+    {
+      ...chart.value,
+      chartExtRequest:
+        dvMainStoreWithOut().getLastViewRequestInfo(chart.value.id) ?? chart.value.chartExtRequest
+    },
+    compareItem.value.compareCalc.field,
+    compareItem.value.compareCalc.type
+  )
+)
+
 // 过滤xaxis，extStack所有日期字段
 const initFieldList = () => {
   let xAxis = null
@@ -239,6 +257,18 @@ const yoyLabel = [
 ]
 // 获得不同字段格式对应能计算的同环比列表
 const initCompareType = () => {
+  if (isIndicatorCombo.value) {
+    const selected = compareItem.value.compareCalc.type
+    state.compareList = compareDayListGuandata.map(item => ({ ...item }))
+    if (yoyLabel.includes(selected) && !state.compareList.some(item => item.value === selected)) {
+      const canonical = selected.replace('_mom', '_yoy')
+      state.compareList = state.compareList.map(item =>
+        item.value === canonical ? { name: selected, value: selected } : item
+      )
+    }
+    if (!yoyLabel.includes(selected)) compareItem.value.compareCalc.type = 'month_yoy'
+    return
+  }
   const checkedField = state.fieldList.filter(ele => ele.id === compareItem.value.compareCalc.field)
   if (checkedField && checkedField.length > 0) {
     switch (checkedField[0].dateStyle) {
@@ -279,6 +309,9 @@ initDateFormatter()
 <template>
   <div>
     <el-form ref="form" :model="compareItem.compareCalc" label-width="80px" class="compare-form">
+      <el-form-item v-if="isIndicatorCombo">
+        {{ t('chart.dateCompare.mode') }}
+      </el-form-item>
       <el-form-item :label="t('chart.compare_date')">
         <el-select
           v-model="compareItem.compareCalc.field"
@@ -293,7 +326,7 @@ initDateFormatter()
           />
         </el-select>
       </el-form-item>
-      <el-form-item v-if="isIndicator" :label="t('chart.datePattern')">
+      <el-form-item v-if="isIndicator && !isIndicatorCombo" :label="t('chart.datePattern')">
         <el-select
           v-model="state.dateFormatter"
           :placeholder="t('chart.date_format')"
@@ -310,7 +343,7 @@ initDateFormatter()
       <el-form-item :label="t('chart.compare_type')">
         <el-radio-group v-model="compareItem.compareCalc.type">
           <el-radio v-for="radio in state.compareList" :key="radio.value" :value="radio.value"
-            >{{ t('chart.' + radio.value) }}
+            >{{ t('chart.' + (isIndicatorCombo ? 'dateCompare.' : '') + radio.value) }}
           </el-radio>
         </el-radio-group>
       </el-form-item>
@@ -328,6 +361,21 @@ initDateFormatter()
           {{ hintStr }}
         </span>
       </el-form-item>
+
+      <template v-if="isIndicatorCombo">
+        <el-form-item :label="t('chart.dateCompare.current')">
+          {{ formatPeriod(datePreview.current) }}
+        </el-form-item>
+        <el-form-item :label="t('chart.dateCompare.previous')">
+          {{ formatPeriod(datePreview.previous) }}
+        </el-form-item>
+        <el-alert
+          v-if="datePreview.status !== 'ok'"
+          :closable="false"
+          :title="t('chart.dateCompare.' + datePreview.status)"
+          type="warning"
+        />
+      </template>
 
       <el-form-item :label="t('chart.tip')">
         <span class="exp-style" style="padding-top: 2px">

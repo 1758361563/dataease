@@ -1,5 +1,5 @@
 /**
- * 观远日历端点映射（售后已确认）
+ * 日期筛选对比的日历端点映射（本项目约定）
  *
  * 月环比 / 月同比：两端点分别减 N 个自然月
  * 年同比 / 年环比：两端点分别减 N 个自然年
@@ -22,7 +22,7 @@ export type DateOnly = {
 
 export function daysInMonth(year: number, month: number): number {
   // Date 月份 0-based；day=0 → 上月最后一天
-  return new Date(year, month, 0).getDate()
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
 }
 
 export function shiftYearMonth(
@@ -51,12 +51,11 @@ export function subtractCalendarYears(input: DateOnly, amount: number): DateOnly
 }
 
 export function subtractCalendarDays(input: DateOnly, amount: number): DateOnly {
-  const d = new Date(input.year, input.month - 1, input.day)
-  d.setDate(d.getDate() - amount)
+  const d = new Date(Date.UTC(input.year, input.month - 1, input.day - amount))
   return {
-    year: d.getFullYear(),
-    month: d.getMonth() + 1,
-    day: d.getDate()
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate()
   }
 }
 
@@ -71,28 +70,33 @@ export function parseDateOnly(iso: string): DateOnly {
   return { year: y, month: m, day: d }
 }
 
-/** 本地时区从时间戳取纯日期（不做 UTC 换算） */
+// 当前业务日期固定为北京时间 UTC+08:00，不随浏览器时区变化。
+const BUSINESS_OFFSET_MS = 8 * 60 * 60 * 1000
+
+/** 从北京时间时间戳取纯日期。 */
 export function toDateOnlyFromMs(ms: number): DateOnly {
-  const d = new Date(ms)
+  const d = new Date(ms + BUSINESS_OFFSET_MS)
   return {
-    year: d.getFullYear(),
-    month: d.getMonth() + 1,
-    day: d.getDate()
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate()
   }
 }
 
 /** 用新 Y-M-D 重建时间戳，保留原时分秒毫秒（避免 setMonth 溢出） */
 export function applyDateOnlyKeepingTime(ms: number, date: DateOnly): number {
-  const src = new Date(ms)
-  return new Date(
-    date.year,
-    date.month - 1,
-    date.day,
-    src.getHours(),
-    src.getMinutes(),
-    src.getSeconds(),
-    src.getMilliseconds()
-  ).valueOf()
+  const src = new Date(ms + BUSINESS_OFFSET_MS)
+  return (
+    Date.UTC(
+      date.year,
+      date.month - 1,
+      date.day,
+      src.getUTCHours(),
+      src.getUTCMinutes(),
+      src.getUTCSeconds(),
+      src.getUTCMilliseconds()
+    ) - BUSINESS_OFFSET_MS
+  )
 }
 
 /**

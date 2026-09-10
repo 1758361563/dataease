@@ -1181,6 +1181,25 @@ export default {
     load_data: '加载数据'
   },
   chart: {
+    dateCompare: {
+      retry: '重试',
+      zero: '上期为 0，增长率不适用',
+      noData: '本期或对比期无有效数据',
+      mode: '基于日期筛选',
+      current: '本期（北京时间）',
+      previous: '对比期（北京时间）',
+      missing: '请绑定同一日期字段的有限日期筛选',
+      empty: '日期筛选交集为空',
+      unsupported: '存在暂不支持的日期条件，无法计算对比',
+      invalid: '日期区间无效或缺少起止边界',
+      day_mom: '较前一日',
+      week_yoy: '较上周同期',
+      week_mom: '较上周同期',
+      month_yoy: '较上月同期',
+      month_mom: '较上月同期',
+      year_yoy: '较去年同期',
+      year_mom: '较去年同期'
+    },
     self: '自己',
     total_row: '整行',
     custom: '自定义',
@@ -1611,6 +1630,7 @@ export default {
     chart_indicator: '指标卡',
     chart_indicator_combo: '对比指标卡',
     indicator_combo_layout: '布局样式',
+    indicator_combo_breakdown: '拆分',
     indicator_combo_layout_columns: '等宽列',
     indicator_combo_layout_row: '横向紧凑',
     indicator_combo_layout_list: '纵向列表',

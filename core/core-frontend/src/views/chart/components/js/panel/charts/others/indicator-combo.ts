@@ -8,7 +8,7 @@ const { t } = useI18n()
  * 对比指标卡（company）
  *
  * 内部：yAxis[0] 中央主展示，yAxis[1..] 底部对比（已配置 compareCalc 的才渲染）。
- * 取数：calcData 内 type→indicator，复用官方同环比链路（零后端改动）。
+ * 取数：使用 indicator-combo 后端处理器，允许一个拆分维度参与 GROUP BY。
  */
 export class IndicatorComboChartView extends AbstractChartView {
   selectorSpec: EditorSelectorSpec = {
@@ -66,8 +66,15 @@ export class IndicatorComboChartView extends AbstractChartView {
     'indicator-combo-layout-selector': ['all'],
     'function-cfg': ['emptyDataStrategy']
   }
-  axis: AxisType[] = ['yAxis', 'filter']
+  axis: AxisType[] = ['xAxis', 'yAxis', 'filter']
   axisConfig: AxisConfig = {
+    xAxis: {
+      name: `${t('chart.indicator_combo_breakdown')} / ${t('chart.dimension')}`,
+      type: 'd',
+      min: 0,
+      limit: 1,
+      allowEmpty: true
+    },
     yAxis: {
       name: `${t('chart.quota')}`,
       min: 1,

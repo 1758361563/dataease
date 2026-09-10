@@ -5,6 +5,7 @@ export type ComparisonItem = {
   key: string
   label: string
   text: string
+  hint?: string
   trend: 'up' | 'down' | 'flat'
 }
 
@@ -32,7 +33,14 @@ defineProps({
   <template v-if="items.length">
     <div v-if="showDivider" class="bi-indicator-divider" aria-hidden="true" />
     <div class="bi-indicator-compares" :class="['is-layout-' + layout, 'is-align-' + align]">
-      <div v-for="item in items" :key="item.key" class="bi-indicator-compare">
+      <div
+        v-for="item in items"
+        :key="item.key"
+        class="bi-indicator-compare"
+        :title="item.hint"
+        tabindex="0"
+        :aria-label="[item.label, item.text, item.hint].join(' ')"
+      >
         <div class="bi-indicator-compare__label">{{ item.label }}</div>
         <div class="bi-indicator-compare__value" :class="'is-' + item.trend">
           <span>{{ item.text }}</span>

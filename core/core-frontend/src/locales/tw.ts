@@ -1176,6 +1176,25 @@ export default {
     load_data: '載入資料'
   },
   chart: {
+    dateCompare: {
+      retry: '重試',
+      zero: '上期為 0，增長率不適用',
+      noData: '本期或對比期無有效資料',
+      mode: '基於日期篩選',
+      current: '本期（北京時間）',
+      previous: '對比期（北京時間）',
+      missing: '請綁定相同日期欄位的有限日期篩選',
+      empty: '日期篩選交集為空',
+      unsupported: '存在暫不支援的日期條件，無法計算對比',
+      invalid: '日期區間無效或缺少起止邊界',
+      day_mom: '較前一日',
+      week_yoy: '較上週同期',
+      week_mom: '較上週同期',
+      month_yoy: '較上月同期',
+      month_mom: '較上月同期',
+      year_yoy: '較去年同期',
+      year_mom: '較去年同期'
+    },
     self: '自己',
     total_row: '整行',
     custom: '自定義',
@@ -1606,6 +1625,7 @@ export default {
     chart_indicator: '指標卡',
     chart_indicator_combo: '對比指標卡',
     indicator_combo_layout: '佈局樣式',
+    indicator_combo_breakdown: '拆分',
     indicator_combo_layout_columns: '等寬列',
     indicator_combo_layout_row: '橫向緊湊',
     indicator_combo_layout_list: '縱向列表',

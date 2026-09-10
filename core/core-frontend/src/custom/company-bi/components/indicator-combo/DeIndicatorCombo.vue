@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { getData } from '@/api/chart'
-import { ref, reactive, shallowRef, computed, CSSProperties, toRefs, PropType } from 'vue'
+import {
+  ref,
+  reactive,
+  shallowRef,
+  computed,
+  CSSProperties,
+  toRefs,
+  PropType,
+  onBeforeUnmount
+} from 'vue'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { customAttrTrans, customStyleTrans, recursionTransObj } from '@/utils/canvasStyle'
 import { deepCopy, isMobile } from '@/utils/utils'
@@ -22,8 +31,11 @@ import { DEFAULT_INDICATOR_COMBO_LAYOUT } from './defaults'
 import IndicatorMainBlock from './IndicatorMainBlock.vue'
 import IndicatorComparisonSection from './IndicatorComparisonSection.vue'
 import { indicatorDisplayName } from './displayName'
+import { resolveBreakdownSort, sortBreakdownCards } from './breakdown'
 import {
   cloneViewWithShiftedDateFilter,
+  resolveDateComparison,
+  formatComparisonPeriod,
   compareGroupKey,
   computeCompareResult,
   stripCompareCalc
@@ -136,6 +148,20 @@ const firstValueOf = origIdx => {
   return undefined
 }
 
+const normalizedValue = raw => {
+  if (raw === null || raw === undefined || raw === '') {
+    return view.value.senior?.functionCfg?.emptyDataStrategy === 'setZero' ? 0 : '-'
+  }
+  return raw
+}
+
+const formattedPrimaryValue = raw => {
+  const value = normalizedValue(raw)
+  if (value === '-') return value
+  const formatter = view.value.yAxis?.[0]?.formatterCfg
+  return formatter ? valueFormatter(value, formatter) : value
+}
+
 const displayNameOf = quota => indicatorDisplayName(quota)
 
 const resultName = computed(() => {
@@ -143,18 +169,6 @@ const resultName = computed(() => {
     return displayNameOf(view.value.yAxis[0])
   }
   return ''
-})
-
-const result = computed(() => {
-  let _result = firstValueOf(0)
-  if (_result === null || _result === undefined || _result === '') {
-    if (view.value.senior && view.value.senior?.functionCfg?.emptyDataStrategy === 'setZero') {
-      _result = 0
-    } else {
-      return '-'
-    }
-  }
-  return _result
 })
 
 const layoutCfg = computed(() =>
@@ -174,7 +188,37 @@ const comparePills = computed(() => {
   return pills
 })
 
-const buildPill = (quota, raw, origIdx) => {
+const comparisonRequest = shallowRef<any>(null)
+const previousValues = shallowRef(new Map<number, Map<string, unknown>>())
+const buildPill = (quota, raw, origIdx, groupIndex = 0) => {
+  const result = formatPill(quota, raw, origIdx)
+  const period = resolveDateComparison(
+    comparisonRequest.value,
+    quota.compareCalc?.field,
+    quota.compareCalc?.type
+  )
+  let hint =
+    period.status === 'ok'
+      ? `${t('chart.dateCompare.current')}: ${formatComparisonPeriod(period.current)}\n${t(
+          'chart.dateCompare.previous'
+        )}: ${formatComparisonPeriod(period.previous)}`
+      : t('chart.dateCompare.' + period.status)
+  if (period.status === 'ok' && (raw === null || raw === undefined || raw === '')) {
+    const previous = previousValues.value
+      .get(origIdx)
+      ?.get(String(chartData.value?.x?.[groupIndex] ?? ''))
+    hint +=
+      '\n' +
+      t(
+        previous === 0 && quota.compareCalc?.resultData === 'percent'
+          ? 'chart.dateCompare.zero'
+          : 'chart.dateCompare.noData'
+      )
+  }
+  return { ...result, hint }
+}
+
+const formatPill = (quota, raw, origIdx) => {
   // 对比项标签：优先用户别名；否则用观远简称（勿用字段名「吊牌额」，会与主标题重复）
   const guandataTypeLabel: Record<string, string> = {
     day_mom: '环比',
@@ -192,7 +236,7 @@ const buildPill = (quota, raw, origIdx) => {
   const effectiveAlias = alias && alias !== fieldName ? alias : ''
   const label =
     effectiveAlias ||
-    guandataTypeLabel[compareType] ||
+    (guandataTypeLabel[compareType] ? t('chart.dateCompare.' + compareType) : '') ||
     (compareType ? t('chart.' + compareType) : '')
   const resultData = quota.compareCalc.resultData
   const key = quota.metricInstanceId || `${quota.id}-${origIdx}`
@@ -203,9 +247,8 @@ const buildPill = (quota, raw, origIdx) => {
   if (Number.isNaN(n)) {
     return { key, label, text: '-', trend: 'flat' as const }
   }
-  // 上期为 0 且本期非 0：观远侧常显「无限」
   if (!Number.isFinite(n)) {
-    return { key, label, text: '∞', trend: 'up' as const }
+    return { key, label, text: '-', trend: 'flat' as const }
   }
   const trend = n > 0 ? ('up' as const) : n < 0 ? ('down' as const) : ('flat' as const)
   if (resultData === 'percent') {
@@ -233,13 +276,13 @@ const buildPill = (quota, raw, origIdx) => {
 }
 
 const indicatorColor = ref(DEFAULT_INDICATOR_STYLE.color)
-const thresholdColor = computed(() => {
+const thresholdColorOf = raw => {
   let color: string = indicatorColor.value
   let backgroundColor: string = DEFAULT_INDICATOR_STYLE.backgroundColor
-  if (result.value === '-') {
+  const value = normalizedValue(raw)
+  if (value === '-') {
     return { color, backgroundColor }
   }
-  const value = result.value
   if (
     view.value.senior &&
     view.value.senior.threshold?.enable &&
@@ -265,16 +308,11 @@ const thresholdColor = computed(() => {
     }
   }
   return { color, backgroundColor }
-})
+}
 
-const formattedResult = computed(() => {
-  let _result = result.value
-  if (_result === '-') return _result
-  if (view.value.yAxis?.[0]?.formatterCfg) {
-    return valueFormatter(_result, view.value.yAxis[0].formatterCfg)
-  }
-  return _result
-})
+const thresholdColor = computed(() => thresholdColorOf(firstValueOf(0)))
+
+const formattedResult = computed(() => formattedPrimaryValue(firstValueOf(0)))
 
 const emit = defineEmits([
   'onPointClick',
@@ -333,6 +371,36 @@ const indicatorNameClass = ref<CSSProperties>({
   'font-style': DEFAULT_INDICATOR_NAME_STYLE.isItalic ? 'italic' : 'normal',
   'letter-spacing': DEFAULT_INDICATOR_NAME_STYLE.letterSpace + 'px',
   'font-synthesis': 'weight style'
+})
+
+const breakdownActive = computed(() => !!view.value?.xAxis?.length)
+
+const breakdownCards = computed(() => {
+  if (!breakdownActive.value) return []
+  const labels = ((chartData.value as any)?.x || []) as unknown[]
+  const mainSeries = seriesAt(0)?.data || []
+  const quotas = view.value?.yAxis || []
+  const cards = labels.map((label, index) => {
+    const rawValue = mainSeries[index]
+    const colors = thresholdColorOf(rawValue)
+    const comparisons: ReturnType<typeof buildPill>[] = []
+    quotas.forEach((quota, origIdx) => {
+      if (origIdx === 0 || !hasCompare(quota)) return
+      comparisons.push(buildPill(quota, seriesAt(origIdx)?.data?.[index], origIdx, index))
+    })
+    return {
+      key: `${String(label)}-${index}`,
+      label: String(label ?? '-'),
+      rawValue,
+      payload: {
+        value: formattedPrimaryValue(rawValue),
+        comparisons,
+        backgroundColor: colors.backgroundColor,
+        valueStyle: { ...indicatorClass.value, color: colors.color }
+      }
+    }
+  })
+  return sortBreakdownCards(cards, resolveBreakdownSort(view.value))
 })
 
 const renderChart = async viewArg => {
@@ -412,14 +480,25 @@ const renderChart = async viewArg => {
  * 2) 上期：按 (日期字段 + 对比类型) 分组，筛选起止整体偏移后再聚合
  * 3) 前端按 resultData 算增长率 / 差值 / 上期值
  */
+let calcRequestSequence = 0
+let lastRequest: { view: any; callback: any } | null = null
+const retryComparison = () => {
+  if (lastRequest && !state.loading) calcData(lastRequest.view, lastRequest.callback)
+}
+onBeforeUnmount(() => {
+  calcRequestSequence++
+})
+
 const calcData = (viewArg, callback) => {
+  lastRequest = { view: viewArg, callback }
+  const requestSequence = ++calcRequestSequence
   if (viewArg.tableId || viewArg['dataFrom'] === 'template') {
     state.loading = true
     isError.value = false
     errMsg.value = ''
 
     const base = JSON.parse(JSON.stringify(viewArg))
-    base.type = 'indicator'
+    base.type = 'indicator-combo'
     const quotas = base.yAxis || []
     seriesOrderMap.value = quotas.map((_, i) => i)
 
@@ -475,6 +554,7 @@ const calcData = (viewArg, callback) => {
 
     Promise.all(tasks)
       .then(results => {
+        if (requestSequence !== calcRequestSequence) return
         const currentRes = results[0]
         if (currentRes?.code && currentRes.code !== 0) {
           isError.value = true
@@ -484,7 +564,7 @@ const calcData = (viewArg, callback) => {
         }
 
         let ri = 1
-        const prevByOrigIdx = new Map<number, unknown>()
+        const prevByOrigIdx = new Map<number, Map<string, unknown>>()
         for (const pt of prevTasks) {
           if (!pt.promise) continue
           const prevRes = results[ri++]
@@ -494,35 +574,68 @@ const calcData = (viewArg, callback) => {
             callback?.()
             return
           }
+          const previousLabels = prevRes?.data?.x || ['']
           pt.items.forEach((it, j) => {
-            prevByOrigIdx.set(it.origIdx, prevRes?.data?.series?.[j]?.data?.[0])
+            const previousSeries =
+              prevRes?.data?.series?.[j]?.data ||
+              (it.quota.id === pt.items[0]?.quota.id &&
+              it.quota.summary === pt.items[0]?.quota.summary
+                ? prevRes?.data?.series?.[0]?.data
+                : undefined) ||
+              []
+            prevByOrigIdx.set(
+              it.origIdx,
+              new Map(previousLabels.map((label, index) => [String(label), previousSeries[index]]))
+            )
           })
         }
 
-        const series = quotas.map(() => ({ data: [undefined] }))
+        const groupLabels = currentRes?.data?.x || ['']
+        const series: Array<{ data: unknown[] }> = quotas.map(() => ({
+          data: groupLabels.map(() => undefined)
+        }))
         const currentSeries = currentRes?.data?.series || []
         quotas.forEach((_, i) => {
-          series[i] = { data: [currentSeries[i]?.data?.[0]] }
+          series[i] = {
+            data: [
+              ...(currentSeries[i]?.data ||
+                (quotas[i]?.id === quotas[0]?.id && quotas[i]?.summary === quotas[0]?.summary
+                  ? currentSeries[0]?.data
+                  : undefined) ||
+                [])
+            ]
+          }
         })
 
         compareMeta.forEach(it => {
           const hadPrevTask = prevTasks.find(p => p.items.some(x => x.origIdx === it.origIdx))
           if (!hadPrevTask?.promise) {
             // 无匹配的外部日期筛选 → 无法算观远 DATE_FILTER 对比
-            series[it.origIdx] = { data: [undefined] }
+            series[it.origIdx] = { data: groupLabels.map(() => undefined) }
             return
           }
-          // 同字段重复拖入时后端可能只回一条 series，回退到主指标本期值
-          const currentVal = currentSeries[it.origIdx]?.data?.[0] ?? currentSeries[0]?.data?.[0]
-          const previousVal = prevByOrigIdx.get(it.origIdx)
           const resultData = it.quota?.compareCalc?.resultData || 'percent'
           series[it.origIdx] = {
-            data: [computeCompareResult(currentVal, previousVal, resultData)]
+            data: groupLabels.map((label, index) => {
+              // 同字段重复拖入时后端可能只回一条 series，回退到主指标本期值。
+              const currentVal = (
+                currentSeries[it.origIdx] ||
+                (quotas[it.origIdx]?.id === quotas[0]?.id &&
+                quotas[it.origIdx]?.summary === quotas[0]?.summary
+                  ? currentSeries[0]
+                  : undefined)
+              )?.data?.[index]
+              const previousVal = prevByOrigIdx.get(it.origIdx)?.get(String(label))
+              return computeCompareResult(currentVal, previousVal, resultData)
+            })
           }
         })
 
+        comparisonRequest.value = base
+        previousValues.value = prevByOrigIdx
         chartData.value = {
           fields: currentRes?.data?.fields || [],
+          x: groupLabels,
           series
         } as Partial<Chart['data']>
         drillFilters.value = currentRes?.drillFilters || []
@@ -532,12 +645,17 @@ const calcData = (viewArg, callback) => {
         callback?.()
       })
       .catch(error => {
+        if (requestSequence !== calcRequestSequence) return
         isError.value = true
         errMsg.value = error?.message || String(error || '')
         drillFilters.value = []
         callback?.()
       })
+      .finally(() => {
+        if (requestSequence === calcRequestSequence) state.loading = false
+      })
   } else {
+    state.loading = false
     drillFilters.value = []
     callback?.()
   }
@@ -697,7 +815,12 @@ defineExpose({ calcData, renderChart, trackMenu })
     :style="contentStyle"
     @mouseup="onPointClick"
   >
-    <chart-error v-if="isError" :err-msg="errMsg" />
+    <template v-if="isError">
+      <chart-error :err-msg="errMsg" />
+      <el-button :disabled="state.loading" @click.stop="retryComparison">{{
+        t('chart.dateCompare.retry')
+      }}</el-button>
+    </template>
 
     <template v-else>
       <view-track-bar
@@ -710,23 +833,51 @@ defineExpose({ calcData, renderChart, trackMenu })
         :is-data-v-mobile="dataVMobile"
       />
 
-      <indicator-main-block
-        :label="resultName"
-        :value="formattedResult"
-        :suffix="suffixContent"
-        :show-label="indicatorNameShow"
-        :show-suffix="showSuffix"
-        :label-style="indicatorNameClass"
-        :value-style="indicatorClass"
-        :suffix-style="indicatorSuffixClass"
-      />
+      <div v-if="breakdownActive" class="bi-indicator-breakdown">
+        <div
+          v-for="card in breakdownCards"
+          :key="card.key"
+          class="bi-indicator-breakdown__card"
+          :style="{ backgroundColor: card.payload.backgroundColor }"
+        >
+          <indicator-main-block
+            :label="card.label"
+            :value="card.payload.value"
+            :suffix="suffixContent"
+            :show-label="true"
+            :show-suffix="showSuffix"
+            :label-style="indicatorNameClass"
+            :value-style="card.payload.valueStyle"
+            :suffix-style="indicatorSuffixClass"
+          />
+          <indicator-comparison-section
+            :items="card.payload.comparisons"
+            :layout="layoutCfg.layout"
+            :align="layoutCfg.align"
+            :show-divider="layoutCfg.showDivider"
+          />
+        </div>
+      </div>
 
-      <indicator-comparison-section
-        :items="comparePills"
-        :layout="layoutCfg.layout"
-        :align="layoutCfg.align"
-        :show-divider="layoutCfg.showDivider"
-      />
+      <template v-else>
+        <indicator-main-block
+          :label="resultName"
+          :value="formattedResult"
+          :suffix="suffixContent"
+          :show-label="indicatorNameShow"
+          :show-suffix="showSuffix"
+          :label-style="indicatorNameClass"
+          :value-style="indicatorClass"
+          :suffix-style="indicatorSuffixClass"
+        />
+
+        <indicator-comparison-section
+          :items="comparePills"
+          :layout="layoutCfg.layout"
+          :align="layoutCfg.align"
+          :show-divider="layoutCfg.showDivider"
+        />
+      </template>
     </template>
   </div>
 </template>
