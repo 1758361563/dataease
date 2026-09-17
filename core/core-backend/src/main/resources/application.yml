@@ -58,6 +58,11 @@ company:
     bootstrap-password: ${COMPANY_BI_BOOTSTRAP_PASSWORD:}
     token-secret: ${COMPANY_BI_TOKEN_SECRET:}
     data-dir: ${dataease.path.data:/opt/dataease2.0/data}
+  feishu:
+    shot-base-url: ${COMPANY_FEISHU_SHOT_BASE_URL:http://127.0.0.1:8091}
+    internal-token: ${COMPANY_FEISHU_INTERNAL_TOKEN:}
+    dry-run: ${COMPANY_FEISHU_DRY_RUN:false}
+    connect-timeout-ms: ${COMPANY_FEISHU_CONNECT_TIMEOUT_MS:15000}
 
 dataease:
   version: '@project.version@'

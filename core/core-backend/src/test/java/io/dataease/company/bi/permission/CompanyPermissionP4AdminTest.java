@@ -140,6 +140,8 @@ class CompanyPermissionP4AdminTest {
         DEException ex = assertThrows(DEException.class, () -> adminGuard.require(CompanyCapability.USER_MANAGE));
         assertEquals(ResultCode.PERMISSION_NO_ACCESS.code(), ex.getCode());
         assertEquals(CompanyCapability.USER_MANAGE, CompanyAdminApiFilter.requiredCapability("/company/bi/admin/users", null));
+        assertEquals(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE,
+                CompanyAdminApiFilter.requiredCapability("/company/bi/feishu/integration", null));
     }
 
     @Test
@@ -465,6 +467,7 @@ class CompanyPermissionP4AdminTest {
         assertTrue(caps.contains(CompanyCapability.DATASET_DESIGN));
         assertTrue(caps.contains(CompanyCapability.DATASOURCE_ACCESS));
         assertTrue(caps.contains(CompanyCapability.ETL_ACCESS));
+        assertTrue(caps.contains(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE));
     }
 
     @Test

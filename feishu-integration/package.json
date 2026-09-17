@@ -1,0 +1,22 @@
+{
+  "name": "feishu-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent Feishu / DataEase screenshot service (Phase 1B)",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "verify": "node src/verify.mjs",
+    "send-1c": "node src/send-1c.mjs",
+    "schema-test": "node src/schema-test.mjs",
+    "seed-dev": "node src/seed-dev-config.mjs",
+    "run-subscription": "node src/run-subscription.mjs",
+    "phase2cd-verify": "node src/phase2cd-verify.mjs",
+    "delivery-http-test": "node src/delivery-http-test.mjs",
+    "delivery-dryrun-http-test": "node src/delivery-dryrun-http-test.mjs"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.4",
+    "playwright": "^1.63.0"
+  }
+}

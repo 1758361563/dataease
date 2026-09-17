@@ -52,3 +52,11 @@ core/core-frontend/src/assets/fsSvg.html
 .vite/
 /core/backend/
 /classpath:substitule.json
+
+# Independent Feishu service runtime. Source under /feishu-integration is tracked.
+/feishu-integration/node_modules/
+/feishu-integration/tmp/
+/feishu-integration/.env
+/feishu-integration/*.log
+/feishu-integration/playwright-report/
+/feishu-integration/test-results/

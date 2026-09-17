@@ -13,7 +13,8 @@ public enum CompanyCapability {
     USER_MANAGE,
     GROUP_MANAGE,
     ACL_MANAGE,
-    AUDIT_VIEW;
+    AUDIT_VIEW,
+    FEISHU_SUBSCRIPTION_MANAGE;
 
     public static boolean granted(CompanyAccountRole role, CompanyCapability capability) {
         if (role == null || capability == null) {

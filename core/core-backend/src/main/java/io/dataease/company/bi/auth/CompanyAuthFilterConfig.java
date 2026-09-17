@@ -6,7 +6,9 @@ import io.dataease.company.bi.permission.CompanyCapabilityPathFilter;
 import io.dataease.company.bi.permission.CompanyDatasetDesignFilter;
 import io.dataease.company.bi.permission.CompanyDatasetDesignGuard;
 import io.dataease.company.bi.permission.PermissionDecisionService;
+import io.dataease.company.bi.feishu.CompanyFeishuProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +16,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 @Configuration
+@EnableConfigurationProperties(CompanyFeishuProperties.class)
 @ConditionalOnProperty(name = CompanyAuthSupport.ENABLED_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class CompanyAuthFilterConfig {
 

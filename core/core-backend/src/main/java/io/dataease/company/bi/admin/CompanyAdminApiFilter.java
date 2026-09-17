@@ -27,6 +27,7 @@ public class CompanyAdminApiFilter implements Filter {
         PREFIXES.put("/company/bi/admin/groups", CompanyCapability.GROUP_MANAGE);
         PREFIXES.put("/company/bi/admin/permissions", CompanyCapability.ACL_MANAGE);
         PREFIXES.put("/company/bi/admin/audit", CompanyCapability.AUDIT_VIEW);
+        PREFIXES.put("/company/bi/feishu", CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
     }
 
     private final PermissionDecisionService permissionDecisionService;
