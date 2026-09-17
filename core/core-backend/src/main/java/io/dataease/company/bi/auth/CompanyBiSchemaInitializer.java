@@ -30,7 +30,14 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             "db/company/company_bi_group_member.sql",
             "db/company/company_bi_resource_acl.sql",
             "db/company/company_bi_audit_log.sql",
-            "db/company/company_bi_compat_seed.sql"
+            "db/company/company_bi_compat_seed.sql",
+            "db/company/company_feishu_app_config.sql",
+            "db/company/company_feishu_recipient.sql",
+            "db/company/company_feishu_identity_map.sql",
+            "db/company/company_feishu_subscription.sql",
+            "db/company/company_feishu_subscription_recipient.sql",
+            "db/company/company_feishu_delivery_run.sql",
+            "db/company/company_feishu_delivery_target.sql"
     };
 
     private final DataSource dataSource;
