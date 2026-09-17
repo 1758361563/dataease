@@ -193,6 +193,17 @@
             jsname="L2NvbXBvbmVudC90aHJlc2hvbGQtd2FybmluZy9FZGl0QmFySGFuZGxlcg=="
             @close-item="closeItem"
           />
+          <el-dropdown-item
+            divided
+            v-if="canManageFeishuSubscription"
+            @click="openFeishuCreateSubscription"
+            >创建订阅</el-dropdown-item
+          >
+          <el-dropdown-item
+            v-if="canManageFeishuSubscription"
+            @click="openFeishuManageSubscriptions"
+            >管理订阅</el-dropdown-item
+          >
           <el-dropdown-item divided @click="deleteComponent" v-if="barShowCheck('delete')">{{
             t('visualization.delete')
           }}</el-dropdown-item>
@@ -272,6 +283,8 @@ import { exportPivotExcel } from '@/views/chart/components/js/panel/common/commo
 import { XpackComponent } from '@/components/plugin'
 import { exportPermission, isMobile } from '@/utils/utils'
 import { isMainCanvas } from '@/utils/canvasUtils'
+import { useRouter } from 'vue-router_2'
+import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
 const dvMainStore = dvMainStoreWithOut()
 const snapshotStore = snapshotStoreWithOut()
 const copyStore = copyStoreWithOut()
@@ -396,6 +409,31 @@ const {
   dvInfo,
   isPopWindow
 } = storeToRefs(dvMainStore)
+
+const feishuRouter = useRouter()
+const companyPermissionStore = useCompanyPermissionStoreWithOut()
+const canManageFeishuSubscription = computed(() => {
+  if (element.value?.component !== 'UserView') return false
+  if (!['canvas', 'preview'].includes(showPosition.value)) return false
+  return companyPermissionStore.hasCapability('FEISHU_SUBSCRIPTION_MANAGE')
+})
+const feishuCardQuery = () => ({
+  dashboardId: String(dvInfo.value?.id || ''),
+  chartId: String(element.value?.id || ''),
+  chartName: String(element.value?.title || element.value?.name || '')
+})
+const openFeishuCreateSubscription = () => {
+  feishuRouter.push({
+    path: '/company-admin/feishu',
+    query: { tab: 'subscriptions', create: '1', ...feishuCardQuery() }
+  })
+}
+const openFeishuManageSubscriptions = () => {
+  feishuRouter.push({
+    path: '/company-admin/feishu',
+    query: { tab: 'subscriptions', ...feishuCardQuery() }
+  })
+}
 
 const state = reactive({
   systemOS: 'Mac',

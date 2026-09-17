@@ -14,6 +14,7 @@ export type CompanyCapabilityName =
   | 'GROUP_MANAGE'
   | 'ACL_MANAGE'
   | 'AUDIT_VIEW'
+  | 'FEISHU_SUBSCRIPTION_MANAGE'
 
 export interface CompanyMe {
   userId: CompanyId

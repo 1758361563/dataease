@@ -9,6 +9,7 @@ import io.dataease.company.bi.permission.CompanyDashboardGuard;
 import io.dataease.exception.DEException;
 import io.dataease.utils.IDUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -37,6 +38,7 @@ public class CompanyFeishuService {
     private final CompanyFeishuDeliveryGateway deliveryGateway;
     private final LongSupplier ids;
 
+    @Autowired
     public CompanyFeishuService(CompanyFeishuRepository store,
                                 CompanyDashboardGuard dashboardGuard,
                                 CompanyAdminTx tx,
@@ -45,12 +47,12 @@ public class CompanyFeishuService {
         this(store, dashboardGuard, tx, properties, deliveryGateway, IDUtils::snowID);
     }
 
-    public CompanyFeishuService(CompanyFeishuRepository store,
-                                CompanyDashboardGuard dashboardGuard,
-                                CompanyAdminTx tx,
-                                CompanyFeishuProperties properties,
-                                CompanyFeishuDeliveryGateway deliveryGateway,
-                                LongSupplier ids) {
+    CompanyFeishuService(CompanyFeishuRepository store,
+                         CompanyDashboardGuard dashboardGuard,
+                         CompanyAdminTx tx,
+                         CompanyFeishuProperties properties,
+                         CompanyFeishuDeliveryGateway deliveryGateway,
+                         LongSupplier ids) {
         this.store = store;
         this.dashboardGuard = dashboardGuard;
         this.tx = tx;
@@ -235,6 +237,10 @@ public class CompanyFeishuService {
     }
 
     public Map<String, Object> runSubscription(Long id, long operatorId) {
+        return runSubscription(id, operatorId, null);
+    }
+
+    public Map<String, Object> runSubscription(Long id, long operatorId, Object requestDryRun) {
         CompanyFeishuRepository.Subscription row = requireSubscription(id);
         if (!"ENABLED".equals(row.status)) {
             CompanyAdminErrors.invalid("只有 ENABLED 订阅可以手动执行");
@@ -246,7 +252,8 @@ public class CompanyFeishuService {
         if (store.findAppConfig() == null) {
             CompanyAdminErrors.invalid("飞书应用未配置");
         }
-        return deliveryGateway.start(id, operatorId, properties.isDryRun());
+        boolean dryRun = properties.isDryRun() || truthy(requestDryRun);
+        return deliveryGateway.start(id, operatorId, dryRun);
     }
 
     public List<Map<String, Object>> listRuns(Long subscriptionId) {
@@ -440,11 +447,15 @@ public class CompanyFeishuService {
     }
 
     private Map<String, Object> runVo(CompanyFeishuRepository.DeliveryRun run, boolean detail) {
+        List<CompanyFeishuRepository.DeliveryTarget> targetRows = store.listTargets(run.id);
+        String executionMode = CompanyFeishuExecutionModes.infer(
+                run.errorSummary, run.screenshotStatus, run.uploadStatus, targetRows);
         Map<String, Object> vo = new LinkedHashMap<>();
         vo.put("id", String.valueOf(run.id));
         vo.put("subscriptionId", String.valueOf(run.subscriptionId));
         vo.put("triggerType", run.triggerType);
         vo.put("status", run.status);
+        vo.put("executionMode", executionMode);
         vo.put("screenshotStatus", run.screenshotStatus);
         vo.put("uploadStatus", run.uploadStatus);
         vo.put("errorSummary", run.errorSummary);
@@ -453,7 +464,7 @@ public class CompanyFeishuService {
         vo.put("createdAt", run.createdAt);
         if (detail) {
             List<Map<String, Object>> targets = new ArrayList<>();
-            for (CompanyFeishuRepository.DeliveryTarget target : store.listTargets(run.id)) {
+            for (CompanyFeishuRepository.DeliveryTarget target : targetRows) {
                 Map<String, Object> item = new LinkedHashMap<>();
                 item.put("id", String.valueOf(target.id));
                 item.put("recipientId", String.valueOf(target.recipientId));
@@ -461,6 +472,8 @@ public class CompanyFeishuService {
                 item.put("recipientType", target.recipientType);
                 item.put("receiveIdType", target.receiveIdType);
                 item.put("status", target.status);
+                item.put("executionMode", CompanyFeishuExecutionModes.inferTarget(
+                        executionMode, target.errorSummary, target.feishuMessageId));
                 item.put("messageId", target.feishuMessageId);
                 item.put("retryCount", target.retryCount);
                 item.put("errorSummary", target.errorSummary);

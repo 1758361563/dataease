@@ -37,8 +37,8 @@ public class CompanyFeishuHttpDeliveryGateway implements CompanyFeishuDeliveryGa
             CompanyAdminErrors.invalid("独立服务令牌未配置");
         }
         String base = StringUtils.removeEnd(StringUtils.defaultIfBlank(properties.getShotBaseUrl(), "http://127.0.0.1:8091"), "/");
-        if (!base.startsWith("http://127.0.0.1") && !base.startsWith("http://localhost")) {
-            CompanyAdminErrors.invalid("独立服务只允许本机回环地址");
+        if (!isAllowedShotBase(base)) {
+            CompanyAdminErrors.invalid("独立服务只允许本机回环地址或 Docker host.docker.internal");
         }
         try {
             String payload = JSON.writeValueAsString(Map.of(
@@ -74,6 +74,28 @@ public class CompanyFeishuHttpDeliveryGateway implements CompanyFeishuDeliveryGa
             LogUtil.error("feishu delivery start error: " + e.getMessage());
             CompanyAdminErrors.invalid("无法连接独立执行服务");
             return Map.of();
+        }
+    }
+
+    /**
+     * DataEase 跑在容器里时，127.0.0.1 是容器自己，不是宿主机上的独立服务。
+     * Docker Desktop 可通过 host.docker.internal 访问宿主机 127.0.0.1 监听端口。
+     */
+    static boolean isAllowedShotBase(String base) {
+        if (StringUtils.isBlank(base)) {
+            return false;
+        }
+        try {
+            URI uri = URI.create(base);
+            if (!"http".equalsIgnoreCase(uri.getScheme())) {
+                return false;
+            }
+            String host = uri.getHost();
+            return "127.0.0.1".equals(host)
+                    || "localhost".equalsIgnoreCase(host)
+                    || "host.docker.internal".equalsIgnoreCase(host);
+        } catch (Exception e) {
+            return false;
         }
     }
 }

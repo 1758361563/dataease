@@ -38,7 +38,7 @@ public class CompanyFeishuController {
         return feishuService.getIntegration();
     }
 
-    @PutMapping("/integration")
+    @RequestMapping(value = "/integration", method = {RequestMethod.PUT, RequestMethod.POST})
     public Map<String, Object> putIntegration(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         long operator = adminGuard.requireBootstrapAdmin();
         CompanyAdminAuditContext.from(request, operator);
@@ -122,9 +122,12 @@ public class CompanyFeishuController {
     }
 
     @PostMapping("/subscriptions/{id}/run")
-    public Map<String, Object> run(@PathVariable("id") Long id, HttpServletRequest request) {
+    public Map<String, Object> run(@PathVariable("id") Long id,
+                                   @RequestBody(required = false) Map<String, Object> body,
+                                   HttpServletRequest request) {
         long operator = adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
-        return feishuService.runSubscription(id, operator);
+        Object dryRun = body == null ? null : body.get("dryRun");
+        return feishuService.runSubscription(id, operator, dryRun);
     }
 
     @GetMapping("/subscriptions/{id}/runs")

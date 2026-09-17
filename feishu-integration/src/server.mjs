@@ -119,12 +119,15 @@ export function createServer(hooks = {}) {
       if (req.method === 'GET' && deliveryMatch) {
         if (!requireInternalToken(req, res)) return
         const { getDeliveryRunById, listDeliveryTargets } = await import('./store.mjs')
+        const { inferExecutionMode, inferTargetExecutionMode } = await import('./execution-mode.mjs')
         const run = await getDeliveryRunById(deliveryMatch[1])
         if (!run) return send(res, 404, { error: 'run not found' })
         const targets = await listDeliveryTargets(run.id)
+        const executionMode = inferExecutionMode(run, targets)
         return send(res, 200, {
           runId: String(run.id),
           status: run.status,
+          executionMode,
           screenshotStatus: run.screenshot_status,
           uploadStatus: run.upload_status,
           errorSummary: run.error_summary,
@@ -132,6 +135,7 @@ export function createServer(hooks = {}) {
             recipientId: String(row.recipient_id),
             receiveIdType: row.receive_id_type,
             status: row.status,
+            executionMode: inferTargetExecutionMode(row, executionMode),
             messageId: row.feishu_message_id,
             errorSummary: row.error_summary
           }))

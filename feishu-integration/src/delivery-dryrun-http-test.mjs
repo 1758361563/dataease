@@ -109,11 +109,12 @@ async function main() {
     assert(detail.status === 200, `run lookup failed: ${detail.status} ${detail.raw}`)
     assert(detail.json.runId === runId, 'runId mismatch')
     assert(detail.json.status === 'SUCCEEDED', `expected SUCCEEDED, got ${detail.json.status}`)
+    assert(detail.json.executionMode === 'DRY_RUN', `expected DRY_RUN, got ${detail.json.executionMode}`)
     assert(detail.json.screenshotStatus === 'SKIPPED', 'dry-run must skip screenshot')
     assert(Array.isArray(detail.json.targets) && detail.json.targets.length >= 1, 'targets missing')
     assert(
-      detail.json.targets.every(row => row.status === 'SUCCEEDED' && !row.messageId),
-      'dry-run must not send Feishu messages'
+      detail.json.targets.every(row => row.status === 'SUCCEEDED' && row.executionMode === 'DRY_RUN' && !row.messageId),
+      'dry-run must not send Feishu messages or look like LIVE'
     )
     assert(!containsSecret(detail.raw), 'secret leaked in run detail')
     console.log(

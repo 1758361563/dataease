@@ -49,6 +49,7 @@ class CompanyFeishuBffTest {
     private CompanyAdminGuard guard;
     private PermissionDecisionService decision;
     private FakeGateway gateway;
+    private CompanyFeishuProperties properties;
     private AtomicLong ids;
 
     @BeforeEach
@@ -64,7 +65,7 @@ class CompanyFeishuBffTest {
         store = new MemoryStore();
         gateway = new FakeGateway();
         ids = new AtomicLong(5000);
-        CompanyFeishuProperties properties = new CompanyFeishuProperties();
+        properties = new CompanyFeishuProperties();
         properties.setInternalToken("test-token");
         properties.setDryRun(true);
         CompanyDashboardGuard dashGuard = mock(CompanyDashboardGuard.class);
@@ -185,6 +186,64 @@ class CompanyFeishuBffTest {
         List<?> targets = (List<?>) detail.get("targets");
         assertEquals(2, targets.size());
         assertEquals("om_dry_1", ((Map<?, ?>) targets.get(0)).get("messageId"));
+        assertEquals("LIVE", detail.get("executionMode"));
+    }
+
+    @Test
+    void runDetailDistinguishesDryRunLiveAndUnknown() {
+        AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
+        Map<String, Object> person = service.createRecipient(recipient("PERSONAL", "user_id", "user_mode"), USER_ADMIN);
+        Map<String, Object> created = service.createSubscription(subscription(String.valueOf(DASH_OK),
+                List.of(person.get("id"))), USER_ADMIN);
+        long subId = Long.parseLong((String) created.get("id"));
+        long recipientId = Long.parseLong((String) person.get("id"));
+
+        CompanyFeishuRepository.DeliveryRun dry = run(7500000000000000201L, subId);
+        dry.errorSummary = "dry-run: send skipped";
+        store.runs.add(dry);
+        store.targets.add(target(dry.id, recipientId, "user_id", "SUCCEEDED", null));
+        store.targets.get(store.targets.size() - 1).errorSummary = "dry-run: send skipped";
+        Map<String, Object> dryDetail = service.getRun(subId, dry.id);
+        assertEquals("DRY_RUN", dryDetail.get("executionMode"));
+        assertEquals("DRY_RUN", ((Map<?, ?>) ((List<?>) dryDetail.get("targets")).get(0)).get("executionMode"));
+
+        CompanyFeishuRepository.DeliveryRun live = run(7500000000000000202L, subId);
+        live.screenshotStatus = "SUCCEEDED";
+        live.uploadStatus = "SUCCEEDED";
+        store.runs.add(live);
+        store.targets.add(target(live.id, recipientId, "user_id", "SUCCEEDED", "om_live_9"));
+        Map<String, Object> liveDetail = service.getRun(subId, live.id);
+        assertEquals("LIVE", liveDetail.get("executionMode"));
+
+        CompanyFeishuRepository.DeliveryRun unknown = run(7500000000000000203L, subId);
+        store.runs.add(unknown);
+        store.targets.add(target(unknown.id, recipientId, "user_id", "SUCCEEDED", null));
+        Map<String, Object> unknownDetail = service.getRun(subId, unknown.id);
+        assertEquals("UNKNOWN", unknownDetail.get("executionMode"));
+    }
+
+    @Test
+    void requestDryRunOverridesDisabledProperty() {
+        properties.setDryRun(false);
+        AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
+        Map<String, Object> person = service.createRecipient(recipient("PERSONAL", "user_id", "user_dry"), USER_ADMIN);
+        Map<String, Object> created = service.createSubscription(subscription(String.valueOf(DASH_OK),
+                List.of(person.get("id"))), USER_ADMIN);
+        service.setSubscriptionStatus(Long.parseLong((String) created.get("id")), "ENABLED", USER_ADMIN);
+        Map<String, Object> accepted = service.runSubscription(Long.parseLong((String) created.get("id")), USER_ADMIN, true);
+        assertEquals(true, accepted.get("accepted"));
+        assertTrue(gateway.calls.get(0).dryRun());
+        properties.setDryRun(true);
+    }
+
+    @Test
+    void shotBaseAllowsDockerDesktopHostButRejectsLan() {
+        assertTrue(CompanyFeishuHttpDeliveryGateway.isAllowedShotBase("http://127.0.0.1:8091"));
+        assertTrue(CompanyFeishuHttpDeliveryGateway.isAllowedShotBase("http://localhost:8091"));
+        assertTrue(CompanyFeishuHttpDeliveryGateway.isAllowedShotBase("http://host.docker.internal:8091"));
+        assertFalse(CompanyFeishuHttpDeliveryGateway.isAllowedShotBase("http://172.18.0.1:8091"));
+        assertFalse(CompanyFeishuHttpDeliveryGateway.isAllowedShotBase("https://host.docker.internal:8091"));
+        assertFalse(CompanyFeishuHttpDeliveryGateway.isAllowedShotBase("http://example.com"));
     }
 
     @Test
