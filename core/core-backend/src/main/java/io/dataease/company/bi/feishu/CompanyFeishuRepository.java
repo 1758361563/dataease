@@ -75,6 +75,7 @@ public interface CompanyFeishuRepository {
         public Long plannedAt;
         public Long operatorUserId;
         public String status;
+        public String executionMode;
         public String screenshotStatus;
         public String uploadStatus;
         public String imageKey;

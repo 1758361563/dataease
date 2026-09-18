@@ -48,7 +48,14 @@ export const CONFIG = {
     user: process.env.DE_MYSQL_USER || 'root',
     password: process.env.DE_MYSQL_PASSWORD || process.env.MYSQL_ROOT_PASSWORD || '',
     database: process.env.DE_MYSQL_DATABASE || 'dataease'
-  }
+  },
+  dryRun: parseDryRunFlag(process.env.COMPANY_FEISHU_DRY_RUN ?? process.env.FEISHU_DRY_RUN),
+  schedulerIntervalMs: Number(process.env.FEISHU_SCHEDULER_INTERVAL_MS || 30_000)
+}
+
+function parseDryRunFlag(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return true
+  return !['0', 'false', 'FALSE', 'no', 'off'].includes(String(raw).trim())
 }
 
 export function ensureDirs() {

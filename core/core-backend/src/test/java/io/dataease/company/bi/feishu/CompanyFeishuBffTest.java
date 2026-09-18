@@ -4,8 +4,6 @@ import io.dataease.auth.bo.TokenUserBO;
 import io.dataease.company.bi.admin.CompanyAdminApiFilter;
 import io.dataease.company.bi.admin.CompanyAdminGuard;
 import io.dataease.company.bi.admin.CompanyAdminTx;
-import io.dataease.company.bi.acl.CompanyAclRepository;
-import io.dataease.company.bi.group.CompanyGroupRepository;
 import io.dataease.company.bi.permission.CompanyCapability;
 import io.dataease.company.bi.permission.CompanyDashboardGuard;
 import io.dataease.company.bi.permission.DatasetPermissionResolver;
@@ -31,9 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 
 class CompanyFeishuBffTest {
 
@@ -60,7 +55,7 @@ class CompanyFeishuBffTest {
         users.put(user(USER_NORMAL, CompanyAccountRole.NORMAL));
         users.put(user(USER_READONLY, CompanyAccountRole.READONLY));
         decision = new PermissionDecisionService(users,
-                new DatasetPermissionResolver(mock(CompanyAclRepository.class), mock(CompanyGroupRepository.class)));
+                new DatasetPermissionResolver(null, null));
         guard = new CompanyAdminGuard(decision);
         store = new MemoryStore();
         gateway = new FakeGateway();
@@ -68,14 +63,14 @@ class CompanyFeishuBffTest {
         properties = new CompanyFeishuProperties();
         properties.setInternalToken("test-token");
         properties.setDryRun(true);
-        CompanyDashboardGuard dashGuard = mock(CompanyDashboardGuard.class);
-        doAnswer(invocation -> {
-            Long dashboardId = invocation.getArgument(0);
-            if (!DASH_OK.equals(dashboardId)) {
-                CompanyDashboardGuard.deny();
+        CompanyDashboardGuard dashGuard = new CompanyDashboardGuard(null) {
+            @Override
+            public void requireView(Long dashboardId) {
+                if (!DASH_OK.equals(dashboardId)) {
+                    deny();
+                }
             }
-            return null;
-        }).when(dashGuard).requireView(any());
+        };
         service = new CompanyFeishuService(store, dashGuard, new ImmediateTx(), properties, gateway, ids::incrementAndGet);
         seedApp();
     }
@@ -180,13 +175,19 @@ class CompanyFeishuBffTest {
         assertTrue(gateway.calls.get(0).dryRun());
 
         store.runs.add(run(7500000000000000099L, Long.parseLong((String) created.get("id"))));
-        store.targets.add(target(7500000000000000099L, Long.parseLong((String) person.get("id")), "user_id", "SUCCEEDED", "om_dry_1"));
-        store.targets.add(target(7500000000000000099L, Long.parseLong((String) chat.get("id")), "chat_id", "SUCCEEDED", "om_dry_2"));
+        store.runs.get(store.runs.size() - 1).executionMode = "DRY_RUN";
+        store.runs.get(store.runs.size() - 1).errorSummary = "dry-run: send skipped";
+        store.targets.add(target(7500000000000000099L, Long.parseLong((String) person.get("id")), "user_id", "SUCCEEDED", null));
+        store.targets.get(store.targets.size() - 1).errorSummary = "dry-run: send skipped";
+        store.targets.add(target(7500000000000000099L, Long.parseLong((String) chat.get("id")), "chat_id", "SUCCEEDED", null));
+        store.targets.get(store.targets.size() - 1).errorSummary = "dry-run: send skipped";
         Map<String, Object> detail = service.getRun(Long.parseLong((String) created.get("id")), 7500000000000000099L);
         List<?> targets = (List<?>) detail.get("targets");
         assertEquals(2, targets.size());
-        assertEquals("om_dry_1", ((Map<?, ?>) targets.get(0)).get("messageId"));
-        assertEquals("LIVE", detail.get("executionMode"));
+        assertEquals(null, ((Map<?, ?>) targets.get(0)).get("messageId"));
+        assertEquals("DRY_RUN", detail.get("executionMode"));
+        assertEquals("SUCCEEDED", ((Map<?, ?>) targets.get(0)).get("status"));
+        assertEquals("SUCCEEDED", ((Map<?, ?>) targets.get(1)).get("status"));
     }
 
     @Test
@@ -199,6 +200,7 @@ class CompanyFeishuBffTest {
         long recipientId = Long.parseLong((String) person.get("id"));
 
         CompanyFeishuRepository.DeliveryRun dry = run(7500000000000000201L, subId);
+        dry.executionMode = "DRY_RUN";
         dry.errorSummary = "dry-run: send skipped";
         store.runs.add(dry);
         store.targets.add(target(dry.id, recipientId, "user_id", "SUCCEEDED", null));
@@ -208,6 +210,7 @@ class CompanyFeishuBffTest {
         assertEquals("DRY_RUN", ((Map<?, ?>) ((List<?>) dryDetail.get("targets")).get(0)).get("executionMode"));
 
         CompanyFeishuRepository.DeliveryRun live = run(7500000000000000202L, subId);
+        live.executionMode = "LIVE";
         live.screenshotStatus = "SUCCEEDED";
         live.uploadStatus = "SUCCEEDED";
         store.runs.add(live);
@@ -215,7 +218,45 @@ class CompanyFeishuBffTest {
         Map<String, Object> liveDetail = service.getRun(subId, live.id);
         assertEquals("LIVE", liveDetail.get("executionMode"));
 
+        CompanyFeishuRepository.DeliveryRun screenshotOnly = run(7500000000000000204L, subId);
+        screenshotOnly.screenshotStatus = "SUCCEEDED";
+        screenshotOnly.uploadStatus = "SUCCEEDED";
+        store.runs.add(screenshotOnly);
+        store.targets.add(target(screenshotOnly.id, recipientId, "user_id", "SUCCEEDED", null));
+        Map<String, Object> screenshotDetail = service.getRun(subId, screenshotOnly.id);
+        assertEquals("UNKNOWN", screenshotDetail.get("executionMode"));
+
+        CompanyFeishuRepository.DeliveryRun lockedDry = run(7500000000000000205L, subId);
+        lockedDry.executionMode = "DRY_RUN";
+        lockedDry.screenshotStatus = "SUCCEEDED";
+        lockedDry.uploadStatus = "SUCCEEDED";
+        store.runs.add(lockedDry);
+        store.targets.add(target(lockedDry.id, recipientId, "user_id", "SUCCEEDED", "om_should_not_upgrade"));
+        Map<String, Object> lockedDetail = service.getRun(subId, lockedDry.id);
+        assertEquals("DRY_RUN", lockedDetail.get("executionMode"));
+        assertFalse(CompanyFeishuExecutionModes.canUpgrade("DRY_RUN", "LIVE"));
+
+        CompanyFeishuRepository.DeliveryRun mixed = run(7500000000000000206L, subId);
+        mixed.executionMode = "LIVE";
+        mixed.status = "FAILED";
+        mixed.errorSummary = "1/2 targets failed";
+        store.runs.add(mixed);
+        Map<String, Object> chat = service.createRecipient(recipient("CHAT", "chat_id", "oc_mode"), USER_ADMIN);
+        long chatId = Long.parseLong((String) chat.get("id"));
+        store.targets.add(target(mixed.id, recipientId, "user_id", "SUCCEEDED", "om_ok"));
+        store.targets.add(target(mixed.id, chatId, "chat_id", "FAILED", null));
+        store.targets.get(store.targets.size() - 1).errorSummary = "bot cannot reach chat";
+        Map<String, Object> mixedDetail = service.getRun(subId, mixed.id);
+        assertEquals("LIVE", mixedDetail.get("executionMode"));
+        assertEquals("FAILED", mixedDetail.get("status"));
+        List<?> mixedTargets = (List<?>) mixedDetail.get("targets");
+        assertEquals("SUCCEEDED", ((Map<?, ?>) mixedTargets.get(0)).get("status"));
+        assertEquals("LIVE", ((Map<?, ?>) mixedTargets.get(0)).get("executionMode"));
+        assertEquals("FAILED", ((Map<?, ?>) mixedTargets.get(1)).get("status"));
+        assertEquals("LIVE", ((Map<?, ?>) mixedTargets.get(1)).get("executionMode"));
+
         CompanyFeishuRepository.DeliveryRun unknown = run(7500000000000000203L, subId);
+        unknown.executionMode = "UNKNOWN";
         store.runs.add(unknown);
         store.targets.add(target(unknown.id, recipientId, "user_id", "SUCCEEDED", null));
         Map<String, Object> unknownDetail = service.getRun(subId, unknown.id);

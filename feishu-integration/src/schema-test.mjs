@@ -6,6 +6,7 @@ import { closePool, exec, query } from './db.mjs'
 import {
   addSubscriptionRecipient,
   deleteTestRows,
+  ensureExecutionModeSchema,
   insertAppConfig,
   insertDeliveryRun,
   insertDeliveryTarget,
@@ -73,6 +74,7 @@ async function main() {
   const report = { schema: [], crud: {}, constraints: {}, leftover: null }
   try {
     await applySchema()
+    await ensureExecutionModeSchema()
     await cleanupByAppId('cli_phase2a_test')
     const tables = await query(
       `SELECT table_name FROM information_schema.tables
@@ -82,6 +84,12 @@ async function main() {
     )
     report.schema = tables.map(row => row.TABLE_NAME || row.table_name)
     assert(report.schema.length === 7, `expected 7 company_feishu_* tables, got ${report.schema.join(',')}`)
+    const modeCols = await query(
+      `SELECT COLUMN_NAME AS column_name FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'company_feishu_delivery_run' AND COLUMN_NAME = 'execution_mode'`,
+      [CONFIG.mysql.database]
+    )
+    assert(modeCols.length === 1, 'execution_mode column missing after compat migration')
 
     const appConfigId = await insertAppConfig({
       appId: 'cli_phase2a_test',

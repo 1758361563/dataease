@@ -76,6 +76,7 @@ async function defaultStartDelivery(body) {
   const claimed = await startManualRun({
     subscriptionId: body.subscriptionId,
     operatorUserId: body.operatorUserId,
+    dryRun: body.dryRun === true,
     triggerType: body.triggerType || 'MANUAL',
     plannedAt: body.plannedAt
   })

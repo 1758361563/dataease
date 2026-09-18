@@ -38,6 +38,7 @@ import {
   inferTargetExecutionMode,
   recipientTypeLabel,
   runStatusLabel,
+  targetStatusLabel,
   subscriptionStatusLabel,
   verifyStatusLabel,
   type FeishuRecipientType
@@ -74,7 +75,12 @@ const subForm = ref({
   includeDetailLink: false,
   fixedFilterJson: '{"version":1,"items":[]}',
   status: 'DRAFT',
-  recipientIds: [] as string[]
+  recipientIds: [] as string[],
+  scheduleKind: 'manual',
+  scheduleTime: '09:00',
+  scheduleDayOfWeek: 1,
+  scheduleDayOfMonth: 1,
+  autoRun: false
 })
 
 const runDrawer = ref(false)
@@ -97,10 +103,31 @@ const targetOutcomeLabel = (row: {
   errorSummary?: string | null
   executionMode?: string
 }) =>
-  runStatusLabel(
+  targetStatusLabel(
     row.status,
     inferTargetExecutionMode(row, inferExecutionMode(runDetail.value || undefined))
   )
+
+const parseStoredSchedule = (raw?: string) => {
+  try {
+    const obj = raw ? JSON.parse(raw) : {}
+    return {
+      scheduleKind: obj.kind || 'manual',
+      scheduleTime: obj.time || '09:00',
+      scheduleDayOfWeek: Number(obj.dayOfWeek) || 1,
+      scheduleDayOfMonth: Number(obj.dayOfMonth) || 1,
+      autoRun: obj.autoRun === true
+    }
+  } catch {
+    return {
+      scheduleKind: 'manual',
+      scheduleTime: '09:00',
+      scheduleDayOfWeek: 1,
+      scheduleDayOfMonth: 1,
+      autoRun: false
+    }
+  }
+}
 
 const parseFilterJson = (raw: string) => {
   const text = raw.trim() || '{"version":1,"items":[]}'
@@ -215,7 +242,12 @@ const resetSubForm = (preset?: { dashboardId?: string; chartId?: string; chartNa
     includeDetailLink: false,
     fixedFilterJson: '{"version":1,"items":[]}',
     status: 'DRAFT',
-    recipientIds: []
+    recipientIds: [],
+    scheduleKind: 'manual',
+    scheduleTime: '09:00',
+    scheduleDayOfWeek: 1,
+    scheduleDayOfMonth: 1,
+    autoRun: false
   }
 }
 
@@ -238,7 +270,8 @@ const openSubEdit = async (row: FeishuSubscription) => {
     includeDetailLink: !!detail.includeDetailLink,
     fixedFilterJson: detail.fixedFilterJson || '{"version":1,"items":[]}',
     status: detail.status,
-    recipientIds: (detail.recipientIds || []).map(keepStringId)
+    recipientIds: (detail.recipientIds || []).map(keepStringId),
+    ...parseStoredSchedule(detail.scheduleJson)
   }
   tab.value = 'subscriptions'
   subDrawer.value = true
@@ -269,7 +302,14 @@ const submitSubscription = async () => {
     bodyTemplate: subForm.value.bodyTemplate,
     includeDetailLink: subForm.value.includeDetailLink,
     fixedFilterJson,
-    scheduleJson: { kind: 'manual', autoRun: false, timezone: 'Asia/Shanghai' },
+    scheduleJson: {
+      kind: subForm.value.scheduleKind,
+      autoRun: subForm.value.autoRun === true && subForm.value.scheduleKind !== 'manual',
+      time: subForm.value.scheduleTime,
+      timezone: 'Asia/Shanghai',
+      dayOfWeek: subForm.value.scheduleDayOfWeek,
+      dayOfMonth: subForm.value.scheduleDayOfMonth
+    },
     status: subForm.value.status === 'ENABLED' ? 'ENABLED' : 'DRAFT',
     recipientIds: subForm.value.recipientIds
   }
@@ -400,7 +440,7 @@ onMounted(async () => {
     <el-alert
       type="warning"
       :closable="false"
-      title="自动调度尚未启用。当前只能手动试运行（dry-run），不会真实发送飞书消息。"
+      title="独立服务按 Asia/Shanghai 读取订阅调度。本机默认 DRY_RUN，不会真实发送。配置了 freshness 的订阅会被跳过，不会假装新鲜度已校验。"
       style="margin-bottom: 12px"
     />
     <el-tabs v-model="tab">
@@ -567,8 +607,37 @@ onMounted(async () => {
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="调度">
+          <el-select v-model="subForm.scheduleKind" style="width: 100%">
+            <el-option label="仅手动" value="manual" />
+            <el-option label="每天" value="daily" />
+            <el-option label="每周" value="weekly" />
+            <el-option label="每月" value="monthly" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="subForm.scheduleKind !== 'manual'" label="时间">
+          <el-input v-model="subForm.scheduleTime" placeholder="HH:mm" />
+        </el-form-item>
+        <el-form-item v-if="subForm.scheduleKind === 'weekly'" label="星期">
+          <el-select v-model="subForm.scheduleDayOfWeek" style="width: 100%">
+            <el-option label="周一" :value="1" />
+            <el-option label="周二" :value="2" />
+            <el-option label="周三" :value="3" />
+            <el-option label="周四" :value="4" />
+            <el-option label="周五" :value="5" />
+            <el-option label="周六" :value="6" />
+            <el-option label="周日" :value="7" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="subForm.scheduleKind === 'monthly'" label="日期">
+          <el-input v-model.number="subForm.scheduleDayOfMonth" />
+        </el-form-item>
+        <el-form-item v-if="subForm.scheduleKind !== 'manual'" label="自动触发">
+          <el-switch v-model="subForm.autoRun" />
+          <span class="hint" style="margin-left: 8px">本机 dry-run，不会真实发送</span>
+        </el-form-item>
         <el-form-item>
-          <span class="hint">调度字段会保存为 manual / autoRun=false。自动定时发送尚未启用。</span>
+          <span class="hint">时区固定 Asia/Shanghai。同一计划时刻只会生成一条 SCHEDULED run。</span>
         </el-form-item>
       </el-form>
       <template #footer>

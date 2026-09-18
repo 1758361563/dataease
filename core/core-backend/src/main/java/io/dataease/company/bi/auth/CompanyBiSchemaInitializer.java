@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.Statement;
 
 @Component
@@ -87,6 +89,60 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
                 stmt.execute(sql);
                 LogUtil.info("Applied company schema if missing: " + location);
             }
+            ensureFeishuExecutionMode(conn);
+        }
+    }
+
+    private void ensureFeishuExecutionMode(Connection conn) throws Exception {
+        boolean present;
+        try (PreparedStatement ps = conn.prepareStatement(
+                """
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'company_feishu_delivery_run'
+                   AND COLUMN_NAME = 'execution_mode'
+                """)) {
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                present = rs.getInt(1) > 0;
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            if (!present) {
+                stmt.execute("""
+                        ALTER TABLE company_feishu_delivery_run
+                          ADD COLUMN execution_mode VARCHAR(16) NULL COMMENT 'DRY_RUN / LIVE / UNKNOWN' AFTER status
+                        """);
+                LogUtil.info("Added company_feishu_delivery_run.execution_mode");
+            }
+            stmt.execute("""
+                    UPDATE company_feishu_delivery_run r
+                       SET execution_mode = 'DRY_RUN'
+                     WHERE execution_mode IS NULL
+                       AND (
+                         LOWER(IFNULL(error_summary, '')) LIKE '%dry-run%'
+                         OR EXISTS (
+                           SELECT 1 FROM company_feishu_delivery_target t
+                            WHERE t.run_id = r.id AND LOWER(IFNULL(t.error_summary, '')) LIKE '%dry-run%'
+                         )
+                       )
+                    """);
+            stmt.execute("""
+                    UPDATE company_feishu_delivery_run r
+                       SET execution_mode = 'LIVE'
+                     WHERE execution_mode IS NULL
+                       AND EXISTS (
+                         SELECT 1 FROM company_feishu_delivery_target t
+                          WHERE t.run_id = r.id
+                            AND t.feishu_message_id IS NOT NULL
+                            AND t.feishu_message_id <> ''
+                       )
+                    """);
+            stmt.execute("""
+                    UPDATE company_feishu_delivery_run
+                       SET execution_mode = 'UNKNOWN'
+                     WHERE execution_mode IS NULL
+                    """);
         }
     }
 }

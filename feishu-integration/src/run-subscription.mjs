@@ -2,6 +2,8 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { CONFIG, ROOT_DIR, TMP_DIR } from './config.mjs'
+import { desiredExecutionMode, normalizeExecutionMode } from './execution-mode.mjs'
+import { freshnessDecision, parseSchedule } from './schedule.mjs'
 import { closePool } from './db.mjs'
 import { getTenantAccessToken, sendImage, uploadImage } from './feishu.mjs'
 import {
@@ -12,6 +14,7 @@ import {
   insertDeliveryTarget,
   listDeliveryTargets,
   listSubscriptionRecipients,
+  persistExecutionMode,
   updateDeliveryRun,
   updateDeliveryTarget
 } from './store.mjs'
@@ -84,15 +87,6 @@ function resolveAppSecret(appSecretRef) {
   const value = process.env[appSecretRef]
   if (!value) throw new Error(`env ${appSecretRef} is not set`)
   return value
-}
-
-function parseSchedule(sub) {
-  if (!sub.schedule_json) return { kind: 'manual', autoRun: false }
-  try {
-    return JSON.parse(sub.schedule_json)
-  } catch {
-    return { kind: 'unknown', autoRun: false }
-  }
 }
 
 function filtersFromSubscription(sub) {
@@ -176,7 +170,7 @@ function assertRunnable(sub, recipients, triggerType) {
   if (sub.status === 'DELETED' || sub.status === 'DISABLED') {
     throw new Error(`subscription status=${sub.status} is not runnable`)
   }
-  const schedule = parseSchedule(sub)
+  const schedule = parseSchedule(sub.schedule_json)
   if (triggerType === 'SCHEDULED' && schedule.autoRun !== true) {
     throw new Error('scheduled trigger refused: subscription autoRun is disabled')
   }
@@ -224,17 +218,20 @@ export async function startManualRun(opts) {
   const sub = await getSubscriptionById(subscriptionId)
   const recipients = await listSubscriptionRecipients(subscriptionId)
   assertRunnable(sub, recipients, triggerType)
+  const executionMode = desiredExecutionMode({ dryRun: opts.dryRun === true, configDryRun: CONFIG.dryRun })
   return claimDeliveryRun({
     subscriptionId,
     triggerType,
     plannedAt: opts.plannedAt || Date.now(),
-    operatorUserId: opts.operatorUserId ?? 1
+    operatorUserId: opts.operatorUserId ?? 1,
+    executionMode
   })
 }
 
 async function completeDryRun(run, recipients) {
   await updateDeliveryRun(run.id, {
     status: 'RUNNING',
+    executionMode: 'DRY_RUN',
     startedAt: Number(run.started_at) || Date.now(),
     screenshotStatus: 'SKIPPED',
     screenshotError: 'dry-run: screenshot skipped',
@@ -290,7 +287,8 @@ export async function executeSubscription(opts) {
       subscriptionId: options.subscriptionId,
       triggerType: options.triggerType || 'MANUAL',
       plannedAt,
-      operatorUserId: options.operatorUserId ?? 1
+      operatorUserId: options.operatorUserId ?? 1,
+      executionMode: desiredExecutionMode({ dryRun: options.dryRun === true, configDryRun: CONFIG.dryRun })
     })
     run = claimed.run
     created = claimed.created
@@ -324,18 +322,53 @@ export async function executeSubscription(opts) {
   }))
 
   const existingTargets = await listDeliveryTargets(run.id)
-  const allSucceeded =
+  const storedMode = normalizeExecutionMode(run.execution_mode)
+  const desired = desiredExecutionMode({ dryRun: options.dryRun === true, configDryRun: CONFIG.dryRun })
+  const executionMode =
+    storedMode === 'DRY_RUN' || storedMode === 'LIVE'
+      ? storedMode
+      : (await persistExecutionMode(run.id, desired)) || desired
+  run.execution_mode = executionMode
+  const dryRun = executionMode === 'DRY_RUN'
+  report.executionMode = executionMode
+  if (storedMode === 'DRY_RUN' && desired === 'LIVE') {
+    report.modeLocked = 'dry-run record cannot be converted to live send'
+  }
+
+  const liveComplete =
+    executionMode === 'LIVE' &&
     run.status === 'SUCCEEDED' &&
-    run.screenshot_status === 'SUCCEEDED' &&
-    run.upload_status === 'SUCCEEDED' &&
     existingTargets.length > 0 &&
-    existingTargets.every(row => row.status === 'SUCCEEDED')
-  if (!created && allSucceeded) {
+    existingTargets.every(row => row.status === 'SUCCEEDED' && row.feishu_message_id)
+  const dryComplete = executionMode === 'DRY_RUN' && run.status === 'SUCCEEDED'
+  if (!created && (liveComplete || dryComplete)) {
     report.skipped = true
-    report.reason = 'run already succeeded; refusing duplicate send'
+    report.reason =
+      executionMode === 'DRY_RUN'
+        ? 'dry-run already completed; refusing to upgrade to live send'
+        : 'run already succeeded; refusing duplicate send'
     report.summary = summarizeRun(run, existingTargets)
     report.finishedAt = stamp()
     return report
+  }
+
+  if ((options.triggerType || run.trigger_type) === 'SCHEDULED') {
+    const freshness = freshnessDecision(sub)
+    report.steps.freshness = {
+      result: freshness.blocked ? 'BLOCKED' : 'NOT_CHECKED',
+      reason: freshness.reason
+    }
+    if (freshness.blocked) {
+      await updateDeliveryRun(run.id, {
+        status: 'SKIPPED',
+        errorSummary: freshness.reason,
+        finishedAt: Date.now()
+      })
+      report.skipped = true
+      report.reason = freshness.reason
+      report.finishedAt = stamp()
+      return report
+    }
   }
 
   await updateDeliveryRun(run.id, {
@@ -344,7 +377,7 @@ export async function executeSubscription(opts) {
   })
 
   try {
-    if (options.dryRun) {
+    if (dryRun) {
       const dry = await completeDryRun(run, recipients)
       const targets = await listDeliveryTargets(run.id)
       report.steps.screenshot = { result: 'SKIPPED', reason: 'dry-run' }

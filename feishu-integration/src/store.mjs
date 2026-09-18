@@ -130,16 +130,76 @@ export async function listSubscriptionRecipients(subscriptionId) {
   )
 }
 
+export async function ensureExecutionModeSchema() {
+  const cols = await query(
+    `SELECT COLUMN_NAME AS column_name
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'company_feishu_delivery_run'
+        AND COLUMN_NAME = 'execution_mode'`
+  )
+  const present = cols.some(row => String(row.column_name || row.COLUMN_NAME || '').toLowerCase() === 'execution_mode')
+  if (!present) {
+    await exec(
+      `ALTER TABLE company_feishu_delivery_run
+         ADD COLUMN execution_mode VARCHAR(16) NULL COMMENT 'DRY_RUN / LIVE / UNKNOWN' AFTER status`
+    )
+  }
+  await exec(
+    `UPDATE company_feishu_delivery_run r
+        SET execution_mode = 'DRY_RUN'
+      WHERE execution_mode IS NULL
+        AND (
+          LOWER(IFNULL(error_summary, '')) LIKE '%dry-run%'
+          OR EXISTS (
+            SELECT 1 FROM company_feishu_delivery_target t
+             WHERE t.run_id = r.id AND LOWER(IFNULL(t.error_summary, '')) LIKE '%dry-run%'
+          )
+        )`
+  )
+  await exec(
+    `UPDATE company_feishu_delivery_run r
+        SET execution_mode = 'LIVE'
+      WHERE execution_mode IS NULL
+        AND EXISTS (
+          SELECT 1 FROM company_feishu_delivery_target t
+           WHERE t.run_id = r.id
+             AND t.feishu_message_id IS NOT NULL
+             AND t.feishu_message_id <> ''
+        )`
+  )
+  await exec(
+    `UPDATE company_feishu_delivery_run
+        SET execution_mode = 'UNKNOWN'
+      WHERE execution_mode IS NULL`
+  )
+}
+
+export async function persistExecutionMode(runId, mode) {
+  const { normalizeExecutionMode, canUpgradeExecutionMode } = await import('./execution-mode.mjs')
+  const wanted = normalizeExecutionMode(mode)
+  if (!wanted || wanted === 'UNKNOWN') return null
+  const run = await getDeliveryRunById(runId)
+  if (!run) return null
+  const current = normalizeExecutionMode(run.execution_mode)
+  if (current === 'DRY_RUN' || current === 'LIVE') {
+    if (!canUpgradeExecutionMode(current, wanted)) return current
+    return current
+  }
+  await updateDeliveryRun(runId, { executionMode: wanted })
+  return wanted
+}
+
 export async function insertDeliveryRun(row) {
   const id = row.id ?? nextId()
   const ts = now()
   await exec(
     `INSERT INTO company_feishu_delivery_run
-      (id, subscription_id, trigger_type, planned_at, operator_user_id, status,
+      (id, subscription_id, trigger_type, planned_at, operator_user_id, status, execution_mode,
        screenshot_status, screenshot_error, screenshot_at, png_ref,
        upload_status, upload_error, upload_at, image_key,
        error_summary, started_at, finished_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       row.subscriptionId,
@@ -147,6 +207,7 @@ export async function insertDeliveryRun(row) {
       row.plannedAt,
       row.operatorUserId ?? null,
       row.status || 'PENDING',
+      row.executionMode ?? null,
       row.screenshotStatus ?? null,
       row.screenshotError ?? null,
       row.screenshotAt ?? null,
@@ -178,6 +239,7 @@ export async function updateDeliveryRun(id, patch) {
     uploadAt: 'upload_at',
     imageKey: 'image_key',
     errorSummary: 'error_summary',
+    executionMode: 'execution_mode',
     startedAt: 'started_at',
     finishedAt: 'finished_at'
   })) {
@@ -307,22 +369,55 @@ export async function updateDeliveryTarget(id, patch) {
   await exec(`UPDATE company_feishu_delivery_target SET ${fields.join(', ')} WHERE id = ?`, values)
 }
 
-export async function claimDeliveryRun({ subscriptionId, triggerType, plannedAt, operatorUserId }) {
+export async function listEnabledSubscriptions() {
+  return query(`SELECT * FROM company_feishu_subscription WHERE status = 'ENABLED' ORDER BY id`)
+}
+
+export async function listIncompleteDeliveryRuns(limit = 50) {
+  return query(
+    `SELECT * FROM company_feishu_delivery_run
+      WHERE status IN ('PENDING', 'RUNNING')
+      ORDER BY created_at
+      LIMIT ?`,
+    [limit]
+  )
+}
+
+export async function withSchedulerLock(fn) {
+  const got = await query(`SELECT GET_LOCK(?, 10) AS locked`, ['company_feishu_scheduler'])
+  const locked = Number(got?.[0]?.locked)
+  if (locked !== 1) return { skipped: true, reason: 'lock-not-acquired' }
+  try {
+    const result = await fn()
+    return { skipped: false, result }
+  } finally {
+    await query(`SELECT RELEASE_LOCK(?) AS released`, ['company_feishu_scheduler'])
+  }
+}
+
+export async function claimDeliveryRun({ subscriptionId, triggerType, plannedAt, operatorUserId, executionMode }) {
   const existing = await findDeliveryRun(subscriptionId, triggerType, plannedAt)
-  if (existing) return { run: existing, created: false }
+  if (existing) {
+    if (executionMode) await persistExecutionMode(existing.id, executionMode)
+    return { run: await getDeliveryRunById(existing.id), created: false }
+  }
   try {
     const id = await insertDeliveryRun({
       subscriptionId,
       triggerType,
       plannedAt,
       operatorUserId,
-      status: 'PENDING'
+      status: 'PENDING',
+      executionMode: executionMode || null
     })
     return { run: await getDeliveryRunById(id), created: true }
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY' || err.errno === 1062) {
       const raced = await findDeliveryRun(subscriptionId, triggerType, plannedAt)
-      if (raced) return { run: raced, created: false }
+      if (raced) {
+        if (executionMode) await persistExecutionMode(raced.id, executionMode)
+        return { run: await getDeliveryRunById(raced.id), created: false }
+      }
     }
     throw err
   }

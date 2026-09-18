@@ -44,10 +44,10 @@ export function inferExecutionMode(run?: {
   errorSummary?: string | null
   screenshotStatus?: string | null
   uploadStatus?: string | null
-  targets?: Array<{ messageId?: string | null; errorSummary?: string | null }>
+  targets?: Array<{ messageId?: string | null; errorSummary?: string | null; status?: string }>
 }): FeishuExecutionMode {
   const explicit = String(run?.executionMode || '').toUpperCase()
-  if (explicit === 'DRY_RUN' || explicit === 'LIVE') {
+  if (explicit === 'DRY_RUN' || explicit === 'LIVE' || explicit === 'UNKNOWN') {
     return explicit
   }
   const texts = [run?.errorSummary, ...(run?.targets || []).map(item => item.errorSummary)]
@@ -63,9 +63,6 @@ export function inferExecutionMode(run?: {
   if ((run?.targets || []).some(item => !!item.messageId)) {
     return 'LIVE'
   }
-  if (run?.screenshotStatus === 'SUCCEEDED' && run?.uploadStatus === 'SUCCEEDED') {
-    return 'LIVE'
-  }
   return 'UNKNOWN'
 }
 
@@ -74,11 +71,12 @@ export function inferTargetExecutionMode(
     messageId?: string | null
     errorSummary?: string | null
     executionMode?: string | null
+    status?: string
   },
   runMode?: FeishuExecutionMode
 ): FeishuExecutionMode {
   const explicit = String(target?.executionMode || '').toUpperCase()
-  if (explicit === 'DRY_RUN' || explicit === 'LIVE') {
+  if (explicit === 'DRY_RUN' || explicit === 'LIVE' || explicit === 'UNKNOWN') {
     return explicit
   }
   if (
@@ -89,7 +87,7 @@ export function inferTargetExecutionMode(
   ) {
     return 'DRY_RUN'
   }
-  if (target?.messageId || runMode === 'LIVE') {
+  if (runMode === 'LIVE' || target?.messageId) {
     return 'LIVE'
   }
   return 'UNKNOWN'
@@ -110,6 +108,10 @@ export function runStatusLabel(status?: string, executionMode?: FeishuExecutionM
   if (status === 'SKIPPED') return '跳过'
   if (status === 'UNKNOWN') return '未知'
   return status || '受理中'
+}
+
+export function targetStatusLabel(status?: string, executionMode?: FeishuExecutionMode): string {
+  return runStatusLabel(status, executionMode)
 }
 
 export function acceptedRunNotice(payload: { runId?: string; status?: string }): string {

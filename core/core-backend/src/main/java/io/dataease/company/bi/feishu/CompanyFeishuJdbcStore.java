@@ -303,6 +303,7 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
             row.plannedAt = nullableLong(rs, "planned_at");
             row.operatorUserId = nullableLong(rs, "operator_user_id");
             row.status = rs.getString("status");
+            row.executionMode = rs.getString("execution_mode");
             row.screenshotStatus = rs.getString("screenshot_status");
             row.uploadStatus = rs.getString("upload_status");
             row.imageKey = rs.getString("image_key");

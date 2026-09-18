@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS company_feishu_delivery_run (
     planned_at          BIGINT       NOT NULL,
     operator_user_id    BIGINT       NULL,
     status              VARCHAR(16)  NOT NULL COMMENT 'PENDING / RUNNING / SUCCEEDED / FAILED / SKIPPED / UNKNOWN',
+    execution_mode      VARCHAR(16)  NULL COMMENT 'DRY_RUN / LIVE / UNKNOWN; set at run creation, never inferred from screenshot/upload',
     screenshot_status   VARCHAR(16)  NULL,
     screenshot_error    VARCHAR(512) NULL,
     screenshot_at       BIGINT       NULL,

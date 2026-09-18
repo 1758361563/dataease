@@ -448,8 +448,8 @@ public class CompanyFeishuService {
 
     private Map<String, Object> runVo(CompanyFeishuRepository.DeliveryRun run, boolean detail) {
         List<CompanyFeishuRepository.DeliveryTarget> targetRows = store.listTargets(run.id);
-        String executionMode = CompanyFeishuExecutionModes.infer(
-                run.errorSummary, run.screenshotStatus, run.uploadStatus, targetRows);
+        String executionMode = CompanyFeishuExecutionModes.resolve(
+                run.executionMode, run.errorSummary, targetRows);
         Map<String, Object> vo = new LinkedHashMap<>();
         vo.put("id", String.valueOf(run.id));
         vo.put("subscriptionId", String.valueOf(run.subscriptionId));
@@ -472,8 +472,8 @@ public class CompanyFeishuService {
                 item.put("recipientType", target.recipientType);
                 item.put("receiveIdType", target.receiveIdType);
                 item.put("status", target.status);
-                item.put("executionMode", CompanyFeishuExecutionModes.inferTarget(
-                        executionMode, target.errorSummary, target.feishuMessageId));
+                item.put("executionMode", CompanyFeishuExecutionModes.resolveTarget(
+                        executionMode, null, target.errorSummary, target.feishuMessageId));
                 item.put("messageId", target.feishuMessageId);
                 item.put("retryCount", target.retryCount);
                 item.put("errorSummary", target.errorSummary);

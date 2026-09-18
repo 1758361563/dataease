@@ -13,32 +13,52 @@ public final class CompanyFeishuExecutionModes {
     private CompanyFeishuExecutionModes() {
     }
 
-    public static String infer(String errorSummary,
-                               String screenshotStatus,
-                               String uploadStatus,
-                               List<CompanyFeishuRepository.DeliveryTarget> targets) {
+    public static String normalize(String storedMode) {
+        if (StringUtils.isBlank(storedMode)) {
+            return null;
+        }
+        String mode = storedMode.trim().toUpperCase();
+        if (DRY_RUN.equals(mode) || LIVE.equals(mode) || UNKNOWN.equals(mode)) {
+            return mode;
+        }
+        return null;
+    }
+
+    public static String resolve(String storedMode,
+                                 String errorSummary,
+                                 List<CompanyFeishuRepository.DeliveryTarget> targets) {
+        String stored = normalize(storedMode);
+        if (stored != null) {
+            return stored;
+        }
         if (containsDryRun(errorSummary) || anyTargetDryRun(targets)) {
             return DRY_RUN;
         }
         if (anyMessageId(targets)) {
             return LIVE;
         }
-        if ("SUCCEEDED".equals(screenshotStatus) && "SUCCEEDED".equals(uploadStatus)) {
+        return UNKNOWN;
+    }
+
+    public static String resolveTarget(String runMode,
+                                       String storedMode,
+                                       String errorSummary,
+                                       String messageId) {
+        String stored = normalize(storedMode);
+        if (stored != null) {
+            return stored;
+        }
+        if (containsDryRun(errorSummary) || DRY_RUN.equals(runMode)) {
+            return DRY_RUN;
+        }
+        if (LIVE.equals(runMode) || StringUtils.isNotBlank(messageId)) {
             return LIVE;
         }
         return UNKNOWN;
     }
 
-    public static String inferTarget(String runMode,
-                                     String errorSummary,
-                                     String messageId) {
-        if (containsDryRun(errorSummary) || DRY_RUN.equals(runMode)) {
-            return DRY_RUN;
-        }
-        if (StringUtils.isNotBlank(messageId) || LIVE.equals(runMode)) {
-            return LIVE;
-        }
-        return UNKNOWN;
+    public static boolean canUpgrade(String fromMode, String toMode) {
+        return !(DRY_RUN.equals(normalize(fromMode)) && LIVE.equals(normalize(toMode)));
     }
 
     private static boolean containsDryRun(String text) {

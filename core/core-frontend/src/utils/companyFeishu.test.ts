@@ -84,6 +84,48 @@ describe('Phase 2F feishu UI helpers', () => {
     assert.equal(runStatusLabel('SUCCEEDED', byMessage), '真实发送成功')
   })
 
+  it('does not treat screenshot/upload success as live send', () => {
+    const mode = inferExecutionMode({
+      screenshotStatus: 'SUCCEEDED',
+      uploadStatus: 'SUCCEEDED',
+      targets: [{ status: 'SUCCEEDED', messageId: null }]
+    })
+    assert.equal(mode, 'UNKNOWN')
+    assert.equal(runStatusLabel('SUCCEEDED', mode), '执行成功（发送方式未记录）')
+  })
+
+  it('keeps explicit DRY_RUN even if a messageId is present', () => {
+    const mode = inferExecutionMode({
+      executionMode: 'DRY_RUN',
+      screenshotStatus: 'SUCCEEDED',
+      uploadStatus: 'SUCCEEDED',
+      targets: [{ status: 'SUCCEEDED', messageId: 'om_should_not_upgrade' }]
+    })
+    assert.equal(mode, 'DRY_RUN')
+    assert.equal(runStatusLabel('SUCCEEDED', mode), '模拟执行成功')
+  })
+
+  it('shows live mixed recipients separately', () => {
+    const runMode = inferExecutionMode({
+      executionMode: 'LIVE',
+      status: 'FAILED',
+      targets: [
+        { status: 'SUCCEEDED', messageId: 'om_ok' },
+        { status: 'FAILED', messageId: null, errorSummary: 'unreachable' }
+      ]
+    })
+    assert.equal(runMode, 'LIVE')
+    assert.equal(runStatusLabel('FAILED', runMode), '真实发送失败')
+    assert.equal(
+      runStatusLabel('SUCCEEDED', inferTargetExecutionMode({ status: 'SUCCEEDED', messageId: 'om_ok' }, runMode)),
+      '真实发送成功'
+    )
+    assert.equal(
+      runStatusLabel('FAILED', inferTargetExecutionMode({ status: 'FAILED', errorSummary: 'unreachable' }, runMode)),
+      '真实发送失败'
+    )
+  })
+
   it('does not treat historical success without evidence as LIVE', () => {
     const mode = inferExecutionMode({
       screenshotStatus: 'SKIPPED',
