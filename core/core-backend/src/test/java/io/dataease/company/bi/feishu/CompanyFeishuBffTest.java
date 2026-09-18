@@ -2,6 +2,7 @@ package io.dataease.company.bi.feishu;
 
 import io.dataease.auth.bo.TokenUserBO;
 import io.dataease.company.bi.admin.CompanyAdminApiFilter;
+import io.dataease.company.bi.admin.CompanyAdminErrors;
 import io.dataease.company.bi.admin.CompanyAdminGuard;
 import io.dataease.company.bi.admin.CompanyAdminTx;
 import io.dataease.company.bi.permission.CompanyCapability;
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,6 +46,7 @@ class CompanyFeishuBffTest {
     private CompanyAdminGuard guard;
     private PermissionDecisionService decision;
     private FakeGateway gateway;
+    private FakeDirectory directory;
     private CompanyFeishuProperties properties;
     private AtomicLong ids;
 
@@ -59,6 +62,7 @@ class CompanyFeishuBffTest {
         guard = new CompanyAdminGuard(decision);
         store = new MemoryStore();
         gateway = new FakeGateway();
+        directory = new FakeDirectory();
         ids = new AtomicLong(5000);
         properties = new CompanyFeishuProperties();
         properties.setInternalToken("test-token");
@@ -71,7 +75,7 @@ class CompanyFeishuBffTest {
                 }
             }
         };
-        service = new CompanyFeishuService(store, dashGuard, new ImmediateTx(), properties, gateway, ids::incrementAndGet);
+        service = new CompanyFeishuService(store, dashGuard, new ImmediateTx(), properties, gateway, ids::incrementAndGet, directory);
         seedApp();
     }
 
@@ -84,6 +88,10 @@ class CompanyFeishuBffTest {
     void filterRequiresFeishuCapability() {
         assertEquals(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE,
                 CompanyAdminApiFilter.requiredCapability("/company/bi/feishu/recipients", null));
+        assertEquals(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE,
+                CompanyAdminApiFilter.requiredCapability("/company/bi/feishu/employees/search", null));
+        assertEquals(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE,
+                CompanyAdminApiFilter.requiredCapability("/company/bi/feishu/employees/confirm", null));
         assertEquals(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE,
                 CompanyAdminApiFilter.requiredCapability("/de2api/company/bi/feishu/subscriptions/1/run",
                         "/de2api/company/bi/feishu/subscriptions/1/run"));
@@ -301,6 +309,51 @@ class CompanyFeishuBffTest {
         assertTrue(gateway.calls.isEmpty());
     }
 
+    @Test
+    void employeeSearchReturnsSameNameMatchesAndConfirmDoesNotMarkSendVerified() {
+        AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
+        Map<String, Object> result = service.searchEmployees("张三");
+        List<?> matches = (List<?>) result.get("matches");
+        assertEquals(2, matches.size());
+        Map<?, ?> first = (Map<?, ?>) matches.get(0);
+        Map<?, ?> second = (Map<?, ?>) matches.get(1);
+        assertEquals("张三", first.get("name"));
+        assertEquals("张三", second.get("name"));
+        assertNotEquals(first.get("userId"), second.get("userId"));
+        assertNotEquals(first.get("departments"), second.get("departments"));
+        assertFalse(first.containsKey("mobile"));
+        assertFalse(first.containsKey("email"));
+
+        Map<String, Object> saved = service.confirmEmployee(Map.of("userId", "uid_fin"), USER_ADMIN);
+        assertEquals("uid_fin", saved.get("feishuId"));
+        assertNotEquals("uid_sale", saved.get("feishuId"));
+        assertEquals("CONFIRMED", saved.get("identityStatus"));
+        assertEquals("UNVERIFIED", saved.get("verifyStatus"));
+        assertEquals(false, saved.get("sendVerified"));
+        assertEquals("PERSONAL", saved.get("recipientType"));
+        assertEquals("user_id", saved.get("receiveIdType"));
+        assertEquals("CONTACT_LOOKUP", saved.get("source"));
+        assertEquals(true, saved.get("created"));
+        assertEquals(true, saved.get("identityJustConfirmed"));
+    }
+
+    @Test
+    void confirmExistingRecipientKeepsSendVerifiedAndDoesNotNeedBiUser() {
+        AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
+        Map<String, Object> person = service.createRecipient(recipient("PERSONAL", "user_id", "uid_sale"), USER_ADMIN);
+        assertEquals("UNCONFIRMED", person.get("identityStatus"));
+        assertEquals("UNVERIFIED", person.get("verifyStatus"));
+        CompanyFeishuRepository.Recipient row = store.findRecipient(Long.parseLong((String) person.get("id")));
+        row.verifyStatus = "VERIFIED";
+        store.updateRecipient(row);
+        Map<String, Object> confirmed = service.confirmEmployee(Map.of("userId", "uid_sale"), USER_ADMIN);
+        assertEquals("CONFIRMED", confirmed.get("identityStatus"));
+        assertEquals("VERIFIED", confirmed.get("verifyStatus"));
+        assertEquals(true, confirmed.get("sendVerified"));
+        assertEquals(false, confirmed.get("created"));
+        assertEquals(0, store.maps.size());
+    }
+
     private void seedApp() {
         CompanyFeishuRepository.AppConfig app = new CompanyFeishuRepository.AppConfig();
         app.id = 1L;
@@ -380,6 +433,45 @@ class CompanyFeishuBffTest {
         }
 
         private record Call(long subscriptionId, long operatorId, boolean dryRun) {
+        }
+    }
+
+    private static final class FakeDirectory implements CompanyFeishuDirectoryGateway {
+        private final List<Map<String, Object>> people = List.of(
+                employee("张三", "uid_sale", "销售"),
+                employee("张三", "uid_fin", "财务"),
+                employee("李四", "uid_li", "运营")
+        );
+
+        private static Map<String, Object> employee(String name, String userId, String dept) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("name", name);
+            row.put("userId", userId);
+            row.put("userIdTail", userId.substring(Math.max(0, userId.length() - 4)));
+            row.put("departments", List.of(dept));
+            return row;
+        }
+
+        @Override
+        public Map<String, Object> search(String query) {
+            List<Map<String, Object>> matches = new ArrayList<>();
+            for (Map<String, Object> row : people) {
+                if (String.valueOf(row.get("name")).contains(query)) {
+                    matches.add(row);
+                }
+            }
+            return Map.of("matches", matches);
+        }
+
+        @Override
+        public Map<String, Object> resolve(String userId) {
+            return people.stream()
+                    .filter(row -> userId.equals(row.get("userId")))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        CompanyAdminErrors.invalid("通讯录中未找到该员工");
+                        return Map.of();
+                    });
         }
     }
 

@@ -1,10 +1,11 @@
 import { startServer } from './server.mjs'
 import { closeBrowser } from './session.mjs'
 import { startScheduler } from './scheduler.mjs'
-import { ensureExecutionModeSchema } from './store.mjs'
+import { ensureExecutionModeSchema, ensureIdentityStatusSchema } from './store.mjs'
 import { CONFIG } from './config.mjs'
 
 await ensureExecutionModeSchema()
+await ensureIdentityStatusSchema()
 const server = await startServer()
 const timer = startScheduler()
 console.log(

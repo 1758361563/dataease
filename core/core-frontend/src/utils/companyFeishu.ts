@@ -4,6 +4,8 @@ export type FeishuVerifyStatus = 'UNVERIFIED' | 'VERIFIED' | 'FAILED'
 export type FeishuEnableStatus = 'ENABLED' | 'DISABLED'
 export type FeishuSubscriptionStatus = 'DRAFT' | 'ENABLED' | 'DISABLED' | 'DELETED'
 
+export type FeishuIdentityStatus = 'UNCONFIRMED' | 'CONFIRMED'
+
 export function receiveIdTypeFor(recipientType: FeishuRecipientType): FeishuReceiveIdType {
   return recipientType === 'CHAT' ? 'chat_id' : 'user_id'
 }
@@ -21,9 +23,28 @@ export function receiveIdTypeLabel(type?: string): string {
 }
 
 export function verifyStatusLabel(status?: string): string {
-  if (status === 'VERIFIED') return '已验证'
-  if (status === 'FAILED') return '验证失败'
-  return '未验证'
+  if (status === 'VERIFIED') return '发送已验证'
+  if (status === 'FAILED') return '发送失败'
+  return '发送未验证'
+}
+
+export function identityStatusLabel(status?: string): string {
+  if (status === 'CONFIRMED') return '身份已确认'
+  return '身份未确认'
+}
+
+export function isIdentityConfirmed(status?: string): boolean {
+  return status === 'CONFIRMED'
+}
+
+export function employeeMatchLabel(row: {
+  name?: string
+  departments?: string[]
+  userIdTail?: string
+}): string {
+  const dept = (row.departments || []).filter(Boolean).join(' / ') || '部门未知'
+  const tail = row.userIdTail ? `…${row.userIdTail}` : ''
+  return `${row.name || '-'} · ${dept}${tail ? ` · ${tail}` : ''}`
 }
 
 export function isRecipientVerified(status?: string): boolean {
@@ -125,10 +146,13 @@ export function recipientOptionLabel(row: {
   recipientType?: string
   receiveIdType?: string
   feishuId?: string
+  identityStatus?: string
   verifyStatus?: string
 }): string {
   const idTail = row.feishuId ? row.feishuId.slice(-6) : '-'
   return `${row.displayName || '-'} · ${recipientTypeLabel(row.recipientType)} · ${
     row.receiveIdType || '-'
-  } · …${idTail} · ${verifyStatusLabel(row.verifyStatus)}`
+  } · …${idTail} · ${identityStatusLabel(row.identityStatus)} · ${verifyStatusLabel(
+    row.verifyStatus
+  )}`
 }

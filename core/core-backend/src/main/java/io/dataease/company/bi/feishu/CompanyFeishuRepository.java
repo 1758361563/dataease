@@ -26,6 +26,7 @@ public interface CompanyFeishuRepository {
         public String unionId;
         public String appId;
         public String source;
+        public String identityStatus;
         public String verifyStatus;
         public String status;
         public Long lastVerifiedAt;

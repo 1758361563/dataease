@@ -5,6 +5,8 @@ import {
   inferExecutionMode,
   inferTargetExecutionMode,
   isRecipientVerified,
+  identityStatusLabel,
+  employeeMatchLabel,
   receiveIdTypeFor,
   recipientOptionLabel,
   runStatusLabel,
@@ -34,17 +36,41 @@ describe('Phase 2F feishu UI helpers', () => {
     assert.equal(isRecipientVerified('UNVERIFIED'), false)
     assert.equal(isRecipientVerified('FAILED'), false)
     assert.equal(isRecipientVerified('VERIFIED'), true)
-    assert.equal(verifyStatusLabel('UNVERIFIED'), '未验证')
-    assert.equal(verifyStatusLabel(undefined), '未验证')
+    assert.equal(verifyStatusLabel('UNVERIFIED'), '发送未验证')
+    assert.equal(verifyStatusLabel(undefined), '发送未验证')
+    assert.equal(identityStatusLabel('CONFIRMED'), '身份已确认')
+    assert.equal(identityStatusLabel('UNCONFIRMED'), '身份未确认')
     const label = recipientOptionLabel({
       displayName: '测试群',
       recipientType: 'CHAT',
       receiveIdType: 'chat_id',
       feishuId: 'oc_36fb1935ef4b79bc11ab80c401f1e741',
+      identityStatus: 'UNCONFIRMED',
       verifyStatus: 'UNVERIFIED'
     })
-    assert.match(label, /未验证/)
-    assert.doesNotMatch(label, /已验证/)
+    assert.match(label, /发送未验证/)
+    assert.match(label, /身份未确认/)
+    assert.doesNotMatch(label, /发送已验证/)
+    assert.doesNotMatch(label, /身份已确认/)
+  })
+
+  it('keeps same-name employees distinguishable and does not treat identity as send success', () => {
+    const one = employeeMatchLabel({ name: '张三', departments: ['销售'], userIdTail: 'sale' })
+    const two = employeeMatchLabel({ name: '张三', departments: ['财务'], userIdTail: '_fin' })
+    assert.notEqual(one, two)
+    assert.match(one, /销售/)
+    assert.match(two, /财务/)
+    const confirmedUnsent = recipientOptionLabel({
+      displayName: '张三',
+      recipientType: 'PERSONAL',
+      receiveIdType: 'user_id',
+      feishuId: 'uid_fin',
+      identityStatus: 'CONFIRMED',
+      verifyStatus: 'UNVERIFIED'
+    })
+    assert.match(confirmedUnsent, /身份已确认/)
+    assert.match(confirmedUnsent, /发送未验证/)
+    assert.doesNotMatch(confirmedUnsent, /发送已验证/)
   })
 
   it('does not treat accepted/202 as send success', () => {
@@ -117,11 +143,17 @@ describe('Phase 2F feishu UI helpers', () => {
     assert.equal(runMode, 'LIVE')
     assert.equal(runStatusLabel('FAILED', runMode), '真实发送失败')
     assert.equal(
-      runStatusLabel('SUCCEEDED', inferTargetExecutionMode({ status: 'SUCCEEDED', messageId: 'om_ok' }, runMode)),
+      runStatusLabel(
+        'SUCCEEDED',
+        inferTargetExecutionMode({ status: 'SUCCEEDED', messageId: 'om_ok' }, runMode)
+      ),
       '真实发送成功'
     )
     assert.equal(
-      runStatusLabel('FAILED', inferTargetExecutionMode({ status: 'FAILED', errorSummary: 'unreachable' }, runMode)),
+      runStatusLabel(
+        'FAILED',
+        inferTargetExecutionMode({ status: 'FAILED', errorSummary: 'unreachable' }, runMode)
+      ),
       '真实发送失败'
     )
   })
@@ -149,6 +181,7 @@ describe('Phase 2F feishu UI helpers', () => {
     const shown = buildCompanyAdminRoutes(['USER_MANAGE', 'FEISHU_SUBSCRIPTION_MANAGE'])
     assert.ok(shown[0].children.some((c: { path: string }) => c.path === 'feishu'))
     assert.equal(isCompanyAdminApi('/company/bi/feishu/subscriptions'), true)
+    assert.equal(isCompanyAdminApi('/company/bi/feishu/employees/search'), true)
     assert.equal(isCompanyAdminApi('/company/bi/admin/users'), true)
     assert.equal(canVisitCompanyPath('/company-admin/feishu', ['DASHBOARD_VIEW']), false)
     assert.equal(canVisitCompanyPath('/company-admin/feishu', ['FEISHU_SUBSCRIPTION_MANAGE']), true)

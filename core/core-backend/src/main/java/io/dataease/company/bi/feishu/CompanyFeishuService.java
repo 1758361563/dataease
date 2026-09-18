@@ -36,6 +36,7 @@ public class CompanyFeishuService {
     private final CompanyAdminTx tx;
     private final CompanyFeishuProperties properties;
     private final CompanyFeishuDeliveryGateway deliveryGateway;
+    private final CompanyFeishuDirectoryGateway directory;
     private final LongSupplier ids;
 
     @Autowired
@@ -43,8 +44,9 @@ public class CompanyFeishuService {
                                 CompanyDashboardGuard dashboardGuard,
                                 CompanyAdminTx tx,
                                 CompanyFeishuProperties properties,
-                                CompanyFeishuDeliveryGateway deliveryGateway) {
-        this(store, dashboardGuard, tx, properties, deliveryGateway, IDUtils::snowID);
+                                CompanyFeishuDeliveryGateway deliveryGateway,
+                                CompanyFeishuDirectoryGateway directory) {
+        this(store, dashboardGuard, tx, properties, deliveryGateway, IDUtils::snowID, directory);
     }
 
     CompanyFeishuService(CompanyFeishuRepository store,
@@ -53,12 +55,23 @@ public class CompanyFeishuService {
                          CompanyFeishuProperties properties,
                          CompanyFeishuDeliveryGateway deliveryGateway,
                          LongSupplier ids) {
+        this(store, dashboardGuard, tx, properties, deliveryGateway, ids, null);
+    }
+
+    CompanyFeishuService(CompanyFeishuRepository store,
+                         CompanyDashboardGuard dashboardGuard,
+                         CompanyAdminTx tx,
+                         CompanyFeishuProperties properties,
+                         CompanyFeishuDeliveryGateway deliveryGateway,
+                         LongSupplier ids,
+                         CompanyFeishuDirectoryGateway directory) {
         this.store = store;
         this.dashboardGuard = dashboardGuard;
         this.tx = tx;
         this.properties = properties;
         this.deliveryGateway = deliveryGateway;
         this.ids = ids;
+        this.directory = directory;
     }
 
     public Map<String, Object> getIntegration() {
@@ -159,6 +172,11 @@ public class CompanyFeishuService {
         CompanyFeishuRepository.Recipient clash = store.findRecipientByKey(row.appId, row.receiveIdType, row.feishuId);
         if (clash != null && !clash.id.equals(existing.id)) {
             CompanyAdminErrors.conflict("收件人已存在");
+        }
+        if (!StringUtils.equals(existing.feishuId, row.feishuId) || !StringUtils.equals(existing.receiveIdType, row.receiveIdType)) {
+            row.identityStatus = "UNCONFIRMED";
+        } else {
+            row.identityStatus = existing.identityStatus;
         }
         store.updateRecipient(row);
         return recipientVo(store.findRecipient(id));
@@ -274,6 +292,60 @@ public class CompanyFeishuService {
         return runVo(run, true);
     }
 
+    public Map<String, Object> searchEmployees(String query) {
+        if (StringUtils.isBlank(query)) {
+            CompanyAdminErrors.invalid("query 不能为空");
+        }
+        requireDirectory();
+        return directory.search(query.trim());
+    }
+
+    public Map<String, Object> confirmEmployee(Map<String, Object> body, long operatorId) {
+        rejectSecretFields(body);
+        requireDirectory();
+        CompanyFeishuRepository.AppConfig app = store.findAppConfig();
+        if (app == null) {
+            CompanyAdminErrors.invalid("请先由系统管理员配置飞书应用");
+        }
+        String userId = requiredText(body, "userId", 64);
+        if (userId.startsWith("ou_") || userId.startsWith("oc_")) {
+            CompanyAdminErrors.invalid("userId 不是可用于机器人私聊的 User ID");
+        }
+        Map<String, Object> employee = directory.resolve(userId);
+        String name = optionalText(employee.get("name"), 128);
+        if (StringUtils.isBlank(name) || !userId.equals(String.valueOf(employee.get("userId")))) {
+            CompanyAdminErrors.invalid("通讯录未返回可用的姓名和 User ID");
+        }
+        CompanyFeishuRepository.Recipient existing = store.findRecipientByKey(app.appId, "user_id", userId);
+        long now = System.currentTimeMillis();
+        if (existing != null) {
+            existing.displayName = name;
+            existing.identityStatus = "CONFIRMED";
+            existing.source = "CONTACT_LOOKUP";
+            existing.updatedAt = now;
+            existing.updatedBy = operatorId;
+            store.updateRecipient(existing);
+            return confirmedRecipientVo(store.findRecipient(existing.id), false);
+        }
+        CompanyFeishuRepository.Recipient row = new CompanyFeishuRepository.Recipient();
+        row.id = ids.getAsLong();
+        row.recipientType = "PERSONAL";
+        row.receiveIdType = "user_id";
+        row.displayName = name;
+        row.feishuId = userId;
+        row.appId = app.appId;
+        row.source = "CONTACT_LOOKUP";
+        row.identityStatus = "CONFIRMED";
+        row.verifyStatus = "UNVERIFIED";
+        row.status = "ENABLED";
+        row.createdAt = now;
+        row.createdBy = operatorId;
+        row.updatedAt = now;
+        row.updatedBy = operatorId;
+        store.insertRecipient(row);
+        return confirmedRecipientVo(store.findRecipient(row.id), true);
+    }
+
     private void requireDashboardView(String dashboardId) {
         try {
             dashboardGuard.requireView(Long.parseLong(dashboardId));
@@ -308,6 +380,7 @@ public class CompanyFeishuService {
         if (StringUtils.isBlank(row.source)) {
             row.source = "MANUAL";
         }
+        row.identityStatus = creating ? "UNCONFIRMED" : null;
         row.verifyStatus = creating ? "UNVERIFIED" : null;
         row.status = optionalEnum(body.get("status"), STATUSES, "ENABLED");
         row.createdAt = now;
@@ -421,6 +494,7 @@ public class CompanyFeishuService {
         vo.put("feishuId", row.feishuId);
         vo.put("appId", row.appId);
         vo.put("source", row.source);
+        vo.put("identityStatus", StringUtils.defaultIfBlank(row.identityStatus, "UNCONFIRMED"));
         vo.put("verifyStatus", row.verifyStatus);
         vo.put("status", row.status);
         vo.put("lastVerifiedAt", row.lastVerifiedAt);
@@ -483,6 +557,20 @@ public class CompanyFeishuService {
             vo.put("targets", targets);
         }
         return vo;
+    }
+
+    private Map<String, Object> confirmedRecipientVo(CompanyFeishuRepository.Recipient row, boolean created) {
+        Map<String, Object> vo = recipientVo(row);
+        vo.put("created", created);
+        vo.put("identityJustConfirmed", true);
+        vo.put("sendVerified", "VERIFIED".equals(row.verifyStatus));
+        return vo;
+    }
+
+    private void requireDirectory() {
+        if (directory == null) {
+            CompanyAdminErrors.invalid("通讯录查询服务未配置");
+        }
     }
 
     private static void rejectSecretFields(Map<String, Object> body) {

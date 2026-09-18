@@ -1,6 +1,7 @@
 package io.dataease.company.bi.feishu;
 
 import io.dataease.company.bi.auth.CompanyAuthSupport;
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -18,6 +19,23 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
 
     public CompanyFeishuJdbcStore(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    @PostConstruct
+    void ensureIdentityStatusColumn() {
+        Integer present = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'company_feishu_recipient'
+                   AND COLUMN_NAME = 'identity_status'
+                """, Integer.class);
+        if (present == null || present == 0) {
+            jdbc.execute("""
+                    ALTER TABLE company_feishu_recipient
+                      ADD COLUMN identity_status VARCHAR(16) NOT NULL DEFAULT 'UNCONFIRMED'
+                      COMMENT 'UNCONFIRMED / CONFIRMED. Search-confirm only; not send-verified' AFTER source
+                    """);
+        }
     }
 
     @Override
@@ -83,11 +101,11 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
         jdbc.update("""
                 INSERT INTO company_feishu_recipient
                   (id, recipient_type, receive_id_type, display_name, feishu_id, union_id, app_id, source,
-                   verify_status, status, last_verified_at, created_at, created_by, updated_at, updated_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   identity_status, verify_status, status, last_verified_at, created_at, created_by, updated_at, updated_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 row.id, row.recipientType, row.receiveIdType, row.displayName, row.feishuId, row.unionId,
-                row.appId, row.source, row.verifyStatus, row.status, row.lastVerifiedAt,
+                row.appId, row.source, row.identityStatus, row.verifyStatus, row.status, row.lastVerifiedAt,
                 row.createdAt, row.createdBy, row.updatedAt, row.updatedBy);
     }
 
@@ -96,11 +114,12 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
         jdbc.update("""
                 UPDATE company_feishu_recipient
                    SET recipient_type=?, receive_id_type=?, display_name=?, feishu_id=?, union_id=?, app_id=?,
-                       source=?, verify_status=?, status=?, last_verified_at=?, updated_at=?, updated_by=?
+                       source=?, identity_status=?, verify_status=?, status=?, last_verified_at=?, updated_at=?, updated_by=?
                  WHERE id=?
                 """,
                 row.recipientType, row.receiveIdType, row.displayName, row.feishuId, row.unionId, row.appId,
-                row.source, row.verifyStatus, row.status, row.lastVerifiedAt, row.updatedAt, row.updatedBy, row.id);
+                row.source, row.identityStatus, row.verifyStatus, row.status, row.lastVerifiedAt, row.updatedAt,
+                row.updatedBy, row.id);
     }
 
     @Override
@@ -246,6 +265,10 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
             row.unionId = rs.getString("union_id");
             row.appId = rs.getString("app_id");
             row.source = rs.getString("source");
+            row.identityStatus = rs.getString("identity_status");
+            if (row.identityStatus == null || row.identityStatus.isBlank()) {
+                row.identityStatus = "UNCONFIRMED";
+            }
             row.verifyStatus = rs.getString("verify_status");
             row.status = rs.getString("status");
             row.lastVerifiedAt = nullableLong(rs, "last_verified_at");

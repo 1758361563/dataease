@@ -28,9 +28,17 @@ export interface FeishuRecipient {
   feishuId: string
   appId: string
   source?: string
+  identityStatus?: string
   verifyStatus: string
   status: string
   lastVerifiedAt?: number | null
+}
+
+export interface FeishuEmployeeMatch {
+  name: string
+  userId: string
+  departments: string[]
+  userIdTail: string
 }
 
 export interface FeishuRecipientBody {
@@ -181,6 +189,24 @@ export const enableFeishuRecipient = (id: string): Promise<FeishuRecipient> =>
 export const disableFeishuRecipient = (id: string): Promise<FeishuRecipient> =>
   request
     .post({ url: `/company/bi/feishu/recipients/${id}/disable` })
+    .then((res: any) => wrapRecipient(res.data))
+
+export const searchFeishuEmployees = (query: string): Promise<FeishuEmployeeMatch[]> =>
+  request
+    .get({ url: '/company/bi/feishu/employees/search', params: { query } })
+    .then((res: any) => res.data?.matches || [])
+
+export const confirmFeishuEmployee = (
+  userId: string
+): Promise<
+  FeishuRecipient & {
+    created?: boolean
+    identityJustConfirmed?: boolean
+    sendVerified?: boolean
+  }
+> =>
+  request
+    .post({ url: '/company/bi/feishu/employees/confirm', data: { userId } })
     .then((res: any) => wrapRecipient(res.data))
 
 export const listFeishuSubscriptions = (): Promise<FeishuSubscription[]> =>

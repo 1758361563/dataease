@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router_2'
 import { ElMessage } from 'element-plus-secondary'
 import GridTable from '@/components/grid-table/src/GridTable.vue'
 import {
+  confirmFeishuEmployee,
   createFeishuRecipient,
   createFeishuSubscription,
   disableFeishuRecipient,
@@ -17,11 +18,13 @@ import {
   listFeishuRuns,
   listFeishuSubscriptions,
   runFeishuSubscription,
+  searchFeishuEmployees,
   testFeishuIntegration,
   updateFeishuIntegration,
   updateFeishuRecipient,
   updateFeishuSubscription,
   type FeishuDeliveryRun,
+  type FeishuEmployeeMatch,
   type FeishuIntegration,
   type FeishuRecipient,
   type FeishuSubscription
@@ -31,6 +34,8 @@ import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermiss
 import {
   acceptedRunNotice,
   isRecipientVerified,
+  identityStatusLabel,
+  employeeMatchLabel,
   receiveIdTypeFor,
   receiveIdTypeLabel,
   recipientOptionLabel,
@@ -41,6 +46,7 @@ import {
   targetStatusLabel,
   subscriptionStatusLabel,
   verifyStatusLabel,
+  isIdentityConfirmed,
   type FeishuRecipientType
 } from '@/utils/companyFeishu'
 
@@ -62,6 +68,13 @@ const recipientForm = ref({
   feishuId: '',
   status: 'ENABLED'
 })
+
+const employeeDialog = ref(false)
+const employeeQuery = ref('')
+const employeeMatches = ref<FeishuEmployeeMatch[]>([])
+const selectedEmployee = ref<FeishuEmployeeMatch | null>(null)
+const employeeSearching = ref(false)
+const employeeConfirming = ref(false)
 
 const subDrawer = ref(false)
 const subForm = ref({
@@ -181,6 +194,55 @@ const openRecipientCreate = () => {
   recipientDialog.value = true
 }
 
+const openEmployeeCreate = () => {
+  employeeQuery.value = ''
+  employeeMatches.value = []
+  selectedEmployee.value = null
+  employeeDialog.value = true
+}
+
+const searchEmployees = async () => {
+  const query = employeeQuery.value.trim()
+  if (!query) {
+    ElMessage.warning('请输入姓名')
+    return
+  }
+  employeeSearching.value = true
+  selectedEmployee.value = null
+  try {
+    employeeMatches.value = await searchFeishuEmployees(query)
+    if (!employeeMatches.value.length) {
+      ElMessage.info('未找到匹配员工，请核对姓名或改用手动填写 User ID')
+    }
+  } finally {
+    employeeSearching.value = false
+  }
+}
+
+const selectEmployee = (row: FeishuEmployeeMatch) => {
+  selectedEmployee.value = row
+}
+
+const confirmEmployee = async () => {
+  if (!selectedEmployee.value) {
+    ElMessage.warning('同名时必须先选择一名员工，不能默认取第一条')
+    return
+  }
+  employeeConfirming.value = true
+  try {
+    const saved = await confirmFeishuEmployee(selectedEmployee.value.userId)
+    if (saved.sendVerified) {
+      ElMessage.success('已确认身份。发送验证状态未改，仍以真实发送结果为准')
+    } else {
+      ElMessage.success('已确认身份并保存为个人收件人，尚未验证消息发送')
+    }
+    employeeDialog.value = false
+    await loadRecipients()
+  } finally {
+    employeeConfirming.value = false
+  }
+}
+
 const openRecipientEdit = (row: FeishuRecipient) => {
   recipientForm.value = {
     id: keepStringId(row.id),
@@ -209,7 +271,7 @@ const submitRecipient = async () => {
     ElMessage.success('收件人已保存')
   } else {
     await createFeishuRecipient(body)
-    ElMessage.success('收件人已创建，当前为未验证')
+    ElMessage.success('收件人已创建。手动填写只完成登记，身份未确认，也未验证消息发送')
   }
   recipientDialog.value = false
   await loadRecipients()
@@ -480,11 +542,13 @@ onMounted(async () => {
 
       <el-tab-pane label="收件人" name="recipients">
         <div class="toolbar">
-          <el-button type="primary" @click="openRecipientCreate">登记收件人</el-button>
+          <el-button type="primary" @click="openEmployeeCreate">添加员工</el-button>
+          <el-button @click="openRecipientCreate">手动填写 User ID / 群聊</el-button>
         </div>
         <p class="hint">
-          V1 由管理员手动录入飞书 ID。保存时必须明确个人 user_id 或群聊
-          chat_id，不会按字符串长度或前缀猜测。
+          添加员工会按姓名搜索通讯录并确认身份，自动保存可用于机器人私聊的 User
+          ID。搜索成功不等于消息已发送。群聊管理不变，仍用手动入口填写 chat_id。不会把飞书部门映射成
+          BI 用户组，也不要求对方有 BI 账号。
         </p>
         <GridTable :show-pagination="false" :table-data="recipients" class="admin-grid">
           <el-table-column prop="displayName" label="名称" min-width="140" />
@@ -495,7 +559,14 @@ onMounted(async () => {
             <template #default="{ row }">{{ receiveIdTypeLabel(row.receiveIdType) }}</template>
           </el-table-column>
           <el-table-column prop="feishuId" label="飞书 ID" min-width="180" />
-          <el-table-column label="验证" width="100">
+          <el-table-column label="身份" width="110">
+            <template #default="{ row }">
+              <el-tag :type="isIdentityConfirmed(row.identityStatus) ? 'success' : 'info'">
+                {{ identityStatusLabel(row.identityStatus) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="发送验证" width="120">
             <template #default="{ row }">
               <el-tag :type="isRecipientVerified(row.verifyStatus) ? 'success' : 'info'">
                 {{ verifyStatusLabel(row.verifyStatus) }}
@@ -543,9 +614,59 @@ onMounted(async () => {
       </el-tab-pane>
     </el-tabs>
 
+    <el-dialog v-model="employeeDialog" title="添加员工" width="640px">
+      <p class="hint">
+        输入姓名后查看匹配结果。同名员工会列出部门与 User ID
+        尾号，必须点选确认，不会自动取第一条。确认后只保存身份，不会发送消息。
+      </p>
+      <el-form label-width="80px" @submit.prevent="searchEmployees">
+        <el-form-item label="姓名" required>
+          <div class="employee-search">
+            <el-input
+              v-model="employeeQuery"
+              placeholder="请输入员工姓名"
+              @keyup.enter="searchEmployees"
+            />
+            <el-button type="primary" :loading="employeeSearching" @click="searchEmployees"
+              >搜索</el-button
+            >
+          </div>
+        </el-form-item>
+      </el-form>
+      <el-table
+        :data="employeeMatches"
+        highlight-current-row
+        max-height="320"
+        @current-change="selectEmployee"
+      >
+        <el-table-column prop="name" label="姓名" min-width="120" />
+        <el-table-column label="部门" min-width="180">
+          <template #default="{ row }">{{
+            (row.departments || []).join(' / ') || '部门未知'
+          }}</template>
+        </el-table-column>
+        <el-table-column label="User ID 尾号" width="120">
+          <template #default="{ row }">…{{ row.userIdTail }}</template>
+        </el-table-column>
+      </el-table>
+      <p class="hint" v-if="selectedEmployee">已选择：{{ employeeMatchLabel(selectedEmployee) }}</p>
+      <p class="hint" v-else-if="employeeMatches.length">请点选一名员工后再确认身份。</p>
+      <template #footer>
+        <el-button @click="employeeDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!selectedEmployee"
+          :loading="employeeConfirming"
+          @click="confirmEmployee"
+        >
+          确认身份
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog
       v-model="recipientDialog"
-      :title="recipientForm.id ? '编辑收件人' : '登记收件人'"
+      :title="recipientForm.id ? '编辑收件人' : '手动填写 User ID / 群聊'"
       width="520px"
     >
       <el-form label-width="120px">
@@ -702,6 +823,11 @@ onMounted(async () => {
   color: #646a73;
   font-size: 12px;
   margin: 0 0 12px;
+}
+.employee-search {
+  display: flex;
+  gap: 8px;
+  width: 100%;
 }
 .run-detail {
   margin-top: 16px;

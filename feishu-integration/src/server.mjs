@@ -98,9 +98,30 @@ async function defaultStartDelivery(body) {
   return { runId: String(claimed.run.id), status: claimed.run.status, created: claimed.created }
 }
 
+async function defaultSearchEmployees(query) {
+  const { searchEmployees } = await import('./contact.mjs')
+  return searchEmployees(query)
+}
+
+async function defaultResolveEmployee(userId) {
+  const { resolveEmployee } = await import('./contact.mjs')
+  return resolveEmployee(userId)
+}
+
+function sendServiceError(res, err) {
+  const status = Number(err.status) || 500
+  send(res, status, {
+    error: err.message || String(err),
+    code: err.code || null,
+    missingScope: err.missingScope || null
+  })
+}
+
 export function createServer(hooks = {}) {
   ensureDirs()
   const startDelivery = hooks.startDelivery || defaultStartDelivery
+  const searchEmployees = hooks.searchEmployees || defaultSearchEmployees
+  const resolveEmployee = hooks.resolveEmployee || defaultResolveEmployee
   return http.createServer(async (req, res) => {
     try {
       sweepExpired(CONFIG.taskTtlMs)
@@ -141,6 +162,25 @@ export function createServer(hooks = {}) {
             errorSummary: row.error_summary
           }))
         })
+      }
+      if (req.method === 'GET' && url.pathname === '/v1/employees/search') {
+        if (!requireInternalToken(req, res)) return
+        try {
+          const matches = await searchEmployees(url.searchParams.get('query') || '')
+          return send(res, 200, { matches })
+        } catch (err) {
+          return sendServiceError(res, err)
+        }
+      }
+      if (req.method === 'POST' && url.pathname === '/v1/employees/resolve') {
+        if (!requireInternalToken(req, res)) return
+        try {
+          const body = await readBody(req)
+          const employee = await resolveEmployee(body.userId)
+          return send(res, 200, employee)
+        } catch (err) {
+          return sendServiceError(res, err)
+        }
       }
       if (req.method === 'POST' && url.pathname === '/v1/screenshots') {
         const body = await readBody(req)

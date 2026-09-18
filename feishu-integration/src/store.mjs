@@ -30,9 +30,9 @@ export async function insertRecipient(row) {
   const ts = now()
   await exec(
     `INSERT INTO company_feishu_recipient
-      (id, recipient_type, receive_id_type, display_name, feishu_id, union_id, app_id, source, verify_status, status,
-       last_verified_at, created_at, created_by, updated_at, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, recipient_type, receive_id_type, display_name, feishu_id, union_id, app_id, source, identity_status,
+       verify_status, status, last_verified_at, created_at, created_by, updated_at, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       row.recipientType,
@@ -42,6 +42,7 @@ export async function insertRecipient(row) {
       row.unionId ?? null,
       row.appId,
       row.source ?? 'MANUAL',
+      row.identityStatus || 'UNCONFIRMED',
       row.verifyStatus || 'UNVERIFIED',
       row.status || 'ENABLED',
       row.lastVerifiedAt ?? null,
@@ -128,6 +129,24 @@ export async function listSubscriptionRecipients(subscriptionId) {
       ORDER BY r.recipient_type, r.id`,
     [subscriptionId]
   )
+}
+
+export async function ensureIdentityStatusSchema() {
+  const cols = await query(
+    `SELECT COLUMN_NAME AS column_name
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'company_feishu_recipient'
+        AND COLUMN_NAME = 'identity_status'`
+  )
+  const present = cols.some(row => String(row.column_name || row.COLUMN_NAME || '').toLowerCase() === 'identity_status')
+  if (!present) {
+    await exec(
+      `ALTER TABLE company_feishu_recipient
+         ADD COLUMN identity_status VARCHAR(16) NOT NULL DEFAULT 'UNCONFIRMED'
+         COMMENT 'UNCONFIRMED / CONFIRMED. Search-confirm only; not send-verified' AFTER source`
+    )
+  }
 }
 
 export async function ensureExecutionModeSchema() {

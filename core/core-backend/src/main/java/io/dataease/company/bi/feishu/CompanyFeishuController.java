@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -81,6 +82,19 @@ public class CompanyFeishuController {
     public Map<String, Object> disableRecipient(@PathVariable("id") Long id, HttpServletRequest request) {
         long operator = adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
         return feishuService.setRecipientStatus(id, "DISABLED", operator);
+    }
+
+    @GetMapping("/employees/search")
+    public Map<String, Object> searchEmployees(@RequestParam("query") String query,
+                                               HttpServletRequest request) {
+        adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
+        return feishuService.searchEmployees(query);
+    }
+
+    @PostMapping("/employees/confirm")
+    public Map<String, Object> confirmEmployee(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        long operator = adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
+        return feishuService.confirmEmployee(body, operator);
     }
 
     @GetMapping("/subscriptions")

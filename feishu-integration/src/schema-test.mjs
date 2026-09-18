@@ -7,6 +7,7 @@ import {
   addSubscriptionRecipient,
   deleteTestRows,
   ensureExecutionModeSchema,
+  ensureIdentityStatusSchema,
   insertAppConfig,
   insertDeliveryRun,
   insertDeliveryTarget,
@@ -75,6 +76,7 @@ async function main() {
   try {
     await applySchema()
     await ensureExecutionModeSchema()
+    await ensureIdentityStatusSchema()
     await cleanupByAppId('cli_phase2a_test')
     const tables = await query(
       `SELECT table_name FROM information_schema.tables
@@ -90,6 +92,12 @@ async function main() {
       [CONFIG.mysql.database]
     )
     assert(modeCols.length === 1, 'execution_mode column missing after compat migration')
+    const identityCols = await query(
+      `SELECT COLUMN_NAME AS column_name FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'company_feishu_recipient' AND COLUMN_NAME = 'identity_status'`,
+      [CONFIG.mysql.database]
+    )
+    assert(identityCols.length === 1, 'identity_status column missing after compat migration')
 
     const appConfigId = await insertAppConfig({
       appId: 'cli_phase2a_test',
