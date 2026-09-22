@@ -402,6 +402,59 @@ export async function listIncompleteDeliveryRuns(limit = 50) {
   )
 }
 
+export async function listPartialRetryRuns(maxRetries = 3, limit = 20) {
+  return query(
+    `SELECT r.*
+       FROM company_feishu_delivery_run r
+      WHERE r.status = 'FAILED'
+        AND (
+          r.execution_mode IS NULL
+          OR r.execution_mode <> 'LIVE'
+          OR EXISTS (
+            SELECT 1 FROM company_feishu_subscription s
+             WHERE s.id = r.subscription_id AND s.delivery_lane = 'PROD'
+          )
+        )
+        AND EXISTS (
+          SELECT 1 FROM company_feishu_delivery_target t
+           WHERE t.run_id = r.id
+             AND t.status = 'SUCCEEDED'
+             AND (
+               r.execution_mode = 'DRY_RUN'
+               OR (t.feishu_message_id IS NOT NULL AND t.feishu_message_id <> '')
+             )
+        )
+        AND EXISTS (
+          SELECT 1 FROM company_feishu_delivery_target t
+           WHERE t.run_id = r.id
+             AND t.status IN ('FAILED', 'UNKNOWN')
+             AND IFNULL(t.retry_count, 0) < ?
+        )
+      ORDER BY r.finished_at
+      LIMIT ?`,
+    [maxRetries, limit]
+  )
+}
+
+export async function ensureDeliveryLaneSchema() {
+  const cols = await query(
+    `SELECT COLUMN_NAME AS column_name
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'company_feishu_subscription'
+        AND COLUMN_NAME = 'delivery_lane'`
+  )
+  const present = cols.some(row => String(row.column_name || row.COLUMN_NAME || '').toLowerCase() === 'delivery_lane')
+  if (!present) {
+    await exec(
+      `ALTER TABLE company_feishu_subscription
+         ADD COLUMN delivery_lane VARCHAR(16) NOT NULL DEFAULT 'TEST'
+         COMMENT 'TEST subscriptions never live-send. PROD may live-send only when the service dry-run flag is off.'
+         AFTER status`
+    )
+  }
+}
+
 export async function withSchedulerLock(fn) {
   const got = await query(`SELECT GET_LOCK(?, 10) AS locked`, ['company_feishu_scheduler'])
   const locked = Number(got?.[0]?.locked)

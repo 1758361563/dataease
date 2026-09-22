@@ -1,9 +1,13 @@
 import { CONFIG } from './config.mjs'
-import { currentDueSlot, freshnessDecision, parseSchedule } from './schedule.mjs'
+import { planScheduledSend, resolveSchedulerDryRun, subscriptionLane } from './delivery-lane.mjs'
+import { etlHoldSummary, freshnessDecision, isEtlHoldSummary } from './etl-status.mjs'
+import { currentDueSlot, parseSchedule } from './schedule.mjs'
+import { recordServiceEvent } from './service-log.mjs'
 import {
   claimDeliveryRun,
   listEnabledSubscriptions,
   listIncompleteDeliveryRuns,
+  listPartialRetryRuns,
   updateDeliveryRun,
   withSchedulerLock
 } from './store.mjs'
@@ -27,37 +31,87 @@ export async function recoverIncompleteRuns({ dryRun, execute } = {}) {
       })
       recovered.push({ runId: String(run.id), skipped: !!report.skipped, status: report.summary?.runStatus })
     } catch (err) {
+      recordServiceEvent({ area: 'scheduler', runId: run.id, message: err.message })
       recovered.push({ runId: String(run.id), error: err.message })
     }
   }
   return recovered
 }
 
-export async function fireDueSubscriptions({ now = Date.now(), dryRun, execute } = {}) {
+export async function retryPartialFailures({ dryRun, execute, maxRetries = 3 } = {}) {
   const executeSubscription = execute || (await import('./run-subscription.mjs')).executeSubscription
-  const useDryRun = dryRun !== false
+  const rows = await listPartialRetryRuns(maxRetries)
+  const retried = []
+  for (const run of rows) {
+    try {
+      const report = await executeSubscription({
+        retryRunId: String(run.id),
+        subscriptionId: String(run.subscription_id),
+        triggerType: run.trigger_type,
+        dryRun: dryRun !== false,
+        closeResources: false
+      })
+      retried.push({ runId: String(run.id), skipped: !!report.skipped, status: report.summary?.runStatus })
+    } catch (err) {
+      recordServiceEvent({ area: 'scheduler', runId: run.id, message: err.message })
+      retried.push({ runId: String(run.id), error: err.message })
+    }
+  }
+  return retried
+}
+
+export async function fireDueSubscriptions({ now = Date.now(), dryRun, execute, readRuns } = {}) {
+  const executeSubscription = execute || (await import('./run-subscription.mjs')).executeSubscription
+  const globalDryRun = dryRun !== false
   const subs = await listEnabledSubscriptions()
   const fired = []
   for (const sub of subs) {
     const schedule = parseSchedule(sub.schedule_json)
     const slot = currentDueSlot(now, schedule)
     if (!slot) continue
-    const freshness = freshnessDecision(sub)
+    const freshness = await freshnessDecision(sub, { readRuns })
+    const plan = planScheduledSend({
+      lane: subscriptionLane(sub),
+      globalDryRun,
+      freshness
+    })
     const claimed = await claimDeliveryRun({
       subscriptionId: sub.id,
       triggerType: 'SCHEDULED',
       plannedAt: slot,
       operatorUserId: null,
-      executionMode: useDryRun ? 'DRY_RUN' : 'LIVE'
+      executionMode: plan.executionMode
     })
     if (!claimed.created && terminalStatus(claimed.run.status)) {
-      fired.push({ subscriptionId: String(sub.id), runId: String(claimed.run.id), skipped: true, reason: 'slot-already-terminal' })
-      continue
+      const waitingForEtl = claimed.run.status === 'SKIPPED' && isEtlHoldSummary(claimed.run.error_summary)
+      if (!waitingForEtl) {
+        fired.push({ subscriptionId: String(sub.id), runId: String(claimed.run.id), skipped: true, reason: 'slot-already-terminal' })
+        continue
+      }
+      if (plan.hold) {
+        await updateDeliveryRun(claimed.run.id, {
+          status: 'SKIPPED',
+          errorSummary: etlHoldSummary(freshness.reason),
+          finishedAt: Date.now()
+        })
+        fired.push({
+          subscriptionId: String(sub.id),
+          runId: String(claimed.run.id),
+          skipped: true,
+          reason: freshness.reason
+        })
+        continue
+      }
+      await updateDeliveryRun(claimed.run.id, {
+        status: 'PENDING',
+        errorSummary: null,
+        finishedAt: null
+      })
     }
-    if (freshness.blocked) {
+    if (plan.hold) {
       await updateDeliveryRun(claimed.run.id, {
         status: 'SKIPPED',
-        errorSummary: freshness.reason,
+        errorSummary: etlHoldSummary(freshness.reason),
         finishedAt: Date.now()
       })
       fired.push({
@@ -73,7 +127,9 @@ export async function fireDueSubscriptions({ now = Date.now(), dryRun, execute }
       subscriptionId: String(sub.id),
       triggerType: 'SCHEDULED',
       plannedAt: slot,
-      dryRun: useDryRun,
+      dryRun: plan.dryRun,
+      liveRefused: plan.liveRefused,
+      readRuns,
       closeResources: false
     })
     fired.push({
@@ -81,7 +137,10 @@ export async function fireDueSubscriptions({ now = Date.now(), dryRun, execute }
       runId: String(claimed.run.id),
       created: claimed.created,
       skipped: !!report.skipped,
-      executionMode: report.executionMode
+      executionMode: report.executionMode,
+      liveRefused: !!plan.liveRefused,
+      hold: plan.hold,
+      dataUpdateLabel: plan.dataUpdateLabel
     })
   }
   return fired
@@ -89,10 +148,11 @@ export async function fireDueSubscriptions({ now = Date.now(), dryRun, execute }
 
 export async function schedulerTick(opts = {}) {
   return withSchedulerLock(async () => {
-    const dryRun = opts.dryRun !== false && (opts.dryRun === true || CONFIG.dryRun !== false)
+    const dryRun = resolveSchedulerDryRun(opts, CONFIG.dryRun)
     const recovered = await recoverIncompleteRuns({ ...opts, dryRun })
-    const fired = await fireDueSubscriptions({ ...opts, dryRun })
-    return { dryRun, recovered, fired }
+    const retried = await retryPartialFailures({ ...opts, dryRun })
+    const fired = await fireDueSubscriptions({ ...opts, dryRun, readRuns: opts.readRuns })
+    return { dryRun, recovered, retried, fired }
   })
 }
 
@@ -100,6 +160,7 @@ export function startScheduler({ intervalMs } = {}) {
   const ms = Number(intervalMs || CONFIG.schedulerIntervalMs || 30_000)
   const tick = () =>
     schedulerTick().catch(err => {
+      recordServiceEvent({ area: 'scheduler', message: err.message })
       console.error('[feishu-shot] scheduler tick failed', err.message)
     })
   tick()

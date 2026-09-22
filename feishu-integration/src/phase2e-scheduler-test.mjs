@@ -1,8 +1,14 @@
 import { closePool, nextId, query } from './db.mjs'
 import { CONFIG } from './config.mjs'
 import { currentDueSlot } from './schedule.mjs'
-import { schedulerTick } from './scheduler.mjs'
-import { addSubscriptionRecipient, ensureExecutionModeSchema, insertSubscription, persistExecutionMode } from './store.mjs'
+import { retryPartialFailures, schedulerTick } from './scheduler.mjs'
+import {
+  addSubscriptionRecipient,
+  ensureDeliveryLaneSchema,
+  ensureExecutionModeSchema,
+  insertSubscription,
+  persistExecutionMode
+} from './store.mjs'
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg)
@@ -11,6 +17,7 @@ function assert(cond, msg) {
 async function main() {
   assert(CONFIG.dryRun === true, 'Phase 2E tests require CONFIG.dryRun=true')
   await ensureExecutionModeSchema()
+  await ensureDeliveryLaneSchema()
   const recipients = await query(
     `SELECT id FROM company_feishu_recipient WHERE status='ENABLED' ORDER BY recipient_type LIMIT 2`
   )
@@ -79,7 +86,50 @@ async function main() {
     pendingId
   ])
   assert(recoveredRun[0].status !== 'PENDING', 'incomplete PENDING run must be recovered')
+  assert(String(recoveredRun[0].error_summary || '').toLowerCase().includes('dry-run'), recoveredRun[0].error_summary)
   assert(recovered.skipped === false)
+
+  assert(recipients.length >= 2, 'partial retry test needs two ENABLED recipients')
+  const partialRunId = nextId()
+  const keptMessageId = `dry-keep-${partialRunId}`
+  await query(
+    `INSERT INTO company_feishu_delivery_run
+      (id, subscription_id, trigger_type, planned_at, status, execution_mode, error_summary, created_at)
+     VALUES (?, ?, 'MANUAL', ?, 'FAILED', 'DRY_RUN', 'partial 1/2', ?)`,
+    [partialRunId, subId, now + 2, now]
+  )
+  await query(
+    `INSERT INTO company_feishu_delivery_target
+      (id, run_id, recipient_id, receive_id_type, feishu_id, feishu_message_id, status, retry_count, error_summary, created_at, updated_at)
+     VALUES
+      (?, ?, ?, 'user_id', 'stability-ok', ?, 'SUCCEEDED', 0, 'dry-run: send skipped', ?, ?),
+      (?, ?, ?, 'chat_id', 'stability-bad', NULL, 'FAILED', 0, 'simulated recipient send failure', ?, ?)`,
+    [
+      nextId(),
+      partialRunId,
+      recipients[0].id,
+      keptMessageId,
+      now,
+      now,
+      nextId(),
+      partialRunId,
+      recipients[1].id,
+      now,
+      now
+    ]
+  )
+  const retried = await retryPartialFailures({ dryRun: true })
+  assert(retried.some(row => String(row.runId) === String(partialRunId)), 'partial failure must be retried on the same run')
+  const partialTargets = await query(
+    `SELECT recipient_id, status, feishu_message_id FROM company_feishu_delivery_target WHERE run_id = ? ORDER BY id`,
+    [partialRunId]
+  )
+  const kept = partialTargets.find(row => String(row.recipient_id) === String(recipients[0].id))
+  const repaired = partialTargets.find(row => String(row.recipient_id) === String(recipients[1].id))
+  assert(kept?.status === 'SUCCEEDED', 'confirmed recipient must stay succeeded')
+  assert(String(kept?.feishu_message_id) === keptMessageId, 'confirmed message id must not be replaced')
+  assert(repaired?.status === 'SUCCEEDED', 'failed recipient can be retried on the same run')
+  assert(repaired?.feishu_message_id == null, 'dry-run retry must not create a Feishu message id')
 
   const freshId = nextId()
   await insertSubscription({
@@ -88,15 +138,23 @@ async function main() {
     dashboardId: CONFIG.defaultDashboardId,
     chartId: CONFIG.defaultChartId,
     scheduleJson: JSON.stringify({ kind: 'daily', autoRun: true, time, timezone: 'Asia/Shanghai' }),
-    freshnessJson: JSON.stringify({ requireEtl: true }),
+    freshnessJson: JSON.stringify({ etlTasks: [`phase2e-missing-${freshId}`], businessDate: '2026-09-21' }),
     status: 'ENABLED',
     createdBy: 1
   })
   await addSubscriptionRecipient(freshId, recipients[0].id, 1)
   const blocked = await schedulerTick({ now, dryRun: true })
   const freshHit = blocked.result.fired.find(row => String(row.subscriptionId) === String(freshId))
-  assert(freshHit?.skipped, 'freshness-configured subscription must skip')
-  assert(String(freshHit.reason || '').includes('no reliable data source'), freshHit.reason)
+  assert(freshHit?.skipped, 'linked ETL without a formal success must skip')
+  assert(String(freshHit.reason || '').includes('已阻止发送旧图'), freshHit.reason)
+  const freshRun = await query(
+    `SELECT status, execution_mode, error_summary FROM company_feishu_delivery_run WHERE subscription_id = ?`,
+    [freshId]
+  )
+  assert(freshRun.length === 1, 'linked ETL skip must keep a single planned run')
+  assert(freshRun[0].status === 'SKIPPED', freshRun[0].status)
+  assert(String(freshRun[0].execution_mode || '').toUpperCase() === 'DRY_RUN', freshRun[0].execution_mode)
+  assert(String(freshRun[0].error_summary || '').startsWith('etl-hold:'), freshRun[0].error_summary)
 
   await query(`DELETE FROM company_feishu_delivery_target WHERE run_id IN (SELECT id FROM company_feishu_delivery_run WHERE subscription_id IN (?, ?))`, [
     subId,

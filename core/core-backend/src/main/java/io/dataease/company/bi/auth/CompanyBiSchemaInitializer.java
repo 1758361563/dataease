@@ -90,6 +90,35 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
                 LogUtil.info("Applied company schema if missing: " + location);
             }
             ensureFeishuExecutionMode(conn);
+            ensureFeishuDeliveryLane(conn);
+        }
+    }
+
+    private void ensureFeishuDeliveryLane(Connection conn) throws Exception {
+        boolean present;
+        try (PreparedStatement ps = conn.prepareStatement(
+                """
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'company_feishu_subscription'
+                   AND COLUMN_NAME = 'delivery_lane'
+                """)) {
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                present = rs.getInt(1) > 0;
+            }
+        }
+        if (present) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("""
+                    ALTER TABLE company_feishu_subscription
+                      ADD COLUMN delivery_lane VARCHAR(16) NOT NULL DEFAULT 'TEST'
+                      COMMENT 'TEST never live-sends. PROD may live-send only when service dry-run is off.'
+                      AFTER status
+                    """);
+            LogUtil.info("Added company_feishu_subscription.delivery_lane");
         }
     }
 

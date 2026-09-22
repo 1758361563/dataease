@@ -44,6 +44,8 @@ import {
   recipientTypeLabel,
   runStatusLabel,
   targetStatusLabel,
+  dataUpdateStatusLabel,
+  deliveryLaneLabel,
   subscriptionStatusLabel,
   verifyStatusLabel,
   isIdentityConfirmed,
@@ -502,7 +504,7 @@ onMounted(async () => {
     <el-alert
       type="warning"
       :closable="false"
-      title="独立服务按 Asia/Shanghai 读取订阅调度。本机默认 DRY_RUN，不会真实发送。配置了 freshness 的订阅会被跳过，不会假装新鲜度已校验。"
+      title="独立服务按 Asia/Shanghai 调度，当前默认模拟发送。测试订阅不会因为切换真实发送而真发。未关联 ETL 的正式订阅可按固定时间执行，页面显示「数据更新状态未经校验」，这不表示数据已更新。已关联任务必须有覆盖约定业务日的成功记录，否则不发送旧图。"
       style="margin-bottom: 12px"
     />
     <el-tabs v-model="tab">
@@ -526,6 +528,12 @@ onMounted(async () => {
           <el-table-column prop="chartId" label="chartId" min-width="160" />
           <el-table-column label="状态" width="90">
             <template #default="{ row }">{{ subscriptionStatusLabel(row.status) }}</template>
+          </el-table-column>
+          <el-table-column label="发送隔离" width="90">
+            <template #default="{ row }">{{ deliveryLaneLabel(row.deliveryLane) }}</template>
+          </el-table-column>
+          <el-table-column label="数据更新" min-width="220">
+            <template #default="{ row }">{{ dataUpdateStatusLabel(row.freshnessJson) }}</template>
           </el-table-column>
           <el-table-column label="操作" width="340" fixed="right">
             <template #default="{ row }">

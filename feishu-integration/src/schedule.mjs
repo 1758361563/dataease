@@ -69,14 +69,4 @@ export function currentDueSlot(nowMs, scheduleInput) {
   return slot
 }
 
-export function freshnessDecision(sub) {
-  const raw = sub?.freshness_json || sub?.freshnessJson
-  if (raw == null || String(raw).trim() === '' || String(raw) === '{}' || String(raw) === 'null') {
-    return { checked: false, blocked: false, reason: 'no freshness config; not pretending a check passed' }
-  }
-  return {
-    checked: false,
-    blocked: true,
-    reason: 'freshness check has no reliable data source yet; refusing to pretend it passed'
-  }
-}
+export { freshnessDecision } from './etl-status.mjs'

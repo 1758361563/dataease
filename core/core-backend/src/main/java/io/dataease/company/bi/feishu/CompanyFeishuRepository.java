@@ -63,6 +63,7 @@ public interface CompanyFeishuRepository {
         public String scheduleJson;
         public String freshnessJson;
         public String status;
+        public String deliveryLane;
         public Long createdAt;
         public Long createdBy;
         public Long updatedAt;

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { currentDueSlot, freshnessDecision, parseSchedule, shanghaiWallToMs } from './schedule.mjs'
+import { evaluateFreshness, parseFreshnessBinding, UNCHECKED_LABEL } from './etl-status.mjs'
+import { currentDueSlot, parseSchedule, shanghaiWallToMs } from './schedule.mjs'
 
 describe('Phase 2E schedule slots', () => {
   it('parses daily/weekly/monthly with Asia/Shanghai', () => {
@@ -40,13 +41,14 @@ describe('Phase 2E schedule slots', () => {
     assert.equal(currentDueSlot(now, { kind: 'manual', autoRun: true, time: '09:00' }), null)
   })
 
-  it('does not pretend freshness was checked', () => {
-    const empty = freshnessDecision({})
+  it('does not pretend an unbound subscription was freshness-checked', () => {
+    const empty = evaluateFreshness(parseFreshnessBinding(null), { available: false, records: [] })
     assert.equal(empty.checked, false)
     assert.equal(empty.blocked, false)
-    const configured = freshnessDecision({ freshness_json: '{"requireEtl":true}' })
-    assert.equal(configured.checked, false)
-    assert.equal(configured.blocked, true)
-    assert.match(configured.reason, /no reliable data source/)
+    assert.equal(empty.label, UNCHECKED_LABEL)
+    const flagOnly = evaluateFreshness(parseFreshnessBinding('{"requireEtl":true}'), { available: false, records: [] })
+    assert.equal(flagOnly.checked, false)
+    assert.equal(flagOnly.blocked, false)
+    assert.equal(flagOnly.label, UNCHECKED_LABEL)
   })
 })

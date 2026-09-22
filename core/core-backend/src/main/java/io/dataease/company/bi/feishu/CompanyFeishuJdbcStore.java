@@ -309,6 +309,7 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
             row.scheduleJson = rs.getString("schedule_json");
             row.freshnessJson = rs.getString("freshness_json");
             row.status = rs.getString("status");
+            row.deliveryLane = rs.getString("delivery_lane");
             row.createdAt = nullableLong(rs, "created_at");
             row.createdBy = nullableLong(rs, "created_by");
             row.updatedAt = nullableLong(rs, "updated_at");

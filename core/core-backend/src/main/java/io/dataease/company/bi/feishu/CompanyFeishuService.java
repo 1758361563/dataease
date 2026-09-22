@@ -229,6 +229,9 @@ public class CompanyFeishuService {
         if (body.get("status") == null) {
             row.status = existing.status;
         }
+        if (!body.containsKey("freshnessJson")) {
+            row.freshnessJson = existing.freshnessJson;
+        }
         requireDashboardView(row.dashboardId);
         List<Long> recipientIds = body.containsKey("recipientIds")
                 ? parseRecipientIds(body.get("recipientIds"))
@@ -510,6 +513,8 @@ public class CompanyFeishuService {
         vo.put("chartName", row.chartName);
         vo.put("status", row.status);
         vo.put("scheduleJson", row.scheduleJson);
+        vo.put("freshnessJson", row.freshnessJson);
+        vo.put("deliveryLane", StringUtils.defaultIfBlank(row.deliveryLane, "TEST"));
         if (detail) {
             vo.put("titleTemplate", row.titleTemplate);
             vo.put("bodyTemplate", row.bodyTemplate);

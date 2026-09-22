@@ -1,0 +1,29 @@
+# Local/test stack. Dry-run is forced here. Secrets stay in .env, which is not copied into the image.
+services:
+  feishu-shot:
+    build: .
+    container_name: feishu-shot
+    restart: unless-stopped
+    init: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      COMPANY_FEISHU_DRY_RUN: "true"
+      FEISHU_LOG_DIR: /var/log/feishu-shot
+      TZ: Asia/Shanghai
+      DE_MYSQL_HOST: mysql-de
+      DE_MYSQL_PORT: "3306"
+    volumes:
+      - ./log:/var/log/feishu-shot
+    ports:
+      - "127.0.0.1:8091:8091"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - dataease
+
+networks:
+  dataease:
+    external: true
+    name: ${FEISHU_DOCKER_NETWORK:-dataease20_dataease-network}

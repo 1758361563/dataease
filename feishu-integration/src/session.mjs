@@ -76,3 +76,7 @@ export async function closeBrowser() {
   context = null
   browser = null
 }
+
+export async function invalidateSession() {
+  await closeBrowser()
+}

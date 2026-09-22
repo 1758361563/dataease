@@ -2,6 +2,9 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   acceptedRunNotice,
+  DATA_UPDATE_UNCHECKED,
+  dataUpdateStatusLabel,
+  deliveryLaneLabel,
   inferExecutionMode,
   inferTargetExecutionMode,
   isRecipientVerified,
@@ -169,6 +172,23 @@ describe('Phase 2F feishu UI helpers', () => {
     assert.equal(text, '执行成功（发送方式未记录）')
     assert.doesNotMatch(text, /真实发送成功/)
     assert.doesNotMatch(text, /模拟执行成功/)
+  })
+
+  it('shows unchecked data status until an ETL task is linked', () => {
+    assert.equal(dataUpdateStatusLabel(null), DATA_UPDATE_UNCHECKED)
+    assert.equal(dataUpdateStatusLabel('{"requireEtl":true}'), DATA_UPDATE_UNCHECKED)
+    assert.match(dataUpdateStatusLabel('{"etlTasks":["销售订单数据"]}'), /未约定业务日/)
+    assert.match(
+      dataUpdateStatusLabel('{"etlTasks":["销售订单数据"],"businessDate":"2026-09-21"}'),
+      /2026-09-21/
+    )
+    assert.match(
+      dataUpdateStatusLabel('{"etlTasks":["销售订单数据"],"businessDate":"2026-09-21"}'),
+      /不发送旧图/
+    )
+    assert.equal(deliveryLaneLabel(null), '测试')
+    assert.equal(deliveryLaneLabel('TEST'), '测试')
+    assert.equal(deliveryLaneLabel('PROD'), '正式')
   })
 
   it('ADMIN feishu route is capability gated', () => {

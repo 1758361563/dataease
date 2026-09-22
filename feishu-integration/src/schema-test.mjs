@@ -6,6 +6,7 @@ import { closePool, exec, query } from './db.mjs'
 import {
   addSubscriptionRecipient,
   deleteTestRows,
+  ensureDeliveryLaneSchema,
   ensureExecutionModeSchema,
   ensureIdentityStatusSchema,
   insertAppConfig,
@@ -77,6 +78,7 @@ async function main() {
     await applySchema()
     await ensureExecutionModeSchema()
     await ensureIdentityStatusSchema()
+    await ensureDeliveryLaneSchema()
     await cleanupByAppId('cli_phase2a_test')
     const tables = await query(
       `SELECT table_name FROM information_schema.tables
@@ -98,6 +100,12 @@ async function main() {
       [CONFIG.mysql.database]
     )
     assert(identityCols.length === 1, 'identity_status column missing after compat migration')
+    const laneCols = await query(
+      `SELECT COLUMN_NAME AS column_name FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'company_feishu_subscription' AND COLUMN_NAME = 'delivery_lane'`,
+      [CONFIG.mysql.database]
+    )
+    assert(laneCols.length === 1, 'delivery_lane column missing after compat migration')
 
     const appConfigId = await insertAppConfig({
       appId: 'cli_phase2a_test',

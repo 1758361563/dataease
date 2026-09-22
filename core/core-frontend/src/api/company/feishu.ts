@@ -57,6 +57,8 @@ export interface FeishuSubscription {
   chartName?: string
   status: string
   scheduleJson?: string
+  freshnessJson?: string | null
+  deliveryLane?: string | null
   titleTemplate?: string
   bodyTemplate?: string
   includeDetailLink?: boolean

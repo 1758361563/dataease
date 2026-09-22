@@ -51,6 +51,58 @@ export function isRecipientVerified(status?: string): boolean {
   return status === 'VERIFIED'
 }
 
+export const DATA_UPDATE_UNCHECKED = '数据更新状态未经校验'
+
+export function parseEtlTaskNames(raw?: string | null): string[] {
+  if (raw == null) return []
+  const text = String(raw).trim()
+  if (!text || text === '{}' || text === 'null') return []
+  try {
+    const obj = JSON.parse(text)
+    const names: string[] = []
+    for (const key of ['etlTasks', 'etlNames', 'assetIds', 'taskIds']) {
+      const list = obj?.[key]
+      if (!Array.isArray(list)) continue
+      for (const item of list) {
+        const name = String(item ?? '').trim()
+        if (name) names.push(name)
+      }
+    }
+    for (const key of ['etlName', 'assetId', 'taskId']) {
+      const name = String(obj?.[key] ?? '').trim()
+      if (name) names.push(name)
+    }
+    return [...new Set(names)]
+  } catch {
+    return []
+  }
+}
+
+export function parseBusinessDate(raw?: string | null): string {
+  if (raw == null) return ''
+  const text = String(raw).trim()
+  if (!text || text === '{}' || text === 'null') return ''
+  try {
+    const obj = JSON.parse(text)
+    const date = String(obj?.businessDate || obj?.bizDate || '').trim()
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : ''
+  } catch {
+    return ''
+  }
+}
+
+export function dataUpdateStatusLabel(freshnessJson?: string | null): string {
+  const tasks = parseEtlTaskNames(freshnessJson)
+  if (!tasks.length) return DATA_UPDATE_UNCHECKED
+  const businessDate = parseBusinessDate(freshnessJson)
+  if (!businessDate) return `已关联 ${tasks.join('、')}；未约定业务日，不会自动发送`
+  return `已关联 ${tasks.join('、')}；需覆盖 ${businessDate}，失败或未覆盖则不发送旧图`
+}
+
+export function deliveryLaneLabel(lane?: string | null): string {
+  return String(lane || '').toUpperCase() === 'PROD' ? '正式' : '测试'
+}
+
 export function subscriptionStatusLabel(status?: string): string {
   if (status === 'ENABLED') return '启用'
   if (status === 'DISABLED') return '停用'

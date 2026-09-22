@@ -2,7 +2,8 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { CONFIG, SHOT_DIR, ensureDirs } from './config.mjs'
-import { withPage } from './session.mjs'
+import { recordServiceEvent } from './service-log.mjs'
+import { invalidateSession, withPage } from './session.mjs'
 
 function normalizeFilters(filters) {
   if (!filters) return []
@@ -325,7 +326,26 @@ async function inspectClip(page, chartId) {
   }, chartId)
 }
 
+function isAuthFailure(err) {
+  const msg = String(err?.message || '')
+  return err?.code === 'SCREENSHOT_AUTH' || /screenshot session|de_v2_user\.token|\/login/i.test(msg)
+}
+
 export async function captureCard(input) {
+  try {
+    return await captureCardOnce(input)
+  } catch (err) {
+    if (!input?._authRetried && isAuthFailure(err)) {
+      recordServiceEvent({ area: 'screenshot', message: `session expired; re-login once: ${err.message}` })
+      await invalidateSession()
+      return captureCardOnce({ ...input, _authRetried: true })
+    }
+    recordServiceEvent({ area: 'screenshot', message: err.message, code: err.code || null })
+    throw err
+  }
+}
+
+async function captureCardOnce(input) {
   ensureDirs()
   const dashboardId = String(input.dashboardId || '')
   const chartId = String(input.chartId || '')
@@ -342,6 +362,11 @@ export async function captureCard(input) {
     try {
       const url = `${CONFIG.baseUrl}/#/panel/index?dvId=${encodeURIComponent(dashboardId)}`
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+      if (/\/login/.test(page.url())) {
+        const expired = new Error('screenshot session is not logged in')
+        expired.code = 'SCREENSHOT_AUTH'
+        throw expired
+      }
       let getData
       try {
         getData = await collector.waitNext(CONFIG.chartWaitMs)

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS company_feishu_subscription (
     schedule_json        TEXT         NULL COMMENT 'manual/daily/weekly/monthly + HH:mm + Asia/Shanghai',
     freshness_json       TEXT         NULL,
     status               VARCHAR(16)  NOT NULL COMMENT 'DRAFT / ENABLED / DISABLED / DELETED',
+    delivery_lane        VARCHAR(16)  NOT NULL DEFAULT 'TEST' COMMENT 'TEST never live-sends. PROD may live-send only when service dry-run is off.',
     created_at           BIGINT       NOT NULL,
     created_by           BIGINT       NOT NULL,
     updated_at           BIGINT       NOT NULL,

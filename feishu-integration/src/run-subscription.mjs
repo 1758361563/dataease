@@ -2,8 +2,11 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { CONFIG, ROOT_DIR, TMP_DIR } from './config.mjs'
+import { isConfirmedDelivery, subscriptionLane } from './delivery-lane.mjs'
 import { desiredExecutionMode, normalizeExecutionMode } from './execution-mode.mjs'
-import { freshnessDecision, parseSchedule } from './schedule.mjs'
+import { etlHoldSummary, freshnessDecision } from './etl-status.mjs'
+import { parseSchedule } from './schedule.mjs'
+import { recordServiceEvent } from './service-log.mjs'
 import { closePool } from './db.mjs'
 import { getTenantAccessToken, sendImage, uploadImage } from './feishu.mjs'
 import {
@@ -228,7 +231,8 @@ export async function startManualRun(opts) {
   })
 }
 
-async function completeDryRun(run, recipients) {
+async function completeDryRun(run, recipients, note) {
+  const summary = note ? `dry-run: send skipped; ${note}` : 'dry-run: send skipped'
   await updateDeliveryRun(run.id, {
     status: 'RUNNING',
     executionMode: 'DRY_RUN',
@@ -240,6 +244,7 @@ async function completeDryRun(run, recipients) {
   })
   const pairs = await ensureTargets(run, recipients)
   for (const { target } of pairs) {
+    if (isConfirmedDelivery(target, 'DRY_RUN')) continue
     await updateDeliveryTarget(target.id, {
       status: 'SUCCEEDED',
       feishuMessageId: null,
@@ -248,7 +253,7 @@ async function completeDryRun(run, recipients) {
   }
   await updateDeliveryRun(run.id, {
     status: 'SUCCEEDED',
-    errorSummary: 'dry-run: send skipped',
+    errorSummary: summary.slice(0, 500),
     finishedAt: Date.now()
   })
   return getDeliveryRunById(run.id)
@@ -322,8 +327,15 @@ export async function executeSubscription(opts) {
   }))
 
   const existingTargets = await listDeliveryTargets(run.id)
+  const lane = subscriptionLane(sub)
   const storedMode = normalizeExecutionMode(run.execution_mode)
-  const desired = desiredExecutionMode({ dryRun: options.dryRun === true, configDryRun: CONFIG.dryRun })
+  let desired = desiredExecutionMode({ dryRun: options.dryRun === true, configDryRun: CONFIG.dryRun })
+  if (desired === 'LIVE' && lane !== 'PROD') {
+    desired = 'DRY_RUN'
+    report.liveRefused = 'test subscription cannot live-send'
+  } else if (options.liveRefused) {
+    report.liveRefused = 'test subscription cannot live-send'
+  }
   const executionMode =
     storedMode === 'DRY_RUN' || storedMode === 'LIVE'
       ? storedMode
@@ -331,6 +343,7 @@ export async function executeSubscription(opts) {
   run.execution_mode = executionMode
   const dryRun = executionMode === 'DRY_RUN'
   report.executionMode = executionMode
+  report.deliveryLane = lane
   if (storedMode === 'DRY_RUN' && desired === 'LIVE') {
     report.modeLocked = 'dry-run record cannot be converted to live send'
   }
@@ -339,7 +352,7 @@ export async function executeSubscription(opts) {
     executionMode === 'LIVE' &&
     run.status === 'SUCCEEDED' &&
     existingTargets.length > 0 &&
-    existingTargets.every(row => row.status === 'SUCCEEDED' && row.feishu_message_id)
+    existingTargets.every(row => isConfirmedDelivery(row, 'LIVE'))
   const dryComplete = executionMode === 'DRY_RUN' && run.status === 'SUCCEEDED'
   if (!created && (liveComplete || dryComplete)) {
     report.skipped = true
@@ -352,23 +365,44 @@ export async function executeSubscription(opts) {
     return report
   }
 
+  if (executionMode === 'LIVE' && lane !== 'PROD') {
+    await updateDeliveryRun(run.id, {
+      status: 'SKIPPED',
+      errorSummary: 'test subscription refused live send',
+      finishedAt: Date.now()
+    })
+    report.skipped = true
+    report.reason = 'test subscription refused live send'
+    report.finishedAt = stamp()
+    return report
+  }
+
+  let freshnessNote = null
   if ((options.triggerType || run.trigger_type) === 'SCHEDULED') {
-    const freshness = freshnessDecision(sub)
+    const freshness = await freshnessDecision(sub, { readRuns: options.readRuns })
     report.steps.freshness = {
-      result: freshness.blocked ? 'BLOCKED' : 'NOT_CHECKED',
-      reason: freshness.reason
+      result: freshness.blocked ? 'BLOCKED' : freshness.checked ? 'PASS' : 'NOT_CHECKED',
+      reason: freshness.reason,
+      label: freshness.label,
+      lastSuccessAt: freshness.lastSuccessAt || null
     }
     if (freshness.blocked) {
       await updateDeliveryRun(run.id, {
         status: 'SKIPPED',
-        errorSummary: freshness.reason,
+        errorSummary: etlHoldSummary(freshness.reason),
         finishedAt: Date.now()
+      })
+      recordServiceEvent({
+        area: 'etl-status',
+        runId: run.id,
+        message: freshness.reason
       })
       report.skipped = true
       report.reason = freshness.reason
       report.finishedAt = stamp()
       return report
     }
+    if (!freshness.checked) freshnessNote = freshness.label
   }
 
   await updateDeliveryRun(run.id, {
@@ -378,7 +412,8 @@ export async function executeSubscription(opts) {
 
   try {
     if (dryRun) {
-      const dry = await completeDryRun(run, recipients)
+      const note = [report.liveRefused, freshnessNote].filter(Boolean).join('; ')
+      const dry = await completeDryRun(run, recipients, note || null)
       const targets = await listDeliveryTargets(run.id)
       report.steps.screenshot = { result: 'SKIPPED', reason: 'dry-run' }
       report.steps.upload = { result: 'SKIPPED', reason: 'dry-run' }
@@ -510,7 +545,7 @@ export async function executeSubscription(opts) {
     const pairs = await ensureTargets(run, recipients)
     const sendResults = []
     for (const { target, recipient } of pairs) {
-      if (target.status === 'SUCCEEDED' && target.feishu_message_id) {
+      if (isConfirmedDelivery(target, 'LIVE')) {
         sendResults.push({
           recipientId: String(recipient.id),
           type: recipient.recipient_type,
@@ -595,12 +630,16 @@ export async function executeSubscription(opts) {
     report.finishedAt = stamp()
     return report
   } catch (err) {
+    const summary = clipError(err)
+    recordServiceEvent({ area: 'delivery', runId: run.id, message: summary, code: err.code || null })
     await updateDeliveryRun(run.id, {
       status: 'FAILED',
-      errorSummary: clipError(err),
+      errorSummary: summary,
       finishedAt: Date.now()
-    }).catch(() => {})
-    report.error = clipError(err)
+    }).catch(dbErr => {
+      recordServiceEvent({ area: 'database', runId: run.id, message: dbErr.message })
+    })
+    report.error = summary
     report.summary = summarizeRun(await getDeliveryRunById(run.id), await listDeliveryTargets(run.id))
     report.finishedAt = stamp()
     throw Object.assign(err, { report })

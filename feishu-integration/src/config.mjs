@@ -26,6 +26,10 @@ function loadDotEnv() {
 
 loadDotEnv()
 
+export const LOG_DIR = process.env.FEISHU_LOG_DIR
+  ? path.resolve(process.env.FEISHU_LOG_DIR)
+  : path.join(ROOT_DIR, 'log')
+
 export const CONFIG = {
   baseUrl: (process.env.DE_BASE_URL || 'http://localhost:8080').replace(/\/$/, ''),
   user: process.env.DE_SCREENSHOT_USER || process.env.DE_P0_USER || 'admin',
