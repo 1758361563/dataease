@@ -1,7 +1,7 @@
 /**
  * Minimal read of formal ETL run results for subscription send gating.
  *
- * Source of truth when a subscription names tasks: table `etl_run_log`
+ * Source of truth when a subscription names tasks: `qiwei_new_bi.etl_run_log`
  * (same columns as etl_migration/scripts/etl_run_log.sql). The ETL runner
  * writes it. This service only reads. It never inserts rows, so a missing
  * table or missing success cannot be turned into a fake update.
@@ -194,9 +194,11 @@ export function evaluateFreshness(binding, snapshot) {
 }
 
 function tableName() {
-  const raw = String(process.env.ETL_RUN_LOG_TABLE || 'etl_run_log').trim()
-  if (!/^[A-Za-z0-9_]+$/.test(raw)) return 'etl_run_log'
-  return raw
+  const raw = String(process.env.ETL_RUN_LOG_TABLE || 'qiwei_new_bi.etl_run_log').trim()
+  // 飞书默认连 dataease 库。正式记录在 qiwei_new_bi.etl_run_log，
+  // 用库名.表名读取，避免只看到本库里另一张同名表。
+  if (/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)?$/.test(raw)) return raw
+  return 'etl_run_log'
 }
 
 export function isMissingRunLog(err) {

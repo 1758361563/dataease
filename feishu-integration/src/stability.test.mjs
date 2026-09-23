@@ -14,6 +14,7 @@ import {
   isEtlHoldSummary,
   isMissingRunLog,
   parseFreshnessBinding,
+  readEtlRunLog,
   UNCHECKED_LABEL
 } from './etl-status.mjs'
 import { redactSecrets } from './service-log.mjs'
@@ -262,6 +263,35 @@ describe('ETL status is read, never invented', () => {
     )
     assert.equal(statusOnly.blocked, true)
     assert.match(statusOnly.reason, /businessDate/)
+  })
+
+  it('reads a schema-qualified run log and rejects unsafe table names', async () => {
+    const previous = process.env.ETL_RUN_LOG_TABLE
+    const seen = []
+    const query = async (sql) => {
+      seen.push(sql)
+      return []
+    }
+    try {
+      process.env.ETL_RUN_LOG_TABLE = 'qiwei_new_bi.etl_run_log'
+      await readEtlRunLog(['销售订单数据'], query)
+      process.env.ETL_RUN_LOG_TABLE = 'qiwei_new_bi.etl_run_log; DROP TABLE x'
+      await readEtlRunLog(['销售订单数据'], query)
+    } finally {
+      if (previous == null) delete process.env.ETL_RUN_LOG_TABLE
+      else process.env.ETL_RUN_LOG_TABLE = previous
+    }
+    assert.match(seen[0], /FROM qiwei_new_bi\.etl_run_log/)
+    assert.match(seen[1], /FROM etl_run_log\b/)
+    assert.equal(seen[1].includes('DROP'), false)
+    delete process.env.ETL_RUN_LOG_TABLE
+    try {
+      await readEtlRunLog(['销售订单数据'], query)
+      assert.match(seen[2], /FROM qiwei_new_bi\.etl_run_log/)
+    } finally {
+      if (previous == null) delete process.env.ETL_RUN_LOG_TABLE
+      else process.env.ETL_RUN_LOG_TABLE = previous
+    }
   })
 
   it('does not treat a database outage as an empty ETL log', () => {
