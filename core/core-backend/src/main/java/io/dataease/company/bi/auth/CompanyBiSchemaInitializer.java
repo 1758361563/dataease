@@ -39,7 +39,8 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             "db/company/company_feishu_subscription.sql",
             "db/company/company_feishu_subscription_recipient.sql",
             "db/company/company_feishu_delivery_run.sql",
-            "db/company/company_feishu_delivery_target.sql"
+            "db/company/company_feishu_delivery_target.sql",
+            "db/company/company_feishu_source.sql"
     };
 
     private final DataSource dataSource;

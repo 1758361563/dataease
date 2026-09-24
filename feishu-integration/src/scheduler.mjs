@@ -2,6 +2,8 @@ import { CONFIG } from './config.mjs'
 import { planScheduledSend, resolveSchedulerDryRun, subscriptionLane } from './delivery-lane.mjs'
 import { etlHoldSummary, freshnessDecision, isEtlHoldSummary } from './etl-status.mjs'
 import { currentDueSlot, parseSchedule } from './schedule.mjs'
+import { listEnabledSheetSources } from './sheet-source.mjs'
+import { syncConfiguredSource } from './sheet-sync.mjs'
 import { recordServiceEvent } from './service-log.mjs'
 import {
   claimDeliveryRun,
@@ -151,9 +153,32 @@ export async function schedulerTick(opts = {}) {
     const dryRun = resolveSchedulerDryRun(opts, CONFIG.dryRun)
     const recovered = await recoverIncompleteRuns({ ...opts, dryRun })
     const retried = await retryPartialFailures({ ...opts, dryRun })
+    const sheets = await fireDueSheetSources({ now: opts.now })
     const fired = await fireDueSubscriptions({ ...opts, dryRun, readRuns: opts.readRuns })
-    return { dryRun, recovered, retried, fired }
+    return { dryRun, recovered, retried, fired, sheets }
   })
+}
+
+export async function fireDueSheetSources({ now = Date.now() } = {}) {
+  const sources = await listEnabledSheetSources()
+  const fired = []
+  for (const source of sources) {
+    const slot = currentDueSlot(now, source.schedule_json)
+    if (!slot) continue
+    try {
+      const report = await syncConfiguredSource(source, slot)
+      fired.push({
+        source: source.source_name,
+        skipped: !!report.skipped,
+        reason: report.reason || null,
+        rows: report.summary ? report.summary.rows : null
+      })
+    } catch (err) {
+      recordServiceEvent({ area: 'sheet-sync', message: err.message })
+      fired.push({ source: source.source_name, error: String(err.message || err).slice(0, 180) })
+    }
+  }
+  return fired
 }
 
 export function startScheduler({ intervalMs } = {}) {

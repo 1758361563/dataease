@@ -42,7 +42,7 @@ async function api(token, path) {
   return json.data
 }
 
-export async function readSpreadsheet(appId, appSecret, sourceUrl, sheetTitle) {
+export async function readSpreadsheet(appId, appSecret, sourceUrl, sheetTitle, sheetId) {
   const parsed = parseSpreadsheetUrl(sourceUrl)
   if (parsed.kind === 'wiki') {
     throw new Error('wiki 链接需要先解析资源；本表已确认为 /sheets/，不应走 wiki')
@@ -55,7 +55,7 @@ export async function readSpreadsheet(appId, appSecret, sourceUrl, sheetTitle) {
     rowCount: sheet.rowCount,
     columnCount: sheet.columnCount
   }))
-  const sheet = sheets.find(item => item.title === sheetTitle)
+  const sheet = sheets.find(item => (sheetId && item.sheetId === sheetId) || item.title === sheetTitle)
   if (!sheet) {
     throw new Error(`工作表不存在: ${sheetTitle}；现有: ${sheets.map(item => item.title).join(', ')}`)
   }

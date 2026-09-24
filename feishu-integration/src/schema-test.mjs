@@ -35,7 +35,8 @@ const SCHEMA_FILES = [
   'company_feishu_subscription.sql',
   'company_feishu_subscription_recipient.sql',
   'company_feishu_delivery_run.sql',
-  'company_feishu_delivery_target.sql'
+  'company_feishu_delivery_target.sql',
+  'company_feishu_source.sql'
 ]
 
 function assert(cond, msg) {

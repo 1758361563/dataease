@@ -2,10 +2,16 @@ import mysql from 'mysql2/promise'
 
 const DB = 'qiwei_new_bi'
 
-export function gridFromValues(values) {
+export function gridFromValues(values, options = {}) {
+  const headerRow = Number(options.headerRow || 1)
+  const dataStartRow = Number(options.dataStartRow || headerRow + 1)
   const matrix = trimUsed(values)
   if (!matrix.length) throw new Error('工作表没有数据')
-  const headers = matrix[0].map(cell => (cell === null || cell === undefined ? '' : String(cell).trim()))
+  const headerIndex = headerRow - 1
+  if (!matrix[headerIndex]) throw new Error('表头行超出工作表范围')
+  let headers = matrix[headerIndex].map(cell => (cell === null || cell === undefined ? '' : String(cell).trim()))
+  const columnEnd = columnRangeEnd(options.columnRange)
+  if (columnEnd) headers = headers.slice(0, columnEnd)
   if (headers.some(name => !name)) throw new Error('表头存在空列，停止同步')
   const seen = new Set()
   for (const name of headers) {
@@ -13,8 +19,8 @@ export function gridFromValues(values) {
     seen.add(name)
   }
   const rows = []
-  for (const raw of matrix.slice(1)) {
-    const padded = headers.map((_, index) => raw[index])
+  for (const raw of matrix.slice(dataStartRow - 1)) {
+    const padded = headers.map((_, index) => (raw || [])[index])
     if (padded.every(isBlank)) continue
     const row = {}
     headers.forEach((name, index) => {
@@ -23,17 +29,34 @@ export function gridFromValues(values) {
     rows.push(row)
   }
   if (!rows.length) throw new Error('没有有效数据行，拒绝用空表切换')
-  const columns = headers.map(name => ({
-    name,
-    sqlType: columnType(name, rows)
-  }))
+  const columns = acceptedColumns(headers, rows, options.acceptedFields)
   return { headers, columns, rows }
+}
+
+function columnRangeEnd(columnRange) {
+  const text = String(columnRange || '').trim()
+  if (!text) return 0
+  const end = text.includes(':') ? text.split(':')[1] : text
+  let n = 0
+  for (const ch of end.trim().toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64)
+  return n
+}
+
+function acceptedColumns(headers, rows, acceptedFields) {
+  if (!acceptedFields || !acceptedFields.length) {
+    return headers.map(name => ({ name, sqlType: columnType(name, rows) }))
+  }
+  const acceptedNames = acceptedFields.map(field => field.name)
+  if (headers.join('|') !== acceptedNames.join('|')) {
+    throw new Error('字段结构与已接受结构不一致，停止同步')
+  }
+  return acceptedFields.map(field => ({ name: field.name, sqlType: field.sqlType }))
 }
 
 export async function syncSnapshot(conn, spec) {
   const plannedAt = spec.plannedAt || nowText()
   const startedAt = nowText()
-  const runId = await beginRun(conn, {
+  const runId = spec.runId || await beginRun(conn, {
     source: spec.source,
     spreadsheet: spec.spreadsheetToken,
     sheet: spec.sheetTitle,
@@ -48,6 +71,7 @@ export async function syncSnapshot(conn, spec) {
     if (formalExists) {
       const current = await formalColumns(conn, spec.targetTable)
       assertSameSchema(current, spec.columns)
+      await conn.query(`DROP TABLE IF EXISTS ${qi(DB)}.${qi(previous)}`)
     }
     await conn.query(`DROP TABLE IF EXISTS ${qi(DB)}.${qi(staging)}`)
     await conn.query(
@@ -64,7 +88,6 @@ export async function syncSnapshot(conn, spec) {
       throw new Error(spec.failBeforeSwap)
     }
     if (formalExists) {
-      await conn.query(`DROP TABLE IF EXISTS ${qi(DB)}.${qi(previous)}`)
       await conn.query(
         `RENAME TABLE ${qi(DB)}.${qi(spec.targetTable)} TO ${qi(DB)}.${qi(previous)}, ${qi(DB)}.${qi(staging)} TO ${qi(DB)}.${qi(spec.targetTable)}`
       )
@@ -237,7 +260,36 @@ async function insertRows(conn, table, columns, rows) {
   }
 }
 
-async function beginRun(conn, run) {
+export async function claimSheetSlot(conn, run) {
+  await ensureRunTable(conn)
+  const [existing] = await conn.execute(
+    `SELECT id, status FROM ${qi(DB)}.\`feishu_sheet_run\` WHERE source = ? AND planned_at = ? ORDER BY id DESC LIMIT 1`,
+    [run.source, run.plannedAt]
+  )
+  if (existing.length) {
+    const status = existing[0].status
+    if (status === 'success' || status === 'failed') return { skip: true, runId: existing[0].id, status }
+    return { skip: false, runId: existing[0].id, status }
+  }
+  try {
+    const runId = await beginRun(conn, run)
+    return { skip: false, runId, status: 'running' }
+  } catch (error) {
+    if (error && (error.code === 'ER_DUP_ENTRY' || error.errno === 1062)) {
+      const [raced] = await conn.execute(
+        `SELECT id, status FROM ${qi(DB)}.\`feishu_sheet_run\` WHERE source = ? AND planned_at = ? ORDER BY id DESC LIMIT 1`,
+        [run.source, run.plannedAt]
+      )
+      if (raced.length && (raced[0].status === 'success' || raced[0].status === 'failed')) {
+        return { skip: true, runId: raced[0].id, status: raced[0].status }
+      }
+      if (raced.length) return { skip: false, runId: raced[0].id, status: raced[0].status }
+    }
+    throw error
+  }
+}
+
+async function ensureRunTable(conn) {
   await conn.query(`
     CREATE TABLE IF NOT EXISTS ${qi(DB)}.\`feishu_sheet_run\` (
       id BIGINT NOT NULL AUTO_INCREMENT,
@@ -253,9 +305,22 @@ async function beginRun(conn, run) {
       target_table VARCHAR(128) NOT NULL,
       error_summary VARCHAR(512) NULL,
       latest_success DATETIME NULL,
-      PRIMARY KEY (id)
+      PRIMARY KEY (id),
+      UNIQUE KEY uk_sheet_slot (source, planned_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
+  const [keys] = await conn.query(
+    `SELECT 1 AS ok FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'feishu_sheet_run' AND INDEX_NAME = 'uk_sheet_slot' LIMIT 1`,
+    [DB]
+  )
+  if (!keys.length) {
+    await conn.query(`ALTER TABLE ${qi(DB)}.\`feishu_sheet_run\` ADD UNIQUE KEY uk_sheet_slot (source, planned_at)`)
+  }
+}
+
+async function beginRun(conn, run) {
+  await ensureRunTable(conn)
   const [result] = await conn.execute(
     `INSERT INTO ${qi(DB)}.\`feishu_sheet_run\`
       (source, spreadsheet, sheet, planned_at, started_at, status, target_table)

@@ -3,6 +3,7 @@ import { closeBrowser } from './session.mjs'
 import { startScheduler } from './scheduler.mjs'
 import { recordServiceEvent } from './service-log.mjs'
 import { ensureDeliveryLaneSchema, ensureExecutionModeSchema, ensureIdentityStatusSchema } from './store.mjs'
+import { ensure798Source } from './sheet-source.mjs'
 import { CONFIG } from './config.mjs'
 
 let server
@@ -11,6 +12,7 @@ try {
   await ensureExecutionModeSchema()
   await ensureIdentityStatusSchema()
   await ensureDeliveryLaneSchema()
+  await ensure798Source()
   server = await startServer()
   timer = startScheduler()
   console.log(
