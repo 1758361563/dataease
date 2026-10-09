@@ -68,6 +68,17 @@ function startTunnel() {
   })
 }
 
+export async function closeQiwei() {
+  if (conn) {
+    await conn.end().catch(() => {})
+    conn = null
+  }
+  if (tunnel && tunnel.exitCode === null && !tunnel.killed) {
+    tunnel.kill()
+  }
+  tunnel = null
+}
+
 export async function getQiwei() {
   await startTunnel()
   if (conn) return conn
@@ -120,6 +131,7 @@ export async function syncConfiguredSource(source, slotMs) {
   const grid = gridFromValues(book.values, {
     headerRow: source.header_row,
     dataStartRow: source.data_start_row,
+    dataEndRow: source.data_end_row ? Number(source.data_end_row) : undefined,
     columnRange: source.column_range,
     acceptedFields
   })

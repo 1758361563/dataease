@@ -31,6 +31,7 @@ import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { comInfo } from './com-info'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import StyleInject from './StyleInject.vue'
+import { getKeyList, reRenderAll } from '@/custom-component/v-query/QueryUtils'
 import { isDashboard } from '@/utils/canvasUtils'
 import {
   sizeYToFitQueryContent,

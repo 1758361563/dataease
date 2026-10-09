@@ -14,7 +14,6 @@ const route = useRoute()
 const systemMenu = computed(() => route.path.includes('system'))
 const companyAdminMenu = computed(() => route.path.includes('company-admin'))
 const settingMenu = computed(() => route.path.includes('sys-setting'))
-const marketMenu = computed(() => route.path.includes('template-market'))
 const toolboxMenu = computed(() => route.path.includes('toolbox'))
 const msgFillMenu = computed(() => route.path.includes('msg-fill'))
 const showSider = computed(
@@ -35,16 +34,8 @@ const { t } = useI18n()
 <template>
   <div class="common-layout">
     <HeaderSystem
-      v-if="settingMenu || marketMenu || toolboxMenu || msgFillMenu"
-      :title="
-        toolboxMenu
-          ? t('toolbox.name')
-          : marketMenu
-          ? t('toolbox.template_center')
-          : msgFillMenu
-          ? t('v_query.msg_center')
-          : ''
-      "
+      v-if="settingMenu || toolboxMenu || msgFillMenu"
+      :title="toolboxMenu ? t('toolbox.name') : msgFillMenu ? t('v_query.msg_center') : ''"
     />
     <Header v-else></Header>
     <el-container class="layout-container">

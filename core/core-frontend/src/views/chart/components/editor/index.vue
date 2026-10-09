@@ -37,6 +37,11 @@ import QuotaItem from '@/views/chart/components/editor/drag-item/QuotaItem.vue'
 import DragPlaceholder from '@/views/chart/components/editor/drag-item/DragPlaceholder.vue'
 import FilterTree from './filter/FilterTree.vue'
 import ChartStyle from '@/views/chart/components/editor/editor-style/ChartStyle.vue'
+import TooltipFields from './TooltipFields.vue'
+import SortAndLimit from './SortAndLimit.vue'
+import { hasDisplayLimitPanel } from '../js/chartDisplayLimit'
+import { pivotAllowsEmptyRowDimension } from '@/views/chart/components/js/panel/charts/table/pivotMeasureRows'
+import { supportsTooltipShelf, syncTooltipAxes } from '@/views/chart/components/js/tooltipContent'
 import VQueryChartStyle from '@/views/chart/components/editor/editor-style/VQueryChartStyle.vue'
 import Senior from '@/views/chart/components/editor/editor-senior/Senior.vue'
 import QuotaFilterEditor from '@/views/chart/components/editor/filter/QuotaFilterEditor.vue'
@@ -270,6 +275,11 @@ const filedList = computed(() => {
 provide('filedList', () => filedList.value)
 provide('quota', () => state.quota)
 watch(
+  () => view.value.id,
+  () => syncTooltipAxes(view.value),
+  { immediate: true }
+)
+watch(
   [() => view.value['tableId']],
   () => {
     nextTick(() => {
@@ -333,6 +343,11 @@ const chartViewInstance = computed(() => {
   return chartViewManager.getChartView(view.value.render, view.value.type)
 })
 const showAxis = (axis: AxisType) => chartViewInstance.value?.axis?.includes(axis)
+const xAxisShowsRequired = computed(
+  () =>
+    !pivotAllowsEmptyRowDimension(view.value) &&
+    !chartViewInstance.value?.axisConfig?.xAxis?.allowEmpty
+)
 const areaSelect = ref()
 const expandKeys = ref([])
 watch(
@@ -525,6 +540,30 @@ const quotaItemRemove = item => {
 const isFilterActive = computed(() => {
   return !!view.value.customFilter?.items?.length
 })
+const filterSummary = computed(() => {
+  const leaves = []
+  const collect = items => {
+    ;(items || []).forEach(item => {
+      if (item?.subTree) collect(item.subTree.items)
+      else leaves.push(item)
+    })
+  }
+  collect(view.value.customFilter?.items)
+  if (!leaves.length) return t('chart.filter')
+  const item = leaves[0]
+  const fieldName = allFields.value.find(field => `${field.id}` === `${item.fieldId}`)?.name || ''
+  const term = item.filterType === 'enum' && !item.term ? 'in' : item.term
+  const operator = term ? t(`chart.filter_${term.replace(' ', '_')}`) : ''
+  const values = item.filterType === 'enum' ? item.enumValue || [] : [item.value].filter(Boolean)
+  const valueSummary =
+    values.length > 1
+      ? `${values[0]} ${t('chart.enum_value_summary', { count: values.length })}`
+      : values[0] || ''
+  const first = [fieldName, operator, valueSummary].filter(Boolean).join(' ')
+  return leaves.length > 1
+    ? `${first} · ${t('chart.filter_condition_count', { count: leaves.length })}`
+    : first
+})
 const isFilterInvalid = computed(() => {
   if (!view.value.customFilter?.items?.length) {
     return false
@@ -566,6 +605,8 @@ const saveCustomSort = () => {
     }
   })
   closeCustomSort()
+  recordSnapshotInfo('calcData')
+  calcData(view.value, true)
 }
 const onCustomSort = item => {
   recordSnapshotInfo('render')
@@ -951,6 +992,7 @@ const onAxisChange = (e, axis: AxisType) => {
 }
 
 const calcData = (view, resetDrill = false, updateQuery = '') => {
+  syncTooltipAxes(view)
   if (
     view.refreshTime === '' ||
     parseFloat(view.refreshTime).toString() === 'NaN' ||
@@ -1326,6 +1368,18 @@ const onTablePageSizeChange = val => {
 const onExtTooltipChange = val => {
   view.value.extTooltip = val
 }
+const onDisplayLimitChange = patch => {
+  recordSnapshotInfo('calcData')
+  Object.assign(view.value, patch)
+  calcData(view.value, true)
+}
+const onTooltipFieldsChange = ({ tooltip, extTooltip, requestData }) => {
+  recordSnapshotInfo(requestData ? 'calcData' : 'render')
+  view.value.extTooltip = extTooltip
+  view.value.customAttr.tooltip = tooltip
+  if (requestData) calcData(view.value)
+  else renderChart(view.value)
+}
 const onChangeQuadrantForm = val => {
   view.value.customAttr.quadrant = val
   renderChart(view.value)
@@ -1656,7 +1710,8 @@ const closeSortPriority = () => {
 }
 const saveSortPriority = () => {
   view.value.sortPriority = state.sortPriority as ChartViewField[]
-  recordSnapshotInfo('render')
+  recordSnapshotInfo('calcData')
+  calcData(view.value, true)
   closeSortPriority()
 }
 const onPriorityChange = val => {
@@ -1673,7 +1728,7 @@ const closeValueFormatter = () => {
 const saveValueFormatter = () => {
   const ele = state.valueFormatterItem.formatterCfg.decimalCount
   if (
-    ele === undefined ||
+    ele == null ||
     ele.toString().indexOf('.') > -1 ||
     parseInt(ele).toString() === 'NaN' ||
     parseInt(ele) < 0 ||
@@ -1694,6 +1749,7 @@ const saveValueFormatter = () => {
       state.valueFormatterItem.formatterCfg
   }
   closeValueFormatter()
+  if (supportsTooltipShelf(view.value.type)) renderChart(view.value)
 }
 
 const elRowStyle = computed(() => {
@@ -2380,10 +2436,7 @@ const chartStyleScroll = (val: any) => {
                             <div class="form-draggable-title">
                               <span>
                                 {{ chartViewInstance.axisConfig.xAxis.name }}
-                                <i
-                                  v-if="!chartViewInstance.axisConfig.xAxis?.allowEmpty"
-                                  class="required"
-                                ></i>
+                                <i v-if="xAxisShowsRequired" class="required"></i>
                               </span>
                               <el-tooltip
                                 :effect="toolTip"
@@ -2434,6 +2487,7 @@ const chartStyleScroll = (val: any) => {
                                     @valueFormatter="valueFormatter"
                                     @onToggleHide="onToggleHide"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                 </template>
                               </draggable>
@@ -2497,6 +2551,7 @@ const chartStyleScroll = (val: any) => {
                                   @onNameEdit="showRename"
                                   @onCustomSort="onExtCustomSort"
                                   @editSortPriority="editSortPriority"
+                                  @onSortChange="calcData(view, true)"
                                 />
                               </template>
                             </draggable>
@@ -2562,6 +2617,7 @@ const chartStyleScroll = (val: any) => {
                                   @onCustomSort="onCustomFlowMapStartNameSort"
                                   @valueFormatter="valueFormatter"
                                   @editSortPriority="editSortPriority"
+                                  @onSortChange="calcData(view, true)"
                                 />
                               </template>
                             </draggable>
@@ -2627,6 +2683,7 @@ const chartStyleScroll = (val: any) => {
                                   @onCustomSort="onCustomFlowMapEndNameSort"
                                   @valueFormatter="valueFormatter"
                                   @editSortPriority="editSortPriority"
+                                  @onSortChange="calcData(view, true)"
                                 />
                               </template>
                             </draggable>
@@ -2690,6 +2747,7 @@ const chartStyleScroll = (val: any) => {
                                   @onNameEdit="showRename"
                                   @onCustomSort="onStackCustomSort"
                                   @editSortPriority="editSortPriority"
+                                  @onSortChange="calcData(view, true)"
                                 />
                               </template>
                             </draggable>
@@ -2755,6 +2813,7 @@ const chartStyleScroll = (val: any) => {
                                   @onCustomSort="onCustomExtColorSort"
                                   @valueFormatter="valueFormatter"
                                   @editSortPriority="editSortPriority"
+                                  @onSortChange="calcData(view, true)"
                                 />
                               </template>
                             </draggable>
@@ -2820,6 +2879,7 @@ const chartStyleScroll = (val: any) => {
                                     @onNameEdit="showRename"
                                     @onCustomSort="onExtCustomSort"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                   <quota-item
                                     v-else-if="element.groupType === 'q'"
@@ -2837,6 +2897,7 @@ const chartStyleScroll = (val: any) => {
                                     @editItemCompare="showQuotaEditCompare"
                                     @valueFormatter="valueFormatter"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                 </template>
                               </draggable>
@@ -2925,6 +2986,7 @@ const chartStyleScroll = (val: any) => {
                                     @valueFormatter="valueFormatter"
                                     @onToggleHide="onToggleHide"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                 </template>
                               </draggable>
@@ -2991,6 +3053,7 @@ const chartStyleScroll = (val: any) => {
                                     @onNameEdit="showRename"
                                     @onCustomSort="onExtCustomRightSort"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                 </template>
                               </draggable>
@@ -3056,6 +3119,7 @@ const chartStyleScroll = (val: any) => {
                                     @editItemCompare="showQuotaEditCompare"
                                     @valueFormatter="valueFormatter"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                 </template>
                               </draggable>
@@ -3122,6 +3186,7 @@ const chartStyleScroll = (val: any) => {
                                     @onNameEdit="showRename"
                                     @onCustomSort="onExtCustomSort"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                   <quota-item
                                     v-else-if="element.groupType === 'q'"
@@ -3139,6 +3204,7 @@ const chartStyleScroll = (val: any) => {
                                     @editItemCompare="showQuotaEditCompare"
                                     @valueFormatter="valueFormatter"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                 </template>
                               </draggable>
@@ -3203,6 +3269,7 @@ const chartStyleScroll = (val: any) => {
                                     @onNameEdit="showRename"
                                     @onCustomSort="onExtCustomSort"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                   <quota-item
                                     v-else-if="element.groupType === 'q'"
@@ -3220,6 +3287,7 @@ const chartStyleScroll = (val: any) => {
                                     @editItemCompare="showQuotaEditCompare"
                                     @valueFormatter="valueFormatter"
                                     @editSortPriority="editSortPriority"
+                                    @onSortChange="calcData(view, true)"
                                   />
                                 </template>
                               </draggable>
@@ -3306,6 +3374,7 @@ const chartStyleScroll = (val: any) => {
                                   @editItemCompare="showQuotaEditCompare"
                                   @valueFormatter="valueFormatter"
                                   @editSortPriority="editSortPriority"
+                                  @onSortChange="calcData(view, true)"
                                 />
                               </template>
                             </draggable>
@@ -3313,6 +3382,24 @@ const chartStyleScroll = (val: any) => {
                           </div>
                         </el-row>
 
+                        <el-row v-if="supportsTooltipShelf(view.type)" class="padding-lr drag-data">
+                          <tooltip-fields
+                            :chart="view"
+                            :themes="props.themes"
+                            :fields="[...state.dimension, ...state.quota]"
+                            :dragging-fields="
+                              activeDimension.length ? activeDimension : activeQuota
+                            "
+                            @change="onTooltipFieldsChange"
+                          />
+                        </el-row>
+                        <el-row v-if="hasDisplayLimitPanel(view)" class="padding-lr drag-data">
+                          <sort-and-limit
+                            :chart="view"
+                            :themes="props.themes"
+                            @change="onDisplayLimitChange"
+                          />
+                        </el-row>
                         <!--drill-->
                         <el-row v-if="showAxis('drill')" class="padding-lr drag-data">
                           <div class="form-draggable-title">
@@ -3380,6 +3467,7 @@ const chartStyleScroll = (val: any) => {
                                   @onNameEdit="showRename"
                                   @onCustomSort="onDrillCustomSort"
                                   @editSortPriority="editSortPriority"
+                                  @onSortChange="calcData(view, true)"
                                 />
                               </template>
                             </draggable>
@@ -3427,7 +3515,9 @@ const chartStyleScroll = (val: any) => {
                               /></Icon>
                             </el-icon>
 
-                            <span>{{ $t('chart.filter') }}</span>
+                            <span class="filter-summary" :title="filterSummary">{{
+                              filterSummary
+                            }}</span>
                           </div>
                           <el-button
                             v-else
@@ -3515,7 +3605,7 @@ const chartStyleScroll = (val: any) => {
                         </el-row>
                       </el-row>
                       <el-row class="result-style" :class="'result-style-' + themes">
-                        <div class="result-style-input">
+                        <div v-if="!hasDisplayLimitPanel(view)" class="result-style-input">
                           <span v-if="view.type !== 'richTextView'">
                             {{ t('chart.result_count') }}
                           </span>
@@ -4278,15 +4368,17 @@ const chartStyleScroll = (val: any) => {
     <el-dialog
       v-model="state.showSortPriority"
       :close-on-click-modal="false"
-      width="372px"
+      width="440px"
       class="dialog-css custom_sort_dialog"
       destroy-on-close
     >
       <template #header>
         <span style="font-size: 15px; font-weight: bold; color: #1f2329">
-          {{ t('chart.sort_priority') }}
+          {{ view.type === 'table-pivot' ? '排序范围与优先级' : t('chart.sort_priority') }}
         </span>
-        <span style="color: #1f2329">({{ t('chart.sort_priority_tip') }})</span>
+        <p style="margin: 8px 0 0; font-size: 12px; color: #646a73">
+          从上到下依次排序，前一项相同时再按下一项排序。
+        </p>
       </template>
       <sort-priority-edit :chart="view" @on-priority-change="onPriorityChange" />
       <template #footer>
@@ -4936,6 +5028,14 @@ span {
       cursor: pointer;
       justify-content: center;
       font-size: 12px;
+      padding: 0 8px;
+      min-width: 0;
+
+      .filter-summary {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       &.tree-btn--dark {
         background: rgba(235, 235, 235, 0.05);
         border-color: #5f5f5f;

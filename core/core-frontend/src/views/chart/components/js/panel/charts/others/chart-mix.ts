@@ -1,3 +1,5 @@
+import { getExplicitChartTooltip } from '@/views/chart/components/js/panel/common/common_antv'
+import { visibleTooltipField } from '@/views/chart/components/js/tooltipFieldIdentity'
 import {
   G2PlotChartView,
   G2PlotDrawOptions
@@ -532,6 +534,9 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
   }
 
   protected configTooltip(chart: Chart, options: DualAxesOptions): DualAxesOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const customAttr: DeepPartial<ChartAttr> = parseJson(chart.customAttr)
     const tooltipAttr = customAttr.tooltip
     if (!tooltipAttr.show) {
@@ -540,12 +545,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
         tooltip: false
       }
     }
-    const formatterMap = tooltipAttr.seriesTooltipFormatter
-      ?.filter(i => i.show)
-      .reduce((pre, next) => {
-        pre[next.seriesId ?? next.id] = next
-        return pre
-      }, {}) as Record<string, SeriesFormatter>
+
     const tooltip: DualAxesOptions['tooltip'] = {
       shared: true,
       showTitle: true,
@@ -555,12 +555,12 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
         }
         const head = originalItems[0]
         // 非原始数据
-        if (!head.data.quotaList) {
+        if (!head?.data?.quotaList) {
           return originalItems
         }
         const result = []
         originalItems.forEach(item => {
-          const formatter = getMixTooltipFormatter(formatterMap, item)
+          const formatter = getMixTooltipFormatter(tooltipAttr.seriesTooltipFormatter, item)
           if (!formatter) {
             return
           }
@@ -570,7 +570,7 @@ export class ColumnLineMix extends G2PlotChartView<DualAxesOptions, DualAxes> {
           result.push({ ...item, name, value })
         })
         head.data.dynamicTooltipValue?.forEach(item => {
-          const formatter = formatterMap[item.fieldId]
+          const formatter = visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item)
           if (formatter) {
             const value = valueFormatter(parseFloat(item.value), formatter.formatterCfg)
             const name = isEmpty(formatter.chartShowName) ? formatter.name : formatter.chartShowName

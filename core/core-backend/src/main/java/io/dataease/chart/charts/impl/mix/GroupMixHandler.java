@@ -21,11 +21,11 @@ public class GroupMixHandler extends MixHandler {
         //左轴堆叠子维度,非堆叠不需要
         axisMap.put(ChartAxis.extStack, Collections.emptyList());
         //左轴指标
-        axisMap.put(ChartAxis.yAxis, view.getYAxis());
+        axisMap.put(ChartAxis.yAxis, withTooltipFields(view, view.getYAxis()));
         //右轴分组子维度
         axisMap.put(ChartAxis.extBubble, view.getExtBubble());
         //右轴指标
-        axisMap.put(ChartAxis.yAxisExt, view.getYAxisExt());
+        axisMap.put(ChartAxis.yAxisExt, withTooltipFields(view, view.getYAxisExt()));
         //去除除了x轴以外的排序
         axisMap.replaceAll((k, v) -> ChartAxis.xAxisExt.equals(k) ? v : MixMetricSort.withoutSort(v));
         axisMap.put(ChartAxis.extLabel, view.getExtLabel());

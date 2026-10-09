@@ -169,16 +169,11 @@ public class CustomWhere2Str {
         }
 
         if (StringUtils.equalsIgnoreCase(item.getFilterType(), "enum")) {
-            if (ObjectUtils.isNotEmpty(item.getEnumValue())) {
-                if ((StringUtils.containsIgnoreCase(field.getType(), "NVARCHAR")
-                        || StringUtils.containsIgnoreCase(field.getType(), "NCHAR"))
-                        && !isCross
-                        && StringUtils.equalsIgnoreCase(dsType, DatasourceConfiguration.DatasourceType.sqlServer.getType())) {
-                    res = "(" + whereName + " IN (" + item.getEnumValue().stream().map(CustomWhere2Str::toSqlServerNQuotedValue).collect(Collectors.joining(",")) + "))";
-                } else {
-                    res = "(" + whereName + " IN (" + item.getEnumValue().stream().map(CustomWhere2Str::toQuotedValue).collect(Collectors.joining(",")) + "))";
-                }
-            }
+            boolean sqlServerNationalString = (StringUtils.containsIgnoreCase(field.getType(), "NVARCHAR")
+                    || StringUtils.containsIgnoreCase(field.getType(), "NCHAR"))
+                    && !isCross
+                    && StringUtils.equalsIgnoreCase(dsType, DatasourceConfiguration.DatasourceType.sqlServer.getType());
+            res = buildEnumExpression(whereName, field.getDeType(), item.getTerm(), item.getEnumValue(), sqlServerNationalString);
         } else {
             if (field.getDeType() == 1 && isCross) {
                 // 规定几种日期格式，一一匹配，匹配到就是该格式
@@ -296,6 +291,60 @@ public class CustomWhere2Str {
             res = build.getWhereField() + " " + build.getWhereTermAndValue();
         }
         return res;
+    }
+
+    /**
+     * Builds an enum predicate using the same validated literal and dialect handling as the
+     * existing custom-filter path. A blank term is intentionally treated as IN so persisted
+     * filters from versions that did not store an enum operator keep their original meaning.
+     */
+    static String buildEnumExpression(String whereName, Integer deType, String term,
+                                      List<String> values, boolean sqlServerNationalString) {
+        String normalizedTerm = StringUtils.lowerCase(StringUtils.trimToEmpty(term)).replace('_', ' ');
+        if (StringUtils.isBlank(normalizedTerm)) {
+            normalizedTerm = "in";
+        }
+        if (StringUtils.equalsAny(normalizedTerm, "null", "is null")) {
+            return "(" + whereName + " IS NULL)";
+        }
+        if (StringUtils.equalsAny(normalizedTerm, "not null", "is not null")) {
+            return "(" + whereName + " IS NOT NULL)";
+        }
+        if (!StringUtils.equalsAny(normalizedTerm, "eq", "not eq", "in", "not in")) {
+            return null;
+        }
+
+        List<String> safeValues = Optional.ofNullable(values).orElseGet(Collections::emptyList).stream()
+                .filter(Objects::nonNull)
+                .toList();
+        if (safeValues.isEmpty()) {
+            return null;
+        }
+
+        boolean numeric = Objects.equals(deType, 2) || Objects.equals(deType, 3) || Objects.equals(deType, 4);
+        List<String> sqlValues = safeValues.stream().map(value -> {
+            if (numeric) {
+                return sanitizeNumberLiteral(value);
+            }
+            return sqlServerNationalString ? toSqlServerNQuotedValue(value) : toQuotedValue(value);
+        }).toList();
+
+        boolean exclude = StringUtils.equalsAny(normalizedTerm, "not eq", "not in");
+        boolean singleValueOperator = StringUtils.equalsAny(normalizedTerm, "eq", "not eq");
+        String predicate;
+        if (singleValueOperator && sqlValues.size() == 1) {
+            predicate = whereName + (exclude ? " <> " : " = ") + sqlValues.getFirst();
+        } else {
+            predicate = whereName + (exclude ? " NOT IN (" : " IN (") + String.join(",", sqlValues) + ")";
+        }
+
+        // New exclusion filters remove only the selected values. SQL's three-valued NOT IN / <>
+        // would otherwise also remove NULL rows. Historical enum filters have a blank term and
+        // continue to use the old IN behavior above.
+        if (exclude) {
+            predicate = "(" + predicate + " OR " + whereName + " IS NULL)";
+        }
+        return "(" + predicate + ")";
     }
 
     private static String sanitizeSqlLiteral(String value) {

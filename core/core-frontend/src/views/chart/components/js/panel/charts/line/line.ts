@@ -1,3 +1,5 @@
+import { getExplicitChartTooltip } from '@/views/chart/components/js/panel/common/common_antv'
+import { visibleTooltipField } from '@/views/chart/components/js/tooltipFieldIdentity'
 import {
   G2PlotChartView,
   G2PlotDrawOptions
@@ -268,6 +270,9 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
   }
 
   protected configTooltip(chart: Chart, options: LineOptions): LineOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const customAttr: DeepPartial<ChartAttr> = parseJson(chart.customAttr)
     const tooltipAttr = customAttr.tooltip
     if (!tooltipAttr.show) {
@@ -277,12 +282,7 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
       }
     }
     const xAxisExt = chart.xAxisExt
-    const formatterMap = tooltipAttr.seriesTooltipFormatter
-      ?.filter(i => i.show)
-      .reduce((pre, next) => {
-        pre[next.id] = next
-        return pre
-      }, {}) as Record<string, SeriesFormatter>
+
     const tooltip: LineOptions['tooltip'] = {
       showTitle: true,
       customItems(originalItems) {
@@ -291,14 +291,20 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
         }
         const head = originalItems[0]
         // 非原始数据
-        if (!head.data.quotaList) {
+        if (!head?.data?.quotaList) {
           return originalItems
         }
         const result = []
         originalItems
-          .filter(item => formatterMap[item.data.quotaList[0].id])
+          .filter(item =>
+            visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item.data.quotaList[0])
+          )
           .forEach(item => {
-            const formatter = formatterMap[item.data.quotaList[0].id]
+            const formatter = visibleTooltipField(
+              tooltipAttr.seriesTooltipFormatter,
+              item.data.quotaList[0]
+            )
+            if (!formatter) return
             const value = valueFormatter(parseFloat(item.value as string), formatter.formatterCfg)
             let name = isEmpty(formatter.chartShowName) ? formatter.name : formatter.chartShowName
             if (xAxisExt?.length > 0) {
@@ -306,8 +312,8 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
             }
             result.push({ ...item, name, value })
           })
-        head.data.dynamicTooltipValue?.forEach(item => {
-          const formatter = formatterMap[item.fieldId]
+        head?.data?.dynamicTooltipValue?.forEach(item => {
+          const formatter = visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item)
           if (formatter) {
             const value = valueFormatter(parseFloat(item.value), formatter.formatterCfg)
             const name = isEmpty(formatter.chartShowName) ? formatter.name : formatter.chartShowName

@@ -5,11 +5,21 @@ const modules = import.meta.glob('../views/**/*.vue')
 export const Layout = () => import('@/layout/index.vue')
 const xpackComName = 'components/plugin'
 export const LayoutTransition = () => import('@/layout/components/LayoutTransition.vue')
+const DISABLED_TEMPLATE_ROUTE_KEYS = ['template-market', 'template-setting', 'template-manage']
+
+const isDisabledTemplateRoute = (route: AppCustomRouteRecordRaw): boolean => {
+  const haystack = `${route.path || ''} ${String(route.name || '')} ${route.component || ''}`
+  return DISABLED_TEMPLATE_ROUTE_KEYS.some(key => haystack.includes(key))
+}
+
 // 后端控制路由生成
 export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRecordRaw[] => {
   const res: AppRouteRecordRaw[] = []
 
   for (const router of routes) {
+    if (isDisabledTemplateRoute(router)) {
+      continue
+    }
     let route = { ...router }
 
     if (route.top && route.inLayout) {
@@ -61,17 +71,25 @@ export const generateRoutesFn2 = (routes: AppCustomRouteRecordRaw[]): AppRouteRe
 }
 
 export const formatRoute = (arr: AppCustomRouteRecordRaw[]): AppCustomRouteRecordRaw[] => {
-  return arr.map(ele => {
-    const router = cloneDeep(ele)
-    const { path, children = [] } = router
+  return arr
+    .filter(ele => !isDisabledTemplateRoute(ele))
+    .map(ele => {
+      const router = cloneDeep(ele)
+      const { path, children = [] } = router
 
-    if (children?.length === 1 && router.path !== '/data') {
-      const [route] = children
-      router.path = `${path}/${route.path}`
-      router.children = []
-    }
-    return router
-  })
+      if (children?.length === 1 && router.path !== '/data') {
+        const [route] = children
+        if (isDisabledTemplateRoute(route)) {
+          router.children = []
+        } else {
+          router.path = `${path}/${route.path}`
+          router.children = []
+        }
+      } else if (router.children?.length) {
+        router.children = router.children.filter(child => !isDisabledTemplateRoute(child))
+      }
+      return router
+    })
 }
 
 // 包装一层父级目录

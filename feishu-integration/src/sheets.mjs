@@ -42,6 +42,25 @@ async function api(token, path) {
   return json.data
 }
 
+export async function listSpreadsheetSheets(appId, appSecret, sourceUrl) {
+  const parsed = parseSpreadsheetUrl(sourceUrl)
+  if (parsed.kind === 'wiki') {
+    throw new Error('wiki 链接需要先解析资源；请粘贴 /sheets/ 链接')
+  }
+  const auth = await getTenantAccessToken(appId, appSecret)
+  const meta = await api(auth.token, `/sheets/v2/spreadsheets/${encodeURIComponent(parsed.token)}/metainfo`)
+  return {
+    title: (meta.properties && meta.properties.title) || '',
+    sheetHint: parsed.sheetHint,
+    sheets: (meta.sheets || []).map(sheet => ({
+      sheetId: sheet.sheetId,
+      title: sheet.title,
+      rowCount: sheet.rowCount,
+      columnCount: sheet.columnCount
+    }))
+  }
+}
+
 export async function readSpreadsheet(appId, appSecret, sourceUrl, sheetTitle, sheetId) {
   const parsed = parseSpreadsheetUrl(sourceUrl)
   if (parsed.kind === 'wiki') {

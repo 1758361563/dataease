@@ -106,16 +106,21 @@ public class Quota2SQLObj {
 
     private static SQLObj getYFields(ChartViewFieldDTO y, String originField, String fieldAlias) {
         String fieldName = "";
+        boolean noAggregation = StringUtils.equalsIgnoreCase(y.getSummary(), "none_aggregation");
         if (StringUtils.equalsIgnoreCase(y.getOriginName(), "*")) {
             fieldName = SQLConstants.AGG_COUNT;
         } else if (SQLConstants.DIMENSION_TYPE.contains(y.getDeType())) {
-            if (StringUtils.equalsIgnoreCase(y.getSummary(), "count_distinct")) {
+            if (noAggregation) {
+                fieldName = originField;
+            } else if (StringUtils.equalsIgnoreCase(y.getSummary(), "count_distinct")) {
                 fieldName = String.format(SQLConstants.AGG_FIELD, "COUNT", "DISTINCT " + originField);
             } else {
                 fieldName = String.format(SQLConstants.AGG_FIELD, y.getSummary(), originField);
             }
         } else {
-            if (StringUtils.equalsIgnoreCase(y.getSummary(), "avg") || StringUtils.containsIgnoreCase(y.getSummary(), "pop")) {
+            if (noAggregation) {
+                fieldName = String.format(SQLConstants.CAST, originField, Objects.equals(y.getDeType(), DeTypeConstants.DE_INT) ? SQLConstants.DEFAULT_INT_FORMAT : SQLConstants.DEFAULT_FLOAT_FORMAT);
+            } else if (StringUtils.equalsIgnoreCase(y.getSummary(), "avg") || StringUtils.containsIgnoreCase(y.getSummary(), "pop")) {
                 String cast = String.format(SQLConstants.CAST, originField, Objects.equals(y.getDeType(), DeTypeConstants.DE_INT) ? SQLConstants.DEFAULT_INT_FORMAT : SQLConstants.DEFAULT_FLOAT_FORMAT);
                 String agg = String.format(SQLConstants.AGG_FIELD, y.getSummary(), cast);
                 String cast1 = String.format(SQLConstants.CAST, agg, SQLConstants.DEFAULT_FLOAT_FORMAT);
@@ -136,6 +141,10 @@ public class Quota2SQLObj {
         return SQLObj.builder()
                 .fieldName(fieldName)
                 .fieldAlias(fieldAlias)
+                // An unprocessed measure is selected in its original form and becomes
+                // part of GROUP BY, so it can coexist with aggregated measures.
+                .groupField(noAggregation ? fieldName : null)
+                .groupAlias(noAggregation ? fieldAlias : null)
                 .build();
     }
 

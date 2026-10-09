@@ -109,12 +109,12 @@ public class TablePivotHandler extends GroupChartHandler {
         DatasourceRequest datasourceRequest = new DatasourceRequest();
         fillDatasourceRequest(datasourceRequest, crossDs, dsMap, sqlMap);
         var allFields = (List<ChartViewFieldDTO>) filterResult.getContext().get("allFields");
-        var rowAxis = view.getXAxis();
-        var colAxis = view.getXAxisExt();
+        var rowAxis = view.getXAxis() == null ? Collections.<ChartViewFieldDTO>emptyList() : view.getXAxis();
+        var colAxis = view.getXAxisExt() == null ? Collections.<ChartViewFieldDTO>emptyList() : view.getXAxisExt();
         var dataMap = new HashMap<String, Object>();
-        if (CollectionUtils.isEmpty(rowAxis)) {
-            return dataMap;
-        }
+        // 0 个真实行维度时，依赖行维度前缀的小计不计算。
+        // 按列维度分组的总计、列小计、无维度交叉总计仍继续。$$extra$$ 不是查询维度。
+        boolean hasRowAxis = CollectionUtils.isNotEmpty(rowAxis);
         // 行总计，列维度聚合加上自定义字段
         var row = tableTotal.getRow();
         if (row.isShowGrandTotals()) {
@@ -131,8 +131,8 @@ public class TablePivotHandler extends GroupChartHandler {
                 tmp.put("sql", Base64.getEncoder().encodeToString(querySql.getBytes()));
             }
         }
-        // 行小计，列维度聚合，自定义指标数 * (行维度的数量 - 1)
-        if (row.isShowSubTotals()) {
+        // 行小计依赖真实行维度前缀。0 个行维度时不执行。
+        if (hasRowAxis && row.isShowSubTotals()) {
             var yAxis = getCustomFields(view, row.getCalcSubTotals().getCfg());
             if (!yAxis.isEmpty()) {
                 var tmpData = new ArrayList<Map<String, Object>>();

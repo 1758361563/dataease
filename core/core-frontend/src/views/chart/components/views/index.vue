@@ -44,6 +44,7 @@ import { cloneDeep, debounce } from 'lodash-es'
 import ChartComponentS2 from '@/views/chart/components/views/components/ChartComponentS2.vue'
 import { ChartLibraryType } from '@/views/chart/components/js/panel/types'
 import chartViewManager from '@/views/chart/components/js/panel'
+import { pivotAllowsEmptyRowDimension } from '@/views/chart/components/js/panel/charts/table/pivotMeasureRows'
 import { storeToRefs } from 'pinia'
 import { checkAddHttp, setIdValueTrans } from '@/utils/canvasUtils'
 import { sanitizeHtml } from '@/utils/utils'
@@ -732,8 +733,12 @@ const checkFieldIsAllowEmpty = (allField?) => {
         }
       }
 
-      // 如果没有限制长度，且值为空，标记为空并跳出
+      // 如果没有限制长度，且值为空，标记为空并跳出。
+      // 透视表仅在指标行头 + 平铺时允许数据行为空；列头和树形仍必填。yAxis 不走这条例外。
       if (!value['limit'] && view.value?.[key]?.length === 0) {
+        if (key === 'xAxis' && pivotAllowsEmptyRowDimension(view.value)) {
+          continue
+        }
         showEmpty.value = true
         break
       }

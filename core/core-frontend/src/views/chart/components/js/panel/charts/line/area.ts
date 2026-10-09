@@ -1,3 +1,4 @@
+import { getExplicitChartTooltip } from '@/views/chart/components/js/panel/common/common_antv'
 import {
   G2PlotChartView,
   G2PlotDrawOptions
@@ -282,6 +283,9 @@ export class Area extends G2PlotChartView<AreaOptions, G2Area> {
   }
 
   protected configTooltip(chart: Chart, options: AreaOptions): AreaOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     return super.configMultiSeriesTooltip(chart, options)
   }
 
@@ -369,6 +373,9 @@ export class StackArea extends Area {
     return setUpStackSeriesColor(chart, data)
   }
   protected configTooltip(chart: Chart, options: AreaOptions): AreaOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const customAttr: DeepPartial<ChartAttr> = parseJson(chart.customAttr)
     const tooltipAttr = customAttr.tooltip
     if (!tooltipAttr.show) {

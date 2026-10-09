@@ -4,6 +4,7 @@ import { PropType, toRefs, nextTick, watch, ref, computed } from 'vue'
 import MiscSelector from '@/views/chart/components/editor/editor-style/components/MiscSelector.vue'
 import LabelSelector from '@/views/chart/components/editor/editor-style/components/LabelSelector.vue'
 import TooltipSelector from '@/views/chart/components/editor/editor-style/components/TooltipSelector.vue'
+import { supportsTooltipShelf } from '@/views/chart/components/js/tooltipContent'
 import XAxisSelector from '@/views/chart/components/editor/editor-style/components/XAxisSelector.vue'
 import YAxisSelector from '@/views/chart/components/editor/editor-style/components/YAxisSelector.vue'
 import DualYAxisSelector from '@/views/chart/components/editor/editor-style/components/DualYAxisSelector.vue'
@@ -522,7 +523,7 @@ watch(
               v-model="chart.customAttr.tooltip.show"
               :themes="themes"
               :change-model="chart.customAttr.tooltip"
-              :title="t('chart.tooltip')"
+              :title="supportsTooltipShelf(chart.type) ? '提示外观' : t('chart.tooltip')"
               :show-switch="propertyInnerAll['tooltip-selector'].includes('show')"
               name="tooltip"
               @modelChange="val => onTooltipChange({ data: val, requestData: true }, 'show')"

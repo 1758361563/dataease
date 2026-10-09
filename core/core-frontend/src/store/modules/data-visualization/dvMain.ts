@@ -1,3 +1,4 @@
+import { supportsTooltipShelf } from '@/views/chart/components/js/tooltipContent'
 import { defineStore } from 'pinia'
 import { store } from '../../index'
 import { deepCopy } from '@/utils/utils'
@@ -590,6 +591,11 @@ export const dvMainStore = defineStore('dataVisualization', {
         if (chartViewInstance) {
           newView = chartViewInstance.setupDefaultOptions(newView)
           newView['title'] = component.name
+        }
+        // New charts opt into explicit content; defaults used to load old charts stay unchanged.
+        if (supportsTooltipShelf(newView.type)) {
+          newView.customAttr.tooltip.contentMode = 'explicit'
+          newView.customAttr.tooltip.autoAxisKeys = []
         }
         currentFont && (newView.customStyle.text.fontFamily = currentFont.name)
         this.canvasViewInfo[component.id] = newView

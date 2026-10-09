@@ -5,13 +5,18 @@ const DB = 'qiwei_new_bi'
 export function gridFromValues(values, options = {}) {
   const headerRow = Number(options.headerRow || 1)
   const dataStartRow = Number(options.dataStartRow || headerRow + 1)
-  const matrix = trimUsed(values)
+  let scoped = values
+  if (options.dataEndRow) {
+    const end = Number(options.dataEndRow)
+    if (!Number.isFinite(end) || end < headerRow) throw new Error('数据结束行早于表头行')
+    scoped = values.slice(0, end)
+  }
+  scoped = sliceColumns(scoped, options.columnRange)
+  const matrix = trimUsed(scoped)
   if (!matrix.length) throw new Error('工作表没有数据')
   const headerIndex = headerRow - 1
   if (!matrix[headerIndex]) throw new Error('表头行超出工作表范围')
-  let headers = matrix[headerIndex].map(cell => (cell === null || cell === undefined ? '' : String(cell).trim()))
-  const columnEnd = columnRangeEnd(options.columnRange)
-  if (columnEnd) headers = headers.slice(0, columnEnd)
+  const headers = matrix[headerIndex].map(cell => (cell === null || cell === undefined ? '' : String(cell).trim()))
   if (headers.some(name => !name)) throw new Error('表头存在空列，停止同步')
   const seen = new Set()
   for (const name of headers) {
@@ -33,13 +38,23 @@ export function gridFromValues(values, options = {}) {
   return { headers, columns, rows }
 }
 
-function columnRangeEnd(columnRange) {
-  const text = String(columnRange || '').trim()
-  if (!text) return 0
-  const end = text.includes(':') ? text.split(':')[1] : text
+function columnIndex(label) {
   let n = 0
-  for (const ch of end.trim().toUpperCase()) n = n * 26 + (ch.charCodeAt(0) - 64)
+  for (const ch of String(label || '').trim().toUpperCase()) {
+    if (ch < 'A' || ch > 'Z') return 0
+    n = n * 26 + (ch.charCodeAt(0) - 64)
+  }
   return n
+}
+
+function sliceColumns(values, columnRange) {
+  const text = String(columnRange || '').trim()
+  if (!text) return values
+  const [rawStart, rawEnd] = text.includes(':') ? text.split(':') : ['A', text]
+  const start = columnIndex(rawStart)
+  const end = columnIndex(rawEnd || rawStart)
+  if (!start || !end || end < start) throw new Error(`列范围不合法: ${text}`)
+  return values.map(row => (row || []).slice(start - 1, end))
 }
 
 function acceptedColumns(headers, rows, acceptedFields) {

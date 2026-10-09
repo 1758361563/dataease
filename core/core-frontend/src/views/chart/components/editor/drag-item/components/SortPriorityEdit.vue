@@ -1,124 +1,87 @@
 <script lang="ts" setup>
 import icon_drag_outlined from '@/assets/svg/icon_drag_outlined.svg'
 import draggable from 'vuedraggable'
-import { reactive, watch, ref } from 'vue'
-import chartViewManager from '../../../js/panel'
-
+import { computed, reactive, watch, ref } from 'vue'
+import { useI18n } from '@/hooks/web/useI18n'
+import { activeSortFields } from '../../../js/chartDisplayLimit'
+import {
+  globalPivotSortReason,
+  pivotSortScope
+} from '../../../js/panel/charts/table/pivotGlobalSort'
 const loading = ref(false)
-
-const state = reactive({
-  sortList: []
-})
-
-const props = defineProps({
-  chart: {
-    type: Object,
-    required: true
-  }
-})
-
+const state = reactive({ sortList: [], sortScope: 'GROUP' })
+const props = defineProps({ chart: { type: Object, required: true } })
 const emit = defineEmits(['onPriorityChange'])
-
+const { t } = useI18n()
+const directionLabel = { asc: '升序', desc: '降序', custom_sort: '自定义顺序' }
+const onUpdate = () =>
+  emit(
+    'onPriorityChange',
+    state.sortList.map(({ id, name, axis, fieldInstanceId }) => ({
+      id,
+      name,
+      axis,
+      fieldInstanceId,
+      scope: state.sortScope
+    }))
+  )
+const globalReason = computed(() =>
+  globalPivotSortReason({ ...props.chart, sortPriority: state.sortList })
+)
+const changeScope = value => {
+  if (value === 'GLOBAL' && globalReason.value) return
+  state.sortScope = value
+  onUpdate()
+}
 watch(
   () => props.chart,
   () => {
-    init()
+    state.sortScope = pivotSortScope(props.chart)
+    state.sortList = activeSortFields(props.chart).map(field => ({
+      id: field.id,
+      axis: field.axis,
+      fieldInstanceId: field.fieldInstanceId,
+      key: field.key,
+      sort: field.sort,
+      name:
+        (field.chartShowName || field.name) +
+        (['yAxis', 'yAxisExt'].includes(field.axis)
+          ? '（' + t('chart.' + (field.summary || 'sum')) + '）'
+          : '')
+    }))
+    onUpdate()
   },
-  { deep: true }
+  { deep: true, immediate: true }
 )
-
-const init = () => {
-  const chart = props.chart
-  if (!chart.sortPriority?.length) {
-    state.sortList.splice(0, state.sortList.length)
-  } else {
-    state.sortList.splice(0, state.sortList.length, ...chart.sortPriority)
-  }
-  const chartInstance = chartViewManager.getChartView(chart.render, chart.type)
-  if (chartInstance) {
-    const axis = chartInstance.axis
-    const axisMap = axis?.reduce((p, n) => {
-      let axisArr
-      switch (n) {
-        case 'xAxis':
-          axisArr = chart.xAxis
-          break
-        case 'yAxis':
-          axisArr = chart.yAxis
-          break
-        case 'xAxisExt':
-          axisArr = chart.xAxisExt
-          break
-        case 'yAxisExt':
-          axisArr = chart.yAxisExt
-          break
-        case 'extBubble':
-          axisArr = chart.extBubble
-          break
-        case 'flowMapEndName':
-          axisArr = chart.flowMapEndName
-          break
-        case 'flowMapStartName':
-          axisArr = chart.flowMapStartName
-          break
-        case 'extColor':
-          axisArr = chart.extColor
-          break
-        case 'extStack':
-          axisArr = chart.extStack
-          break
-        case 'drill':
-          axisArr = chart.drillFields
-          break
-        default:
-          break
-      }
-      axisArr?.forEach(ele => {
-        if (!p[ele.id]) {
-          p[ele.id] = ele.chartShowName ?? ele.name
-        }
-      })
-      return p
-    }, {})
-    state.sortList = state.sortList.reduce((p, n) => {
-      if (axisMap[n.id]) {
-        n.name = axisMap[n.id]
-        p.push(n)
-      }
-      return p
-    }, [])
-    Object.entries(axisMap).forEach(([key, value]) => {
-      if (!state.sortList.find(item => item.id === key)) {
-        state.sortList.push({ id: key, name: value })
-      }
-    })
-  }
-}
-const onUpdate = () => {
-  emit('onPriorityChange', state.sortList)
-}
-
-init()
 </script>
 
 <template>
+  <div v-if="chart.type === 'table-pivot'" class="sort-scope">
+    <div class="sort-scope-title">排序范围</div>
+    <el-radio-group :model-value="state.sortScope" @change="changeScope">
+      <el-radio label="GROUP">分组内排序（默认）</el-radio>
+      <el-radio label="GLOBAL" :disabled="!!globalReason">跨分组全局排序</el-radio>
+    </el-radio-group>
+    <p v-if="globalReason" class="sort-scope-tip">{{ globalReason }}</p>
+    <p v-else-if="state.sortScope === 'GLOBAL'" class="sort-scope-tip">
+      全局排序会逐行显示行维度；行小计不显示，总计仍保留。
+    </p>
+  </div>
   <el-scrollbar height="100%" max-height="599px">
     <draggable
       v-loading="loading"
       :list="state.sortList"
       animation="300"
       class="drag-list"
-      item-key="id"
+      item-key="key"
       @update="onUpdate"
     >
       <template #item="{ element }">
-        <span :key="element.id" class="item-dimension" :title="element.name">
+        <span :key="element.key" class="item-dimension" :title="element.name">
           <el-icon class="item-icon">
             <Icon name="icon_drag_outlined"><icon_drag_outlined class="svg-icon" /></Icon>
           </el-icon>
-          <span class="item-span">
-            {{ element.name }}
-          </span>
+          <span class="item-span"> {{ element.name }} · {{ directionLabel[element.sort] }} </span>
         </span>
       </template>
     </draggable>
@@ -126,8 +89,26 @@ init()
 </template>
 
 <style lang="less" scoped>
+.sort-scope {
+  padding: 0 2px 12px;
+}
+
+.sort-scope-title {
+  margin-bottom: 8px;
+  color: #1f2329;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.sort-scope-tip {
+  margin: 6px 0 0;
+  color: #878d9f;
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .drag-list {
-  height: 50vh;
+  min-height: 0;
 }
 
 .item-dimension {

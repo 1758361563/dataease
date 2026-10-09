@@ -1,4 +1,5 @@
 <script lang="tsx" setup>
+import { activeSortFields } from '../../js/chartDisplayLimit'
 import {
   clearOtherMixSorts,
   supportsMixMetricSort
@@ -18,6 +19,7 @@ import iconFilter from '@/assets/svg/icon-filter.svg'
 import { useI18n } from '@/hooks/web/useI18n'
 import { computed, onMounted, reactive, ref, toRefs, watch } from 'vue'
 import { formatterItem } from '@/views/chart/components/js/formatter'
+import { supportsTooltipShelf } from '@/views/chart/components/js/tooltipContent'
 import { getItemType, resetValueFormatter } from '@/views/chart/components/editor/drag-item/utils'
 import { quotaViews, notSupportAccumulateViews } from '@/views/chart/components/js/util'
 import { SUPPORT_Y_M } from '@/views/chart/components/editor/util/chart'
@@ -71,6 +73,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'onSortChange',
   'onQuotaItemRemove',
   'onCustomSort',
   'onQuotaItemChange',
@@ -118,8 +121,8 @@ const AXIS_FORMAT_VIEW = [
 ]
 const showValueFormatter = computed<boolean>(() => {
   return (
-    AXIS_FORMAT_VIEW.includes(props.chart.type) &&
-    (props.item.deType === 2 || props.item.deType === 3)
+    (AXIS_FORMAT_VIEW.includes(props.chart.type) || supportsTooltipShelf(props.chart.type)) &&
+    ([2, 3].includes(props.item.deType) || ['count', 'count_distinct'].includes(props.item.summary))
   )
 })
 
@@ -213,6 +216,7 @@ const sort = param => {
     item.value.sort = param.type
     item.value.customSort = []
     emit('onQuotaItemChange', item.value)
+    emit('onSortChange')
   }
 }
 
@@ -491,6 +495,23 @@ onMounted(() => {
                   class="drop-style sub"
                   :class="themes === 'dark' ? 'dark-dimension-quota' : ''"
                 >
+                  <el-dropdown-item
+                    class="menu-item-padding"
+                    v-if="chart.type === 'table-normal' && item.id !== '-1'"
+                    :command="beforeSummary('none_aggregation')"
+                  >
+                    <span
+                      class="sub-menu-content"
+                      :class="'none_aggregation' === item.summary ? 'content-active' : ''"
+                    >
+                      {{ t('chart.none_aggregation') }}
+                      <el-icon class="sub-menu-content--icon">
+                        <Icon name="icon_done_outlined" v-if="'none_aggregation' === item.summary"
+                          ><icon_done_outlined class="svg-icon"
+                        /></Icon>
+                      </el-icon>
+                    </span>
+                  </el-dropdown-item>
                   <el-dropdown-item
                     class="menu-item-padding"
                     v-if="item.id !== '-1' && ![0, 1, 5, 7].includes(item.deType)"
@@ -812,12 +833,19 @@ onMounted(() => {
           </el-dropdown-item>
 
           <el-dropdown-item
-            v-if="showSort && !chart.type.includes('chart-mix')"
+            v-if="
+              showSort &&
+              !chart.type.includes('chart-mix') &&
+              (activeSortFields(chart).length > 1 ||
+                (chart.type === 'table-pivot' && activeSortFields(chart).length > 0))
+            "
             class="menu-item-padding"
             :command="beforeClickItem('sortPriority')"
           >
             <el-icon />
-            <span>{{ t('chart.sort_priority') }}</span>
+            <span>{{
+              chart.type === 'table-pivot' ? '排序范围与优先级' : t('chart.sort_priority')
+            }}</span>
           </el-dropdown-item>
 
           <el-dropdown-item

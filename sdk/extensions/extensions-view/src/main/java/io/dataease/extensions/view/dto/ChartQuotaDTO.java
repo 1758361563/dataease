@@ -11,4 +11,7 @@ import lombok.Data;
 public class ChartQuotaDTO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
+    private String fieldInstanceId;
+    private String metricInstanceId;
+    private String summary;
 }

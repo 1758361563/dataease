@@ -1,3 +1,5 @@
+import { visibleTooltipField } from '@/views/chart/components/js/tooltipFieldIdentity'
+import { explicitTooltipItems } from '@/views/chart/components/js/tooltipContent'
 import { hexColorToRGBA, hexToRgba, measureText, parseJson } from '../../util'
 import {
   DEFAULT_BASIC_STYLE,
@@ -271,18 +273,32 @@ export function getTooltip(chart: Chart) {
   return tooltip
 }
 
+export function getExplicitChartTooltip(chart: Chart) {
+  const customAttr = parseJson(chart.customAttr)
+  const tooltip = customAttr.tooltip
+  if (!tooltip.show || !tooltip.seriesTooltipFormatter?.some(field => field.show !== false)) {
+    return false
+  }
+  return {
+    showTitle: !tooltip.seriesTooltipFormatter?.some(
+      field => field.tooltipSource === 'dimension' && field.show !== false
+    ),
+    shared: true,
+    customItems: items => explicitTooltipItems({ ...chart, customAttr }, items, valueFormatter),
+    container: getTooltipContainer(`tooltip-${chart.id}`, chart.container),
+    itemTpl: TOOLTIP_TPL,
+    enterable: true
+  }
+}
+
 export function getMultiSeriesTooltip(chart: Chart) {
   const customAttr: DeepPartial<ChartAttr> = parseJson(chart.customAttr)
   const tooltipAttr = customAttr.tooltip
+  if (tooltipAttr.contentMode === 'explicit') return getExplicitChartTooltip(chart)
   if (!tooltipAttr.show) {
     return false
   }
-  const formatterMap = tooltipAttr.seriesTooltipFormatter
-    ?.filter(i => i.show)
-    .reduce((pre, next) => {
-      pre[next.id] = next
-      return pre
-    }, {}) as Record<string, SeriesFormatter>
+
   const tooltip: Tooltip = {
     showTitle: true,
     customItems(originalItems) {
@@ -291,21 +307,27 @@ export function getMultiSeriesTooltip(chart: Chart) {
       }
       const head = originalItems[0]
       // 非原始数据
-      if (!head.data.quotaList) {
+      if (!head?.data?.quotaList) {
         return originalItems
       }
       const result = []
       originalItems
-        .filter(item => formatterMap[item.data.quotaList[0].id])
+        .filter(item =>
+          visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item.data.quotaList[0])
+        )
         .forEach(item => {
-          const formatter = formatterMap[item.data.quotaList[0].id]
+          const formatter = visibleTooltipField(
+            tooltipAttr.seriesTooltipFormatter,
+            item.data.quotaList[0]
+          )
+          if (!formatter) return
           const value = valueFormatter(parseFloat(item.value as string), formatter.formatterCfg)
           const name = isEmpty(formatter.chartShowName) ? formatter.name : formatter.chartShowName
           const color = getTooltipItemConditionColor(item)
           result.push({ ...item, name, value, ...(color ? { color } : {}) })
         })
-      head.data.dynamicTooltipValue?.forEach(item => {
-        const formatter = formatterMap[item.fieldId]
+      head?.data?.dynamicTooltipValue?.forEach(item => {
+        const formatter = visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item)
         if (formatter) {
           const value =
             item.value != null
@@ -1820,7 +1842,7 @@ export function configPlotTooltipEvent<O extends PickOptions, P extends Plot<O>>
   plot: P
 ) {
   const { tooltip } = parseJson(chart.customAttr)
-  if (!tooltip.show) {
+  if (!tooltip.show || !plot.options.tooltip?.container) {
     ChartCarouselTooltip.destroyByContainer(chart.container)
     return
   }

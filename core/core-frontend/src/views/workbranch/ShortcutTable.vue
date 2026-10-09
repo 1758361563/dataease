@@ -519,8 +519,8 @@ const getEmptyDesc = (): string => {
   padding: 8px 24px 24px 24px;
   background: #fff;
   border-radius: 6px;
-  min-height: calc(100% - 280px);
-  margin-top: 16px;
+  min-height: 100%;
+  margin-top: 0;
 
   .select-type-list {
     width: 120px;
@@ -531,7 +531,7 @@ const getEmptyDesc = (): string => {
   }
 
   &.expand {
-    height: calc(100% - 89px);
+    height: 100%;
   }
 
   .type-button {

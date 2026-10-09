@@ -13,6 +13,10 @@ import java.math.BigDecimal;
 public class DynamicValueDTO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long fieldId;
+    // Preserve the placement identity alongside the legacy physical field id.
+    private String fieldInstanceId;
+    private String metricInstanceId;
+    private String summary;
     private BigDecimal value;
     private String stringValue;
 }

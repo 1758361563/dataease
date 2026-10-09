@@ -48,6 +48,16 @@ export async function ensureSheetSourceSchema() {
   await exec(sql)
 }
 
+export async function ensureDataEndRowColumn() {
+  await ensureSheetSourceSchema()
+  const rows = await query(
+    `SELECT 1 AS ok FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'company_feishu_source' AND COLUMN_NAME = 'data_end_row'`
+  )
+  if (rows.length) return
+  await exec('ALTER TABLE company_feishu_source ADD COLUMN data_end_row INT NULL')
+}
+
 export async function listEnabledSheetSources() {
   return query(`SELECT * FROM company_feishu_source WHERE enabled = 1 ORDER BY id`)
 }

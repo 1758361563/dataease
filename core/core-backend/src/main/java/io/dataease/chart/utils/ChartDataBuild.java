@@ -65,6 +65,9 @@ public class ChartDataBuild {
                     if (j > -1) {
                         ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                         chartQuotaDTO.setId(yAxis.get(j).getId());
+                        chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                        chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                        chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                         quotaList.add(chartQuotaDTO);
                         axisChartDataDTO.setQuotaList(quotaList);
                         try {
@@ -100,6 +103,9 @@ public class ChartDataBuild {
                     int j = i - xAxis.size();
                     ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                     chartQuotaDTO.setId(yAxis.get(j).getId());
+                    chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                    chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                    chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                     quotaList.add(chartQuotaDTO);
                     axisChartDataDTO.setQuotaList(quotaList);
                     try {
@@ -165,6 +171,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -240,6 +249,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -307,6 +319,9 @@ public class ChartDataBuild {
                     int valueIndex = xAxis.size();
                     ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                     chartQuotaDTO.setId(yAxis.get(0).getId());
+                    chartQuotaDTO.setFieldInstanceId(yAxis.get(0).getFieldInstanceId());
+                    chartQuotaDTO.setMetricInstanceId(yAxis.get(0).getMetricInstanceId());
+                    chartQuotaDTO.setSummary(yAxis.get(0).getSummary());
                     quotaList.add(chartQuotaDTO);
                     axisChartDataDTO.setQuotaList(quotaList);
                     try {
@@ -356,6 +371,9 @@ public class ChartDataBuild {
                     int j = i - xAxis.size();
                     ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                     chartQuotaDTO.setId(yAxis.get(j).getId());
+                    chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                    chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                    chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                     quotaList.add(chartQuotaDTO);
                     axisChartDataDTO.setQuotaList(quotaList);
                     try {
@@ -416,6 +434,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -639,6 +660,9 @@ public class ChartDataBuild {
                         }
                     }
                     valueDTO.setFieldId(f.getId());
+                    valueDTO.setFieldInstanceId(f.getFieldInstanceId());
+                    valueDTO.setMetricInstanceId(f.getMetricInstanceId());
+                    valueDTO.setSummary(f.getSummary());
                     dynamicLabelValue.add(valueDTO);
                 }
             }
@@ -656,6 +680,9 @@ public class ChartDataBuild {
                         }
                     }
                     valueDTO.setFieldId(f.getId());
+                    valueDTO.setFieldInstanceId(f.getFieldInstanceId());
+                    valueDTO.setMetricInstanceId(f.getMetricInstanceId());
+                    valueDTO.setSummary(f.getSummary());
                     dynamicTooltipValue.add(valueDTO);
                 }
             }
@@ -712,6 +739,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -795,6 +825,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -884,6 +917,9 @@ public class ChartDataBuild {
                 int valueIndex = xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(0).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(0).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(0).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(0).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -949,6 +985,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -998,6 +1037,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -1213,6 +1255,9 @@ public class ChartDataBuild {
 
                                     ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                                     chartQuotaDTO.setId(yAxis.get(0).getId());
+                                    chartQuotaDTO.setFieldInstanceId(yAxis.get(0).getFieldInstanceId());
+                                    chartQuotaDTO.setMetricInstanceId(yAxis.get(0).getMetricInstanceId());
+                                    chartQuotaDTO.setSummary(yAxis.get(0).getSummary());
                                     quotaList.add(chartQuotaDTO);
                                     axisChartDataDTO.setQuotaList(quotaList);
 
@@ -1268,6 +1313,9 @@ public class ChartDataBuild {
                     int j = i - xAxis.size();
                     ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                     chartQuotaDTO.setId(yAxis.get(j).getId());
+                    chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                    chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                    chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                     quotaList.add(chartQuotaDTO);
                     axisChartDataDTO.setQuotaList(quotaList);
                     try {
@@ -1342,6 +1390,9 @@ public class ChartDataBuild {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 scatterChartDataDTO.setQuotaList(quotaList);
 
@@ -1630,6 +1681,9 @@ public class ChartDataBuild {
                     int valueIndex = xAxis.size();
                     ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                     chartQuotaDTO.setId(yAxis.get(0).getId());
+                    chartQuotaDTO.setFieldInstanceId(yAxis.get(0).getFieldInstanceId());
+                    chartQuotaDTO.setMetricInstanceId(yAxis.get(0).getMetricInstanceId());
+                    chartQuotaDTO.setSummary(yAxis.get(0).getSummary());
                     quotaList.add(chartQuotaDTO);
                     axisChartDataDTO.setQuotaList(quotaList);
                     try {
@@ -1668,6 +1722,9 @@ public class ChartDataBuild {
                     }
                 }
                 valueDTO.setFieldId(chartViewFieldDTO.getId());
+                valueDTO.setFieldInstanceId(chartViewFieldDTO.getFieldInstanceId());
+                valueDTO.setMetricInstanceId(chartViewFieldDTO.getMetricInstanceId());
+                valueDTO.setSummary(chartViewFieldDTO.getSummary());
                 dynamicLabelValue.add(valueDTO);
             }
         }
@@ -1684,6 +1741,9 @@ public class ChartDataBuild {
                     }
                 }
                 valueDTO.setFieldId(chartViewFieldDTO.getId());
+                valueDTO.setFieldInstanceId(chartViewFieldDTO.getFieldInstanceId());
+                valueDTO.setMetricInstanceId(chartViewFieldDTO.getMetricInstanceId());
+                valueDTO.setSummary(chartViewFieldDTO.getSummary());
                 dynamicTooltipValue.add(valueDTO);
             }
         }
@@ -1733,6 +1793,9 @@ public class ChartDataBuild {
                 if (j > -1) {
                     ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                     chartQuotaDTO.setId(yAxis.get(j).getId());
+                    chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                    chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                    chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                     quotaList.add(chartQuotaDTO);
                     axisChartDataDTO.setQuotaList(quotaList);
                     try {

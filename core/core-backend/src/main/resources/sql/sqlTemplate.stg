@@ -38,7 +38,7 @@ ORDER BY
 >>
 
 
-previewSql(limitFiled, groups, aggregators, filters, orders, table, isGroup, notUseAs, useAliasForGroup)
+previewSql(limitFiled, groups, aggregators, groupBys, filters, orders, table, isGroup, notUseAs, useAliasForGroup)
 ::=<<
 SELECT
 <if(limitFiled)>
@@ -63,13 +63,13 @@ FROM
 WHERE
     <filters:{filter|<if(filter)><filter><endif>}; separator="\nAND ">
 <endif>
-<if(isGroup && groups && !useAliasForGroup)>
+<if(isGroup && groupBys && !useAliasForGroup)>
 GROUP BY
-    <groups:{group|<if(group)><group.fieldName><endif>}; separator=",\n">
+    <groupBys:{group|<if(group)><group.fieldName><endif>}; separator=",\n">
 <endif>
-<if(isGroup && groups && useAliasForGroup)>
+<if(isGroup && groupBys && useAliasForGroup)>
 GROUP BY
-    <groups:{group|<if(group)><group.fieldAlias><endif>}; separator=",\n">
+    <groupBys:{group|<if(group)><group.fieldAlias><endif>}; separator=",\n">
 <endif>
 <if(orders)>
 ORDER BY

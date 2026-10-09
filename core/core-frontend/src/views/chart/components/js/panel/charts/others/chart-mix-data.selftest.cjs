@@ -11,7 +11,9 @@ function loadTs(name) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }
   }).outputText
   const loaded = { exports: {} }
-  new Function('module', 'exports', 'require', output)(loaded, loaded.exports, require)
+  const localRequire = id =>
+    id === '../../../tooltipFieldIdentity' ? loadTs('../../../tooltipFieldIdentity.ts') : require(id)
+  new Function('module', 'exports', 'require', output)(loaded, loaded.exports, localRequire)
   return loaded.exports
 }
 const { alignMixCategories } = loadTs('chart-mix-data.ts')

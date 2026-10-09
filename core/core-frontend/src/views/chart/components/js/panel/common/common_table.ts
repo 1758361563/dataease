@@ -11,6 +11,14 @@ import {
 } from '../..//util'
 import { resultKey, rowValue, resultKeysForFieldId } from '@/views/chart/components/js/chartFieldInstance'
 import {
+  pivotAllowsEmptyRowDimension,
+  rowQuotaGridColLeafCell,
+  rowQuotaGridColNodeCell,
+  rowQuotaGridDataCell,
+  rowQuotaGridMeasureCell,
+  rowQuotaGridQuotaHeadCell
+} from '@/views/chart/components/js/panel/charts/table/pivotMeasureRows'
+import {
   DEFAULT_BASIC_STYLE,
   DEFAULT_TABLE_CELL,
   DEFAULT_TABLE_HEADER
@@ -2236,7 +2244,10 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
       cell.border = {
         right: { style: 'thick', color: { argb: '00000000' } }
       }
-      worksheet.mergeCells(index + 1, 1, index + 1, rowLength + 1)
+      // rowLength=0 时指标名本身就是第 1 列，不能把单个单元格 merge。
+      if (rowLength >= 1) {
+        worksheet.mergeCells(index + 1, 1, index + 1, rowLength + 1)
+      }
     })
   }
   fields?.rows?.forEach((row, index) => {
@@ -2246,7 +2257,8 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
     cell.border = { bottom: { style: 'thick', color: { argb: '00000000' } } }
   })
   const quotaColLabel = chart.customAttr.basicStyle.quotaColLabel ?? t('dataset.value')
-  const quotaColHeadCell = worksheet.getCell(colLength === 0 ? 1 : colLength, rowLength + 1)
+  const quotaHead = rowQuotaGridQuotaHeadCell(colLength, rowLength)
+  const quotaColHeadCell = worksheet.getCell(quotaHead.row, quotaHead.col)
   quotaColHeadCell.value = quotaColLabel
   quotaColHeadCell.alignment = { vertical: 'middle', horizontal: 'center' }
   quotaColHeadCell.border = {
@@ -2265,8 +2277,9 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
       curNode = curNode.parent
     }
     const { rowIndex } = node
-    const writeRowIndex = rowIndex + 2 + (colLength === 0 ? 1 : colLength - 1)
-    const writeColIndex = node.level + 1
+    const measureCell = rowQuotaGridMeasureCell(rowIndex, node.level, colLength)
+    const writeRowIndex = measureCell.row
+    const writeColIndex = measureCell.col
     const cell = worksheet.getCell(writeRowIndex, writeColIndex)
     let value = node.label
     if (node.field === '$$extra$$' && metaMap[value]?.name) {
@@ -2320,8 +2333,9 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
       curNode = curNode.parent
     }
     const { colIndex } = node
-    const writeRowIndex = node.level + 1
-    const writeColIndex = colIndex + rowLength + 2
+    const colLeafCell = rowQuotaGridColLeafCell(node.level, colIndex, rowLength)
+    const writeRowIndex = colLeafCell.row
+    const writeColIndex = colLeafCell.col
     const cell = worksheet.getCell(writeRowIndex, writeColIndex)
     const value = node.label
     cell.value = value
@@ -2346,9 +2360,10 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
     }
     const colIndex = getNodeStartColIndex(node)
     const width = notLeafNodeWidthMap[node.id]
-    const writeRowIndex = node.level + 1
+    const colNodeCell = rowQuotaGridColNodeCell(node.level, colIndex, rowLength)
+    const writeRowIndex = colNodeCell.row
     const value = node.label
-    const writeColIndex = colIndex + rowLength + 1
+    const writeColIndex = colNodeCell.col
     const cell = worksheet.getCell(writeRowIndex, writeColIndex)
     cell.value = value
     cell.alignment = { vertical: 'middle', horizontal: 'center' }
@@ -2368,7 +2383,8 @@ export async function exportRowQuotaGridPivot(instance: PivotSheet, chart: Chart
     for (let colIndex = 0; colIndex < colLeafNodes.length; colIndex++) {
       const dataCellMeta = layoutResult.getCellMeta(rowIndex, colIndex)
       const { fieldValue } = dataCellMeta
-      const cell = worksheet.getCell(rowIndex + maxColHeight + 1, rowLength + colIndex + 2)
+      const dataCell = rowQuotaGridDataCell(rowIndex, colIndex, rowLength, maxColHeight)
+      const cell = worksheet.getCell(dataCell.row, dataCell.col)
       cell.alignment = { vertical: 'middle', horizontal: 'center' }
       if (fieldValue === "-" || fieldValue === null || fieldValue === undefined) {
         cell.value = '-'
@@ -2796,7 +2812,8 @@ export async function exportPivotExcel(instance: PivotSheet, chart: ChartObj) {
   const { fields } = instance.dataCfg
   const rowLength = fields?.rows?.length || 0
   const valueLength = fields?.values?.length || 0
-  if (!(rowLength && valueLength)) {
+  const measureOnlyRows = !rowLength && valueLength > 0 && pivotAllowsEmptyRowDimension(chart)
+  if (!(valueLength && (rowLength || measureOnlyRows))) {
     ElMessage.warning(i18nt('chart.pivot_export_invalid_field'))
     return
   }

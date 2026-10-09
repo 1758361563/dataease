@@ -143,10 +143,15 @@ const del = (index, child) => {
 <style lang="less" scoped>
 .logic {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   position: relative;
   z-index: 1;
   width: 100%;
+
+  .logic-right {
+    flex: 1;
+    min-width: 0;
+  }
 
   .logic-left {
     box-sizing: border-box;
@@ -243,6 +248,12 @@ const del = (index, child) => {
       border: 1px solid var(--ed-color-primary, #3370ff);
       border-radius: 2px;
     }
+  }
+}
+
+@media (max-width: 720px) {
+  .logic .logic-left {
+    width: 42px;
   }
 }
 </style>

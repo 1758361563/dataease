@@ -21,7 +21,7 @@ import { hexColorToRGBA, isAlphaColor, parseJson } from '../../../util'
 import { S2ChartView, S2DrawOptions } from '../../types/impl/s2'
 import { TABLE_EDITOR_PROPERTY_INNER } from './common'
 import { useI18n } from '@/hooks/web/useI18n'
-import { keys, maxBy, merge, minBy, some, isEmpty, get } from 'lodash-es'
+import { cloneDeep, keys, maxBy, merge, minBy, some, isEmpty, get } from 'lodash-es'
 import {
   copyContent,
   CustomDataCell,
@@ -31,6 +31,12 @@ import {
 import Decimal from 'decimal.js'
 import { DEFAULT_TABLE_HEADER } from '@/views/chart/components/editor/util/chart'
 import { resultKey } from '@/views/chart/components/js/chartFieldInstance'
+import {
+  decodeGlobalPivotValue,
+  isGlobalPivotSort,
+  prepareGlobalPivotData
+} from './pivotGlobalSort'
+import { isBlockedMeasureOnlyTree, readGridColTotal } from './pivotMeasureRows'
 
 function mapTotalCfg(cfgList = [], yAxis: Axis[] = []) {
   const map = {}
@@ -191,6 +197,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
         field: resultKey(ele),
         name: ele.chartShowName ?? ele.name,
         formatter: value => {
+          value = decodeGlobalPivotValue(value)
           if (!f) {
             return value
           }
@@ -211,8 +218,22 @@ export class TablePivot extends S2ChartView<PivotSheet> {
     })
 
     // total config
-    const { basicStyle, tooltip, tableTotal, tableHeader } = parseJson(chart.customAttr)
+    const parsedAttr = parseJson(chart.customAttr)
+    const { basicStyle, tooltip, tableHeader } = parsedAttr
+    // 能力边界：树形 + 指标行头 + 0 个真实行维度不渲染。不改保存配置，不注入占位维度。
+    if (isBlockedMeasureOnlyTree(chart)) {
+      if (chartObj) {
+        chartObj.destroy()
+      }
+      return
+    }
+    const tableTotal = cloneDeep(parsedAttr.tableTotal)
+    const globalRowSort = isGlobalPivotSort(chart)
+    if (globalRowSort) {
+      tableTotal.row.showSubTotals = false
+    }
     if (!tableTotal.row.subTotalsDimensionsNew || tableTotal.row.subTotalsDimensions == undefined) {
+      // 只使用真实行维度。$$extra$$ 是 S2 指标名，不能作为小计维度。
       tableTotal.row.subTotalsDimensions = r
     }
     tableTotal.col.subTotalsDimensions = c
@@ -257,8 +278,9 @@ export class TablePivot extends S2ChartView<PivotSheet> {
       }
     })
     // 空值处理
-    const newData = this.configEmptyDataStrategy(chart)
-    const sortParams = this.configSortParams(chart, newData)
+    const sourceData = this.configEmptyDataStrategy(chart)
+    const newData = prepareGlobalPivotData(chart, sourceData)
+    const sortParams = globalRowSort ? [] : this.configSortParams(chart, newData)
     // data config
     const s2DataConfig: S2DataConfig = {
       fields: {
@@ -570,7 +592,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
     const dimensionList = []
     for (const key in rowData) {
       if (nameIdMap[key]) {
-        dimensionList.push({ id: nameIdMap[key], value: rowData[key] })
+        dimensionList.push({ id: nameIdMap[key], value: decodeGlobalPivotValue(rowData[key]) })
       }
     }
     const param = {
@@ -596,7 +618,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
     const dimensionList = []
     for (const key in rowData) {
       if (nameIdMap[key]) {
-        dimensionList.push({ id: nameIdMap[key], value: rowData[key] })
+        dimensionList.push({ id: nameIdMap[key], value: decodeGlobalPivotValue(rowData[key]) })
       }
     }
     const param = {
@@ -1238,18 +1260,11 @@ function getGridCustomCalcResult(query, axisMap, status: TotalStatus, customCalc
   if (status.isRowTotal && status.isColTotal) {
     return customCalc.rowColTotal?.data?.[quotaField]
   }
-  // 列总计
+  // 列总计。0 个真实行维度时结果在指标根上，不能按行路径取值。
   if (status.isColTotal && !status.isRowSubTotal) {
     const { colTotal } = customCalc
     const path = getTreePath(query, row)
-    let val
-    if (path.length) {
-      if (colTotal) {
-        path.push(quotaField)
-        val = get(colTotal.data, path)
-      }
-    }
-    return val
+    return readGridColTotal(row, colTotal?.data, quotaField, path)
   }
   // 列小计
   if (status.isColSubTotal && !status.isRowTotal && !status.isRowSubTotal) {

@@ -25,6 +25,13 @@ public class MixHandler extends YoyChartHandler {
     @Getter
     private final String type = "chart-mix";
 
+    protected static List<ChartViewFieldDTO> withTooltipFields(ChartViewDTO view, List<ChartViewFieldDTO> measures) {
+        var result = new ArrayList<>(measures);
+        if (view.getExtLabel() != null) result.addAll(view.getExtLabel());
+        if (view.getExtTooltip() != null) result.addAll(view.getExtTooltip());
+        return result;
+    }
+
     @Override
     public AxisFormatResult formatAxis(ChartViewDTO view) {
         var axisMap = new HashMap<ChartAxis, List<ChartViewFieldDTO>>();
@@ -35,11 +42,11 @@ public class MixHandler extends YoyChartHandler {
         //左轴堆叠子维度,非堆叠不需要
         axisMap.put(ChartAxis.extStack, Collections.emptyList());
         //左轴指标
-        axisMap.put(ChartAxis.yAxis, view.getYAxis());
+        axisMap.put(ChartAxis.yAxis, withTooltipFields(view, view.getYAxis()));
         //右轴分组子维度
         axisMap.put(ChartAxis.extBubble, view.getExtBubble());
         //右轴指标
-        axisMap.put(ChartAxis.yAxisExt, view.getYAxisExt());
+        axisMap.put(ChartAxis.yAxisExt, withTooltipFields(view, view.getYAxisExt()));
         //去除除了x轴以外的排序
         axisMap.replaceAll((k, v) -> MixMetricSort.withoutSort(v));
         axisMap.put(ChartAxis.extLabel, view.getExtLabel());

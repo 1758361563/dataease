@@ -87,7 +87,7 @@ const errorDetected = ({
     }
   }
   if (filterType === 'enum') {
-    if (enumValue.length < 1) {
+    if (!['null', 'not_null'].includes(term) && enumValue.length < 1) {
       errorMessage.value = t('chart.enum_value_can_not_null')
       return
     }
@@ -445,9 +445,6 @@ const emits = defineEmits(['save'])
 }
 .real-line,
 .dash-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  user-select: none;
+  display: none;
 }
 </style>

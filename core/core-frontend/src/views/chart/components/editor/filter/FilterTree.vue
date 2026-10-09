@@ -82,7 +82,7 @@ defineExpose({
 </script>
 <template>
   <el-dialog
-    width="896px"
+    width="min(960px, calc(100vw - 32px))"
     append-to-body
     :title="$t('chart.add_filter')"
     destroy-on-close
@@ -102,6 +102,17 @@ defineExpose({
 </template>
 <style lang="less">
 .filter-tree-cont {
+  max-height: calc(100vh - 32px);
+  margin-top: 16px !important;
+  margin-bottom: 16px !important;
+  display: flex;
+  flex-direction: column;
+
+  .ed-dialog__body {
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .tree-cont {
     min-height: 67px;
     width: 100%;
@@ -109,7 +120,7 @@ defineExpose({
     border-radius: 6px;
     border: 1px solid var(--deBorderBase, #dcdfe6);
     overflow: auto;
-    max-height: 500px;
+    max-height: calc(100vh - 190px);
     .content {
       height: 100%;
       width: 100%;

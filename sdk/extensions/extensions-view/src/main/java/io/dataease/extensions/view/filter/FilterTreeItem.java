@@ -19,7 +19,7 @@ public class FilterTreeItem implements Serializable {
     private Long fieldId;
     private DatasetTableFieldDTO field;// field object
     private String filterType;// 'logic' or 'enum'
-    private String term;//'eq','not_eq','lt','le','gt','ge','in','not in','like','not like','null','not_null','empty','not_empty','between'
+    private String term;//'eq','not_eq','lt','le','gt','ge','in','not in','like','not like','null','not_null','empty','not_empty','between'; blank enum term means legacy IN
     private String value;// 'a'
     private List<String> enumValue;// ['a','b']
     private String filterTypeTime;// dateValue | dynamicDate

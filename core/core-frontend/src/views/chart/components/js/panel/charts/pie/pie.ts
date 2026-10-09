@@ -1,3 +1,5 @@
+import { getExplicitChartTooltip } from '@/views/chart/components/js/panel/common/common_antv'
+import { visibleTooltipField } from '@/views/chart/components/js/tooltipFieldIdentity'
 import {
   G2PlotChartView,
   G2PlotDrawOptions
@@ -205,6 +207,9 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
   }
 
   protected configTooltip(chart: Chart, options: PieOptions): PieOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const { tooltip: tooltipAttr, label } = parseJson(chart.customAttr)
     const { yAxis } = chart
     if (!tooltipAttr.show) {
@@ -217,24 +222,23 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
     const seriesTotalMap = getTooltipSeriesTotalMap(options.data)
     // trick, cal total, maybe use scale of chart in plot instance
     const total = options.data?.reduce((pre, next) => add(pre, next.value ?? 0), 0)
-    const formatterMap = tooltipAttr.seriesTooltipFormatter
-      ?.filter(i => i.show)
-      .reduce((pre, next) => {
-        pre[next.id] = next
-        return pre
-      }, {}) as Record<string, SeriesFormatter>
+
     const tooltip: PieOptions['tooltip'] = {
       showTitle: true,
       title: () => undefined,
       customItems(originalItems) {
         let tooltipItems = originalItems
         if (tooltipAttr.seriesTooltipFormatter?.length) {
-          tooltipItems = originalItems.filter(item => formatterMap[item.data.quotaList[0].id])
+          tooltipItems = originalItems.filter(item =>
+            visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item.data.quotaList[0])
+          )
         }
         const result = []
         const head = originalItems[0]
         tooltipItems.forEach(item => {
-          const formatter = formatterMap[item.data.quotaList[0].id] ?? yAxis[0]
+          const formatter =
+            visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item.data.quotaList[0]) ??
+            yAxis[0]
           const originValue = parseFloat(item.value as string)
           const value = valueFormatter(originValue, formatter.formatterCfg)
           // sync with label
@@ -244,8 +248,8 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
           const name = isEmpty(formatter.chartShowName) ? formatter.name : formatter.chartShowName
           result.push({ ...item, name, value: `${value ?? ''} (${percent}%)` })
         })
-        head.data.dynamicTooltipValue?.forEach(item => {
-          const formatter = formatterMap[item.fieldId]
+        head?.data?.dynamicTooltipValue?.forEach(item => {
+          const formatter = visibleTooltipField(tooltipAttr.seriesTooltipFormatter, item)
           if (formatter) {
             const total = seriesTotalMap[item.fieldId]
             // sync with label

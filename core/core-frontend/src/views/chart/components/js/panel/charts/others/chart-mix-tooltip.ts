@@ -1,7 +1,9 @@
+import { visibleTooltipField, type TooltipFieldIdentity } from '../../../tooltipFieldIdentity'
+
 type MixTooltipItem = {
   name?: string
   data?: {
-    quotaList?: Array<{ id?: string }>
+    quotaList?: TooltipFieldIdentity[]
     valueExt?: unknown
   }
 }
@@ -18,14 +20,19 @@ function getMixTooltipAxisType(item: MixTooltipItem): MixTooltipAxisType {
   return 'yAxis'
 }
 
-export function getMixTooltipFormatter<T>(
-  formatterMap: Record<string, T>,
+export function getMixTooltipFormatter<T extends TooltipFieldIdentity>(
+  formatterMap: Record<string, T> | readonly T[],
   item: MixTooltipItem
 ): T | undefined {
-  const fieldId = item?.data?.quotaList?.[0]?.id
-  if (!fieldId) {
+  const field = item?.data?.quotaList?.[0]
+  const fieldId = field?.id
+  if (!field || fieldId == null) {
     return undefined
   }
   const axisType = getMixTooltipAxisType(item)
-  return formatterMap[`${fieldId}-${axisType}`] ?? formatterMap[fieldId]
+  if (Array.isArray(formatterMap)) {
+    return visibleTooltipField(formatterMap, field, axisType)
+  }
+  const legacyMap = formatterMap as Record<string, T>
+  return legacyMap[`${fieldId}-${axisType}`] ?? legacyMap[fieldId]
 }

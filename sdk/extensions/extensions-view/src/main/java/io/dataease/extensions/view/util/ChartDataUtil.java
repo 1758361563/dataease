@@ -247,6 +247,9 @@ public class ChartDataUtil {
                 int j = i - xAxis.size();
                 ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
                 chartQuotaDTO.setId(yAxis.get(j).getId());
+                chartQuotaDTO.setFieldInstanceId(yAxis.get(j).getFieldInstanceId());
+                chartQuotaDTO.setMetricInstanceId(yAxis.get(j).getMetricInstanceId());
+                chartQuotaDTO.setSummary(yAxis.get(j).getSummary());
                 quotaList.add(chartQuotaDTO);
                 axisChartDataDTO.setQuotaList(quotaList);
                 try {
@@ -281,6 +284,9 @@ public class ChartDataUtil {
                     }
                 }
                 valueDTO.setFieldId(chartViewFieldDTO.getId());
+                valueDTO.setFieldInstanceId(chartViewFieldDTO.getFieldInstanceId());
+                valueDTO.setMetricInstanceId(chartViewFieldDTO.getMetricInstanceId());
+                valueDTO.setSummary(chartViewFieldDTO.getSummary());
                 dynamicLabelValue.add(valueDTO);
             }
         }
@@ -297,6 +303,9 @@ public class ChartDataUtil {
                     }
                 }
                 valueDTO.setFieldId(chartViewFieldDTO.getId());
+                valueDTO.setFieldInstanceId(chartViewFieldDTO.getFieldInstanceId());
+                valueDTO.setMetricInstanceId(chartViewFieldDTO.getMetricInstanceId());
+                valueDTO.setSummary(chartViewFieldDTO.getSummary());
                 dynamicTooltipValue.add(valueDTO);
             }
         }

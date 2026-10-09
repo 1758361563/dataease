@@ -141,6 +141,10 @@ public class YoyChartHandler extends DefaultChartHandler {
         if (!data.isEmpty() && CollectionUtils.isEmpty(xAxisSortList) && CollectionUtils.isNotEmpty(yAxisSortList)) {
             // 指标排序仅第一个生效
             ChartViewFieldDTO firstYAxis = yAxisSortList.getFirst();
+            // Ordinary aggregates are already ordered (including ties/nulls) before SQL LIMIT.
+            // Looking up by physical id here can also pick a different placement/aggregation.
+            if (firstYAxis.getCompareCalc() == null || StringUtils.equalsAnyIgnoreCase(
+                    firstYAxis.getCompareCalc().getType(), "none", "")) return data;
             boolean asc = firstYAxis.getSort().equalsIgnoreCase("asc");
             // 维度指标
             List<ChartViewFieldDTO> allAxisList = new ArrayList<>();

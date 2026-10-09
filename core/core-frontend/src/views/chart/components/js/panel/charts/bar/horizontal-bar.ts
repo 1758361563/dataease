@@ -1,3 +1,4 @@
+import { getExplicitChartTooltip } from '@/views/chart/components/js/panel/common/common_antv'
 import {
   G2PlotChartView,
   G2PlotDrawOptions
@@ -196,6 +197,9 @@ export class HorizontalBar extends G2PlotChartView<BarOptions, Bar> {
   }
 
   protected configTooltip(chart: Chart, options: BarOptions): BarOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     return super.configMultiSeriesTooltip(chart, options)
   }
 
@@ -423,6 +427,9 @@ export class HorizontalStackBar extends HorizontalBar {
   }
 
   protected configTooltip(chart: Chart, options: BarOptions): BarOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const tooltipAttr = parseJson(chart.customAttr).tooltip
     if (!tooltipAttr.show) {
       return {
@@ -701,6 +708,9 @@ export class HorizontalPercentageStackBar extends HorizontalStackBar {
   }
 
   protected configTooltip(chart: Chart, options: BarOptions): BarOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const tooltipAttr = parseJson(chart.customAttr).tooltip
     if (!tooltipAttr.show) {
       return {

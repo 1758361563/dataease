@@ -63,7 +63,6 @@ const enumList = ref([])
 const showTextArea = ref()
 const keydownCanceled = ref(false)
 const checklist = ref([])
-const filterList = ref([])
 const textareaValue = ref('')
 
 const { item } = toRefs(props)
@@ -73,7 +72,8 @@ const filedList = inject('filedList')
 
 const checkListWithFilter = computed(() => {
   if (!filterFiled.value) return enumList.value
-  return enumList.value.filter(ele => ele.includes(filterFiled.value))
+  const kw = String(filterFiled.value).toLowerCase()
+  return enumList.value.filter(ele => String(ele).toLowerCase().includes(kw))
 })
 
 const sysParamsIln = computed(() => {
@@ -101,6 +101,24 @@ const operators = computed(() => {
     return valueOptions
   }
 })
+const enumOperators = computed(() =>
+  ['eq', 'not_eq', 'in', 'not in', 'null', 'not_null'].map(value => ({
+    value,
+    label: `chart.filter_${value.replace(' ', '_')}`
+  }))
+)
+const conditionOperators = computed(() => {
+  if (![0, 5, 7].includes(item.value.deType)) return operators.value
+  const options = [...enumOperators.value]
+  textOptions.forEach(option => {
+    if (!options.some(({ value }) => value === option.value)) options.push(option)
+  })
+  return options
+})
+const enumTerm = computed(() => item.value.filterType === 'enum')
+const termNeedsValue = computed(
+  () => !['null', 'not_null', 'empty', 'not_empty'].includes(item.value.term)
+)
 const dimensions = computed(() => {
   if (!keywords.value) return computedFiledList.value
   return computedFiledList.value.filter(ele => ele.name.includes(keywords.value))
@@ -124,28 +142,28 @@ watch(
 
 onBeforeMount(() => {
   initNameEnumName()
-  filterListInit(item.value.deType)
 })
 
 const confirm = () => {
+  if (['eq', 'not_eq'].includes(item.value.term) && checklist.value.length > 1) {
+    checklist.value = checklist.value.slice(0, 1)
+  }
   cancelfixValue()
-  enumInput.value.$el.click()
+  deElDropdownMenuFixed.value?.hide?.()
 }
 
 const cancelSelect = () => {
   const { enumValue } = item.value
   checklist.value = [...enumValue]
-  checkboxlist.value = checkListWithFilter.value.filter(ele => enumValue.includes(ele))
-  if (checkboxlist.value.length) {
-    checkAll.value = checkboxlist.value.length === checkListWithFilter.value.length
-    isIndeterminate.value = checkboxlist.value.length !== checkListWithFilter.value.length
-  }
+  deElDropdownMenuFixed.value?.hide?.()
+}
 
-  if (!checkboxlist.value.length) {
-    checkAll.value = false
-    isIndeterminate.value = false
+const openEnumPicker = () => {
+  checklist.value = [...(item.value.enumValue || [])]
+  filterFiled.value = ''
+  if (!enumList.value.length) {
+    initEnumOptions()
   }
-  enumInput.value.$el.click()
 }
 
 const initNameEnumName = () => {
@@ -157,6 +175,7 @@ const initNameEnumName = () => {
   initEnumOptions()
   activeName.value = item.value.name
   checklist.value = [...enumValue]
+  if (item.value.filterType === 'enum' && !item.value.term) item.value.term = 'in'
 }
 const cancelKeyDow = () => {
   if (!showTextArea.value && !keydownCanceled.value) {
@@ -164,12 +183,6 @@ const cancelKeyDow = () => {
   }
   showTextArea.value = true
 }
-const filterTypeChange = () => {
-  item.value.term = ''
-  item.value.value = null
-  initEnumOptions()
-}
-
 const filterTypeChangeTime = () => {
   item.value.term = ''
   item.value.timeValue = null
@@ -184,16 +197,6 @@ const initEnumOptions = () => {
   if (filterType === 'enum' && [0, 5, 7].includes(deType)) {
     multFieldValuesForPermissions({ fieldIds: [fieldId] }).then(res => {
       enumList.value = optionData(res.data)
-      checkboxlist.value = enumList.value.filter(ele => checklist.value.includes(ele))
-      if (checkboxlist.value.length) {
-        checkAll.value = checkboxlist.value.length === enumList.value.length
-        isIndeterminate.value = checkboxlist.value.length !== enumList.value.length
-      }
-
-      if (!checkboxlist.value.length) {
-        checkAll.value = false
-        isIndeterminate.value = false
-      }
     })
   }
 }
@@ -294,8 +297,8 @@ const confirmTimeSelect = () => {
 }
 
 const optionData = data => {
-  if (!data) return null
-  return data.filter(item => !!item)
+  if (!data) return []
+  return data.filter(item => item !== null && item !== undefined)
 }
 const cancel = () => {
   item.value.name = activeName.value || ''
@@ -303,10 +306,8 @@ const cancel = () => {
 const cancelfixValue = () => {
   item.value.enumValue = [...checklist.value]
 }
-const delChecks = (idx, i) => {
+const delChecks = idx => {
   checklist.value.splice(idx, 1)
-  checkboxlist.value = checkboxlist.value.filter(ele => ele !== i)
-  selectedChange()
 }
 const selectItem = ({ name, id, deType }) => {
   activeName.value = name
@@ -314,32 +315,16 @@ const selectItem = ({ name, id, deType }) => {
     fieldId: id,
     name,
     deType,
-    filterType: 'logic',
+    filterType: [0, 5, 7].includes(deType) ? 'enum' : 'logic',
     enumValue: [],
     value: '',
-    term: '',
+    term: [0, 5, 7].includes(deType) ? 'in' : 'eq',
     filterTypeTime: 'dateValue',
     timeValue: '',
     dynamicTimeSetting: {}
   })
-  filterListInit(deType)
   checklist.value = []
-}
-
-const filterListInit = deType => {
-  filterList.value = [
-    {
-      value: 'logic',
-      label: t('deDataset.logic_filter')
-    },
-    {
-      value: 'enum',
-      label: t('deDataset.enum_filter')
-    }
-  ]
-  if (authTargetType.value === 'sysParams' || [1, 2, 3].includes(deType)) {
-    filterList.value = [filterList.value[0]]
-  }
+  initEnumOptions()
 }
 
 const filterListTime = [
@@ -354,9 +339,6 @@ const filterListTime = [
 ]
 const clearAll = () => {
   checklist.value = []
-  checkboxlist.value = []
-  checkAll.value = false
-  isIndeterminate.value = false
 }
 
 const selectAll = () => {
@@ -365,56 +347,44 @@ const selectAll = () => {
       checklist.value.push(ele)
     }
   })
-  checkboxlist.value = [...new Set([...checkListWithFilter.value, ...checkboxlist.value])]
 }
 
-const isIndeterminate = ref(false)
-const checkAll = ref(false)
-const checkboxlist = ref([])
-let oldList = []
-watch(
-  () => checkListWithFilter.value,
-  val => {
-    if (!oldList.length && val.length !== enumList.value.length) {
-      oldList = [...checkboxlist.value]
-    }
-
-    if (oldList.length && val.length === enumList.value.length) {
-      oldList = []
-    }
-
-    const result = val.every(ele => checkboxlist.value.includes(ele))
-    isIndeterminate.value = val.length && checkboxlist.value.length && !result
-    checkAll.value = val.length && result
-  }
+const selectedInSearch = computed(() =>
+  checkListWithFilter.value.filter(ele => checklist.value.includes(ele))
 )
-const selectedChange = () => {
-  const notSelectList = checkListWithFilter.value.filter(ele => !checkboxlist.value.includes(ele))
-  const newCheckboxlist = [...checkboxlist.value]
-  checklist.value = [...new Set(checklist.value.concat(checkboxlist.value))].filter(
-    ele => !notSelectList.includes(ele)
-  )
-  checkboxlist.value = [...new Set(oldList.concat(checkboxlist.value))].filter(
-    ele => !notSelectList.includes(ele)
-  )
-  if (newCheckboxlist.length) {
-    checkAll.value = newCheckboxlist.length === checkListWithFilter.value.length
-    isIndeterminate.value = newCheckboxlist.length !== checkListWithFilter.value.length
-  }
-
-  if (!newCheckboxlist.length) {
-    checkAll.value = false
-    isIndeterminate.value = false
-  }
-}
+const checkAll = computed(
+  () =>
+    checkListWithFilter.value.length > 0 &&
+    selectedInSearch.value.length === checkListWithFilter.value.length
+)
+const isIndeterminate = computed(() => selectedInSearch.value.length > 0 && !checkAll.value)
 const checkAllChange = val => {
   if (val) {
     selectAll()
   } else {
-    checkboxlist.value = checkboxlist.value.filter(ele => !checkListWithFilter.value.includes(ele))
     checklist.value = checklist.value.filter(ele => !checkListWithFilter.value.includes(ele))
   }
-  isIndeterminate.value = false
+}
+const enumSelectionChange = values => {
+  if (['eq', 'not_eq'].includes(item.value.term) && values.length > 1) {
+    checklist.value = values.slice(-1)
+  }
+}
+const operatorChange = term => {
+  if (['in', 'not in'].includes(term)) {
+    item.value.filterType = 'enum'
+    item.value.value = ''
+    initEnumOptions()
+  } else if (['like', 'not like', 'empty', 'not_empty'].includes(term)) {
+    item.value.filterType = 'logic'
+    item.value.enumValue = []
+    checklist.value = []
+  }
+  if (!termNeedsValue.value) {
+    item.value.value = ''
+    item.value.enumValue = []
+    checklist.value = []
+  }
 }
 const addFields = () => {
   const list = textareaValue.value.split('\n').reduce((pre, next) => {
@@ -445,10 +415,8 @@ const emits = defineEmits(['update:item', 'del'])
 
 <template>
   <div class="white-nowrap">
-    <div class="filed" @mouseover="showDel = true" @mouseleave="showDel = false">
-      <span class="filed-title">{{ t('auth.filter_fields') }}</span>
-
-      <el-dropdown trigger="click" :hide-on-click="false">
+    <div class="filed condition-row" @mouseover="showDel = true" @mouseleave="showDel = false">
+      <el-dropdown class="condition-field" trigger="click" :hide-on-click="false">
         <el-input
           :placeholder="t('auth.select_filter_fields')"
           v-model="item.name"
@@ -496,31 +464,26 @@ const emits = defineEmits(['update:item', 'del'])
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <div class="white-nowrap flex-align-center" style="position: relative" v-if="item.fieldId">
-        <template v-if="item.deType !== 1">
-          <span class="filed-title">{{ t('auth.screen_method') }}</span>
+      <div class="condition-controls" v-if="item.fieldId">
+        <el-select
+          class="condition-operator"
+          size="small"
+          v-model="item.term"
+          @change="operatorChange"
+          :placeholder="t('auth.default_method')"
+        >
+          <el-option
+            v-for="ele in conditionOperators"
+            :key="ele.value"
+            :label="t(ele.label)"
+            :value="ele.value"
+          />
+        </el-select>
+
+        <template v-if="item.deType === 1 && termNeedsValue">
           <el-select
             size="small"
-            class="w181"
-            @change="filterTypeChange"
-            v-model="item.filterType"
-            :placeholder="t('auth.select')"
-          >
-            <el-option
-              v-for="ele in filterList"
-              :key="ele.value"
-              :label="ele.label"
-              :value="ele.value"
-            >
-            </el-option>
-          </el-select>
-          <span class="filed-title">{{ t('auth.fixed_value') }}</span>
-        </template>
-        <template v-else>
-          <el-select
-            size="small"
-            class="w100"
-            style="margin-left: 16px"
+            class="date-value-type"
             @change="filterTypeChangeTime"
             v-model="item.filterTypeTime"
             :placeholder="t('auth.select')"
@@ -534,24 +497,10 @@ const emits = defineEmits(['update:item', 'del'])
             </el-option>
           </el-select>
         </template>
-        <template v-if="item.filterType === 'logic'">
-          <el-select
-            class="w100"
-            size="small"
-            v-model="item.term"
-            :placeholder="t('auth.default_method')"
-          >
-            <el-option
-              v-for="ele in operators"
-              :key="ele.value"
-              :label="t(ele.label)"
-              :value="ele.value"
-            >
-            </el-option>
-          </el-select>
 
+        <template v-if="!enumTerm && termNeedsValue">
           <template v-if="authTargetType === 'sysParams'">
-            <el-select class="w70 mar5" size="small" v-model="item.value">
+            <el-select class="condition-value" size="small" v-model="item.value">
               <el-option
                 v-for="itx in sysParamsIln"
                 :key="itx.value"
@@ -561,14 +510,9 @@ const emits = defineEmits(['update:item', 'del'])
               </el-option>
             </el-select>
           </template>
-          <template
-            v-else-if="
-              [2, 3].includes(item.deType) &&
-              !['null', 'empty', 'not_null', 'not_empty'].includes(item.term)
-            "
-          >
+          <template v-else-if="[2, 3].includes(item.deType) && termNeedsValue">
             <el-input-number
-              class="w70 mar5"
+              class="condition-value"
               size="small"
               effect="plain"
               v-model="item.value"
@@ -576,12 +520,12 @@ const emits = defineEmits(['update:item', 'del'])
             ></el-input-number>
             <div class="bottom-line"></div>
           </template>
-          <template v-else-if="!['null', 'empty', 'not_null', 'not_empty'].includes(item.term)">
+          <template v-else>
             <el-input
               v-if="item.deType === 1 && item.filterTypeTime === 'dynamicDate' && !item.timeValue"
               @click="handleClick"
               readonly
-              class="w70 mar5"
+              class="condition-value"
               size="small"
               v-model="item.timeValue"
             />
@@ -594,7 +538,7 @@ const emits = defineEmits(['update:item', 'del'])
               ><el-input
                 @click="handleClick"
                 readonly
-                class="w70 mar5"
+                class="condition-value"
                 size="small"
                 v-model="item.timeValue"
             /></el-tooltip>
@@ -607,26 +551,35 @@ const emits = defineEmits(['update:item', 'del'])
               ><el-input
                 readonly
                 @click="showTimeDialog(item)"
-                class="w70 mar5"
+                class="condition-value"
                 size="small"
                 v-model="item.value"
             /></el-tooltip>
-            <el-input v-else class="w70 mar5" size="small" v-model="item.value" />
+            <el-input v-else class="condition-value" size="small" v-model="item.value" />
             <div class="bottom-line"></div>
           </template>
         </template>
 
         <el-popover
+          v-if="enumTerm && termNeedsValue"
           popper-class="de-el-dropdown-menu-fixed"
-          v-else
-          width="360px"
+          width="min(560px, calc(100vw - 32px))"
           trigger="click"
+          placement="top-start"
           ref="deElDropdownMenuFixed"
           :hide-on-click="false"
+          @show="openEnumPicker"
         >
           <template #reference>
             <el-input
-              :value="item.enumValue.join(',')"
+              class="condition-value enum-value-summary"
+              :value="
+                item.enumValue.length > 1
+                  ? `${item.enumValue[0]} ${t('chart.enum_value_summary', {
+                      count: item.enumValue.length
+                    })}`
+                  : item.enumValue.join(',')
+              "
               ref="enumInput"
               size="small"
               readonly
@@ -635,71 +588,73 @@ const emits = defineEmits(['update:item', 'del'])
             </el-input>
           </template>
           <div class="de-panel clearfix">
-            <div class="mod-left">
+            <div class="enum-search">
               <el-input :placeholder="t('auth.enter_keywords')" v-model="filterFiled"> </el-input>
-              <ul class="autochecker-list" style="height: 260px">
-                <div class="select-all">
-                  <el-checkbox
-                    v-model="checkAll"
-                    :indeterminate="isIndeterminate"
-                    :label="t('component.allSelect')"
-                    @change="checkAllChange"
-                  />
-                </div>
-                <el-checkbox-group v-model="checkboxlist" @change="selectedChange">
-                  <el-scrollbar height="230px">
-                    <li :key="i" v-for="i in checkListWithFilter" :title="i">
-                      <el-checkbox :label="i">
-                        {{ i }}
-                      </el-checkbox>
-                    </li>
-                  </el-scrollbar>
-                </el-checkbox-group>
-              </ul>
             </div>
-            <div class="mod-left right-de">
-              <div class="right-top clearfix">
-                {{ t('common.list_selection') }}
-                <div class="right-btn">
-                  <span @click="cancelKeyDow">
-                    <i class="el-icon-edit"></i>
-                    {{ t('auth.manual_input') }}
-                  </span>
-                  <transition name="el-zoom-in-top">
-                    <div v-if="showTextArea" class="de-el-dropdown-menu-manu">
-                      <div class="text-area">
-                        <textarea
-                          :placeholder="t('auth.please_fill')"
-                          class="input"
-                          v-model="textareaValue"
-                        ></textarea>
-                        <div class="text-area-btn">
-                          <button type="button" @click="showTextArea = false" class="btn">
-                            <span>{{ t('auth.close') }}</span>
-                          </button>
-                          <button type="button" @click="addFields" class="btn right-add">
-                            <span>{{ t('auth.add') }}</span>
-                          </button>
+            <div class="enum-columns">
+              <div class="mod-left">
+                <ul class="autochecker-list">
+                  <div v-if="!['eq', 'not_eq'].includes(item.term)" class="select-all">
+                    <el-checkbox
+                      :model-value="checkAll"
+                      :indeterminate="isIndeterminate"
+                      :label="t('chart.select_current_search_results')"
+                      @change="checkAllChange"
+                    />
+                  </div>
+                  <el-scrollbar class="enum-scroll">
+                    <el-checkbox-group v-model="checklist" @change="enumSelectionChange">
+                      <li :key="i" v-for="i in checkListWithFilter" :title="i">
+                        <el-checkbox :label="i">{{ i }}</el-checkbox>
+                      </li>
+                    </el-checkbox-group>
+                  </el-scrollbar>
+                </ul>
+              </div>
+              <div class="mod-left right-de">
+                <div class="right-top clearfix">
+                  {{ t('common.list_selection') }}
+                  <div class="right-btn">
+                    <span @click="cancelKeyDow">
+                      <i class="el-icon-edit"></i>
+                      {{ t('auth.manual_input') }}
+                    </span>
+                    <transition name="el-zoom-in-top">
+                      <div v-if="showTextArea" class="de-el-dropdown-menu-manu">
+                        <div class="text-area">
+                          <textarea
+                            :placeholder="t('auth.please_fill')"
+                            class="input"
+                            v-model="textareaValue"
+                          ></textarea>
+                          <div class="text-area-btn">
+                            <button type="button" @click="showTextArea = false" class="btn">
+                              <span>{{ t('auth.close') }}</span>
+                            </button>
+                            <button type="button" @click="addFields" class="btn right-add">
+                              <span>{{ t('auth.add') }}</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </transition>
+                    </transition>
+                  </div>
                 </div>
+                <ul class="autochecker-list selected-list">
+                  <div class="clear-checkbox__label">
+                    <span>{{ t('auth.added') + ' ' + checklist.length }}</span
+                    ><span @click="clearAll">{{ t('user.clear_button') }}</span>
+                  </div>
+                  <el-scrollbar class="enum-scroll">
+                    <li :key="i" v-for="(i, idx) in checklist">
+                      <div :title="i" class="right-checkbox__label">{{ i }}</div>
+                      <el-icon @click="delChecks(idx)" class="remove-hover-icon">
+                        <Icon><icon_close_outlined class="svg-icon" /></Icon>
+                      </el-icon>
+                    </li>
+                  </el-scrollbar>
+                </ul>
               </div>
-              <ul class="autochecker-list">
-                <div class="clear-checkbox__label">
-                  <span>{{ t('auth.added') + ' ' + checklist.length }}</span
-                  ><span @click="clearAll">{{ t('user.clear_button') }}</span>
-                </div>
-                <el-scrollbar height="230px">
-                  <li :key="i" v-for="(i, idx) in checklist">
-                    <div :title="i" class="right-checkbox__label">{{ i }}</div>
-                    <el-icon @click="delChecks(idx, i)" class="remove-hover-icon">
-                      <Icon><icon_close_outlined class="svg-icon" /></Icon>
-                    </el-icon>
-                  </li>
-                </el-scrollbar>
-              </ul>
             </div>
             <div class="right-menu-foot">
               <el-button secondary @click="cancelSelect">
@@ -712,7 +667,7 @@ const emits = defineEmits(['update:item', 'del'])
           </div>
         </el-popover>
       </div>
-      <el-icon v-if="showDel" class="font12" @click="emits('del')">
+      <el-icon class="font12 condition-delete" @click="emits('del')">
         <Icon name="icon_delete-trash_outlined"
           ><icon_deleteTrash_outlined class="svg-icon"
         /></Icon>
@@ -744,9 +699,9 @@ const emits = defineEmits(['update:item', 'del'])
   white-space: nowrap;
 }
 .filed {
-  width: fit-content;
-  height: 41.4px;
-  padding: 1px 3px 1px 10px;
+  width: calc(100% - 20px);
+  min-height: 48px;
+  padding: 8px 10px;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -754,7 +709,45 @@ const emits = defineEmits(['update:item', 'del'])
   min-width: 200px;
   justify-content: left;
   position: relative;
-  white-space: nowrap;
+  white-space: normal;
+  gap: 8px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+
+  .condition-field {
+    flex: 0 1 220px;
+    min-width: 140px;
+  }
+
+  .condition-controls {
+    display: flex;
+    flex: 1 1 360px;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .condition-operator {
+    width: 132px !important;
+    flex: 0 0 132px;
+  }
+
+  .condition-value {
+    width: min(280px, 100%) !important;
+    flex: 1 1 180px;
+    min-width: 120px;
+  }
+
+  .date-value-type {
+    width: 112px !important;
+    flex: 0 0 112px;
+  }
+
+  .condition-delete {
+    opacity: 0.7;
+    flex: 0 0 auto;
+  }
   :deep(.ed-input-number.is-controls-right .ed-input__wrapper) {
     padding-left: 1px !important;
     padding-right: 1px !important;
@@ -912,7 +905,8 @@ const emits = defineEmits(['update:item', 'del'])
   }
 }
 .filed:hover {
-  background-color: #e9eaef;
+  background-color: #f8f9fa;
+  border-color: #bbbfc4;
   :deep(.ed-input-number__decrease),
   :deep(.ed-input-number__increase) {
     display: flex;
@@ -1017,24 +1011,34 @@ const emits = defineEmits(['update:item', 'del'])
 .de-el-dropdown-menu-fixed {
   padding: 0 !important;
   border: none !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
   .de-panel {
     color: rgba(0, 0, 0, 0.65);
     font-size: 14px;
     box-sizing: border-box;
     position: relative;
     padding: 0;
-    width: 360px;
-    max-width: 600px;
+    width: 560px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 48px);
+    display: flex;
+    flex-direction: column;
     min-height: 30px;
     background-color: #fff;
     box-shadow: none;
     border: 1px solid rgba(0, 0, 0, 0.05);
     .right-menu-foot {
+      position: relative;
+      z-index: 20;
+      background: #fff;
       text-align: right;
       padding: 5px;
       float: right;
       width: 100%;
       border-top: 1px solid hsla(0, 0%, 59%, 0.1);
+      flex: 0 0 auto;
       .ed-button {
         line-height: 28px;
         height: 28px;
@@ -1048,8 +1052,8 @@ const emits = defineEmits(['update:item', 'del'])
       vertical-align: top;
       padding: 5px;
       width: 50%;
-      height: 300px;
-      float: left;
+      min-width: 0;
+      height: min(340px, calc(100vh - 180px));
       box-sizing: border-box;
       .ed-input__wrapper {
         font-family: inherit;
@@ -1082,6 +1086,21 @@ const emits = defineEmits(['update:item', 'del'])
           border-color: none;
         }
       }
+    }
+
+    .enum-search {
+      flex: 0 0 auto;
+      padding: 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .enum-columns {
+      display: flex;
+      min-height: 0;
+    }
+
+    .enum-scroll {
+      height: calc(100% - 34px);
     }
 
     .right-de {
@@ -1293,5 +1312,39 @@ const emits = defineEmits(['update:item', 'del'])
 .clearfix {
   /* 触发 hasLayout */
   zoom: 1;
+}
+
+@media (max-width: 720px) {
+  .filed.condition-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+
+    .condition-field,
+    .condition-controls {
+      flex-basis: 100%;
+      width: 100%;
+    }
+
+    .condition-controls {
+      flex-wrap: wrap;
+    }
+  }
+
+  .de-el-dropdown-menu-fixed .de-panel {
+    .enum-columns {
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .mod-left {
+      width: 100%;
+      height: min(220px, calc((100vh - 190px) / 2));
+    }
+
+    .right-de {
+      border-left: 0;
+      border-top: 1px solid hsla(0, 0%, 59%, 0.1);
+    }
+  }
 }
 </style>

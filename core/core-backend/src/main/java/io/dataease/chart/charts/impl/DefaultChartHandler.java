@@ -7,6 +7,7 @@ import io.dataease.chart.constant.ChartConstants;
 import io.dataease.chart.manage.ChartDataManage;
 import io.dataease.chart.manage.ChartViewManege;
 import io.dataease.chart.utils.ChartDataBuild;
+import io.dataease.chart.utils.SingleCategoryRank;
 import io.dataease.constant.SQLConstants;
 import io.dataease.dataset.manage.DatasetTableFieldManage;
 import io.dataease.engine.sql.SQLProvider;
@@ -132,13 +133,15 @@ public class DefaultChartHandler extends AbstractChartPlugin {
         var allFields = (List<ChartViewFieldDTO>) filterResult.getContext().get("allFields");
         Dimension2SQLObj.dimension2sqlObj(sqlMeta, xAxis, FieldUtil.transFields(allFields), crossDs, dsMap, Utils.getParams(FieldUtil.transFields(allFields)), view.getCalParams(), pluginManage);
         Quota2SQLObj.quota2sqlObj(sqlMeta, yAxis, FieldUtil.transFields(allFields), crossDs, dsMap, Utils.getParams(FieldUtil.transFields(allFields)), view.getCalParams(), pluginManage);
-        String querySql = SQLProvider.createQuerySQL(sqlMeta, true, needOrder, view);
+        boolean fullRanking = SingleCategoryRank.required(view, xAxis, yAxis);
+        String querySql = SQLProvider.createQuerySQL(sqlMeta, true, needOrder, fullRanking ? SingleCategoryRank.fullView(view) : view);
         querySql = provider.rebuildSQL(querySql, sqlMeta, crossDs, dsMap);
         datasourceRequest.setQuery(querySql);
         logger.debug("calcite chart sql: " + querySql);
         List<String[]> data = (List<String[]>) provider.fetchResultField(datasourceRequest).get("data");
         //自定义排序
-        data = ChartDataUtil.resultCustomSort(xAxis, yAxis, view.getSortPriority(), data);
+        data = fullRanking ? SingleCategoryRank.apply(view, xAxis, yAxis, data)
+                : ChartDataUtil.resultCustomSort(xAxis, yAxis, view.getSortPriority(), data);
         //快速计算
         var extStack = formatResult.getAxisMap().get(ChartAxis.extStack);
         var xAxisExt = formatResult.getAxisMap().get(ChartAxis.xAxisExt);

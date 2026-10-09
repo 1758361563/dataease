@@ -1,4 +1,5 @@
 <script lang="tsx" setup>
+import { activeSortFields } from '../../js/chartDisplayLimit'
 import { clearOtherMixSorts } from '../../js/panel/charts/others/chart-mix-sort'
 import icon_sortAToZ_outlined from '@/assets/svg/icon_sort-a-to-z_outlined.svg'
 import icon_sortZToA_outlined from '@/assets/svg/icon_sort-z-to-a_outlined.svg'
@@ -57,6 +58,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'onSortChange',
   'onDimensionItemRemove',
   'onCustomSort',
   'onDimensionItemChange',
@@ -133,6 +135,7 @@ const sort = param => {
     item.value.customSort = []
     delete item.value.axisType
     emit('onDimensionItemChange', item.value)
+    emit('onSortChange')
   }
 }
 
@@ -211,7 +214,11 @@ const showSortPriority = computed(() => {
   if (props.chart.type.includes('chart-mix')) {
     return false
   }
-  return showSort.value
+  return (
+    showSort.value &&
+    (activeSortFields(props.chart).length > 1 ||
+      (props.chart.type === 'table-pivot' && activeSortFields(props.chart).length > 0))
+  )
 })
 const toggleHide = () => {
   item.value.index = props.index
@@ -416,7 +423,9 @@ onMounted(() => {
             class="menu-item-padding"
           >
             <el-icon />
-            <span>{{ t('chart.sort_priority') }}</span>
+            <span>{{
+              chart.type === 'table-pivot' ? '排序范围与优先级' : t('chart.sort_priority')
+            }}</span>
           </el-dropdown-item>
           <el-dropdown-item
             @click.prevent

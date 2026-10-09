@@ -1113,6 +1113,9 @@ declare interface ChartLabelAttr {
  * 提示设置
  */
 declare interface ChartTooltipAttr {
+  /** Absent on legacy charts: preserve automatic tooltip behavior. */
+  contentMode?: 'explicit'
+  autoAxisKeys?: string[]
   /**
    * 显隐
    */

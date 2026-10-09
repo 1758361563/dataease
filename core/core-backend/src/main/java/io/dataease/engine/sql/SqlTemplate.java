@@ -43,7 +43,7 @@ public class SqlTemplate {
             "<endif>\n" +
             ">>";
 
-    public static String PREVIEW_SQL = "previewSql(limitFiled, groups, aggregators, filters, orders, table, isGroup, notUseAs, useAliasForGroup, distinct)\n" +
+    public static String PREVIEW_SQL = "previewSql(limitFiled, groups, aggregators, groupBys, filters, orders, table, isGroup, notUseAs, useAliasForGroup, distinct)\n" +
             "::=<<\n" +
             "SELECT\n" +
             "<if(limitFiled)>\n" +
@@ -68,13 +68,13 @@ public class SqlTemplate {
             "WHERE\n" +
             "    <filters:{filter|<if(filter)><filter><endif>}; separator=\"\\nAND \">\n" +
             "<endif>\n" +
-            "<if(isGroup && groups && !useAliasForGroup)>\n" +
+            "<if(isGroup && groupBys && !useAliasForGroup)>\n" +
             "GROUP BY\n" +
-            "    <groups:{group|<if(group)><group.fieldName><endif>}; separator=\",\\n\">\n" +
+            "    <groupBys:{group|<if(group)><group.fieldName><endif>}; separator=\",\\n\">\n" +
             "<endif>\n" +
-            "<if(isGroup && groups && useAliasForGroup)>\n" +
+            "<if(isGroup && groupBys && useAliasForGroup)>\n" +
             "GROUP BY\n" +
-            "    <groups:{group|<if(group)><group.fieldAlias><endif>}; separator=\",\\n\">\n" +
+            "    <groupBys:{group|<if(group)><group.fieldAlias><endif>}; separator=\",\\n\">\n" +
             "<endif>\n" +
             "<if(orders)>\n" +
             "ORDER BY\n" +

@@ -15,6 +15,7 @@ import org.stringtemplate.v4.STGroupString;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * @Author Junjun
@@ -46,6 +47,7 @@ public class SQLProvider {
         st_sql.add("isGroup", isGroup);
         st_sql.add("distinct", distinct);
         if (ObjectUtils.isNotEmpty(xFields)) st_sql.add("groups", xFields);
+        addGroupByFields(st_sql, xFields, null);
         if (ObjectUtils.isNotEmpty(tableObj)) st_sql.add("table", tableObj);
         String customWheres = sqlMeta.getCustomWheres();
         String extWheres = sqlMeta.getExtWheres();
@@ -92,6 +94,7 @@ public class SQLProvider {
         List<String> yWheres = sqlMeta.getYWheres();
         List<SQLObj> yOrders = sqlMeta.getYOrders();
         if (ObjectUtils.isNotEmpty(yFields)) st_sql.add("aggregators", yFields);
+        addGroupByFields(st_sql, xFields, yFields);
 
         String customWheres = sqlMeta.getCustomWheres();
         String extWheres = sqlMeta.getExtWheres();
@@ -149,6 +152,7 @@ public class SQLProvider {
                 orders.add(result);
             }
         }
+        orders = stableCategoryOrders(view, xFields, orders);
         if (ObjectUtils.isNotEmpty(orders)) st.add("orders", orders);
 
         return sqlLimit(st.render(), view);
@@ -169,6 +173,7 @@ public class SQLProvider {
         List<SQLObj> yFields = sqlMeta.getYFields();
         List<String> yWheres = sqlMeta.getYWheres();
         if (ObjectUtils.isNotEmpty(yFields)) st_sql.add("aggregators", yFields);
+        addGroupByFields(st_sql, xFields, yFields);
 
         String customWheres = sqlMeta.getCustomWheres();
         String extWheres = sqlMeta.getExtWheres();
@@ -196,6 +201,25 @@ public class SQLProvider {
         return sqlLimit(st.render(), view);
     }
 
+    private static void addGroupByFields(ST sql, List<SQLObj> xFields, List<SQLObj> yFields) {
+        List<SQLObj> groupByFields = new ArrayList<>();
+        if (ObjectUtils.isNotEmpty(xFields)) {
+            groupByFields.addAll(xFields);
+        }
+        if (ObjectUtils.isNotEmpty(yFields)) {
+            yFields.stream()
+                    .filter(field -> StringUtils.isNotBlank(field.getGroupField()))
+                    .map(field -> SQLObj.builder()
+                            .fieldName(field.getGroupField())
+                            .fieldAlias(field.getGroupAlias())
+                            .build())
+                    .forEach(groupByFields::add);
+        }
+        if (!groupByFields.isEmpty()) {
+            sql.add("groupBys", groupByFields);
+        }
+    }
+
     public static String sqlLimit(String sql, ChartViewDTO view) {
         if (StringUtils.equalsAnyIgnoreCase(view.getType(), "table-info", "table-normal")) {
             return sql;
@@ -205,5 +229,56 @@ public class SQLProvider {
         } else {
             return sql;
         }
+    }
+
+    // A single category has one aggregate row. Keep nulls last in either direction,
+    // then break equal metric values by category before LIMIT selects the members.
+    static List<SQLObj> stableCategoryOrders(ChartViewDTO view, List<SQLObj> dimensions, List<SQLObj> orders) {
+        if (isGlobalPivotSort(view) && CollectionUtils.isNotEmpty(dimensions) && CollectionUtils.isNotEmpty(orders)) {
+            SQLObj primary = orders.getFirst();
+            if (!StringUtils.equalsAnyIgnoreCase(primary.getOrderDirection(), "asc", "desc")) return orders;
+            List<SQLObj> stable = new ArrayList<>();
+            stable.add(nullsLast(primary.getOrderAlias()));
+            stable.add(primary);
+            for (SQLObj dimension : dimensions) {
+                String alias = String.format(SQLConstants.FIELD_DOT, dimension.getFieldAlias());
+                if (!alias.replace("`", "").equals(primary.getOrderAlias().replace("`", ""))) {
+                    stable.add(nullsLast(alias));
+                    stable.add(SQLObj.builder().orderAlias(alias).orderDirection("ASC").build());
+                }
+            }
+            return stable;
+        }
+        if (view.getType() == null || !Set.of("bar", "bar-horizontal", "bar-group", "bar-stack", "bar-group-stack",
+                "bar-percentage", "bar-group-horizontal", "bar-stack-horizontal", "bar-percentage-horizontal",
+                "line", "area", "area-stack", "pie", "pie-donut").contains(view.getType())
+                || dimensions == null || dimensions.size() != 1 || orders.size() != 1
+                || CollectionUtils.isNotEmpty(view.getXAxisExt()) || CollectionUtils.isNotEmpty(view.getExtStack())
+                || CollectionUtils.isNotEmpty(view.getExtBubble())) return orders;
+        SQLObj primary = orders.getFirst();
+        if (!StringUtils.equalsAnyIgnoreCase(primary.getOrderDirection(), "asc", "desc")) return orders;
+        List<SQLObj> stable = new ArrayList<>();
+        stable.add(nullsLast(primary.getOrderAlias()));
+        stable.add(primary);
+        String category = String.format(SQLConstants.FIELD_DOT, dimensions.getFirst().getFieldAlias());
+        if (!category.replace("`", "").equals(primary.getOrderAlias().replace("`", ""))) {
+            stable.add(nullsLast(category));
+            stable.add(SQLObj.builder().orderAlias(category).orderDirection("ASC").build());
+        }
+        return stable;
+    }
+
+    private static boolean isGlobalPivotSort(ChartViewDTO view) {
+        return StringUtils.equalsIgnoreCase(view.getType(), "table-pivot")
+                && view.getXAxis() != null && view.getXAxis().size() >= 2
+                && CollectionUtils.isEmpty(view.getXAxisExt())
+                && CollectionUtils.isNotEmpty(view.getSortPriority())
+                && StringUtils.equalsIgnoreCase(view.getSortPriority().getFirst().getAxis(), "yAxis")
+                && StringUtils.equalsIgnoreCase(view.getSortPriority().getFirst().getScope(), "GLOBAL");
+    }
+
+    private static SQLObj nullsLast(String alias) {
+        return SQLObj.builder().orderAlias("CASE WHEN " + alias + " IS NULL THEN 1 ELSE 0 END")
+                .orderDirection("ASC").build();
     }
 }

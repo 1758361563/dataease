@@ -1,3 +1,4 @@
+import { getExplicitChartTooltip } from '@/views/chart/components/js/panel/common/common_antv'
 import type { Column, ColumnOptions } from '@antv/g2plot/esm/plots/column'
 import { cloneDeep, defaults, each, groupBy, isEmpty, merge } from 'lodash-es'
 import {
@@ -210,6 +211,9 @@ export class Bar extends G2PlotChartView<ColumnOptions, Column> {
   }
 
   protected configTooltip(chart: Chart, options: ColumnOptions): ColumnOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     return super.configMultiSeriesTooltip(chart, options)
   }
 
@@ -397,6 +401,9 @@ export class StackBar extends Bar {
   }
 
   protected configTooltip(chart: Chart, options: ColumnOptions): ColumnOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const tooltipAttr = parseJson(chart.customAttr).tooltip
     if (!tooltipAttr.show) {
       return {
@@ -804,6 +811,9 @@ export class GroupStackBar extends StackBar {
   }
 
   protected configTooltip(chart: Chart, options: ColumnOptions): ColumnOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const tooltipAttr = parseJson(chart.customAttr).tooltip
     if (!tooltipAttr.show) {
       return {
@@ -923,6 +933,9 @@ export class PercentageStackBar extends GroupStackBar {
   }
 
   protected configTooltip(chart: Chart, options: ColumnOptions): ColumnOptions {
+    if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
+      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+    }
     const tooltipAttr = parseJson(chart.customAttr).tooltip
     if (!tooltipAttr.show) {
       return {

@@ -217,6 +217,9 @@ declare interface ChartViewField {
    * 对比指标卡既有 placement 身份。resultKey fallback。
    */
   metricInstanceId?: string
+  /** Optional persisted sort metadata. Legacy pivot charts default to GROUP. */
+  axis?: string
+  scope?: 'GROUP' | 'GLOBAL'
 }
 
 declare interface Filter {
