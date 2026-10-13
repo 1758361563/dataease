@@ -63,6 +63,13 @@ public class Det2AppDatasetRebindV1Manage {
             Map<Long, Long> dsTableFieldsIdMap,
             Map<String, String> dsTableFieldsDatasetNameMap,
             Map<Long, Long> datasourceIdMap) {
+        if (appData == null || request == null) return false;
+        var calculations = io.dataease.visualization.calculation.DashboardCalculationManage.parse(request.getCalculationConfig());
+        // The physical-field-only V1 path cannot rewrite dashboard/private calculated field graphs.
+        // Use the general application mapper; saveCanvas performs the scoped graph rebind afterwards.
+        if (!calculations.getParameters().isEmpty() || !calculations.getDatasetFields().isEmpty()
+                || (request.getCanvasViewInfo() != null && request.getCanvasViewInfo().values().stream()
+                .anyMatch(chart -> chart.getViewFields() != null && chart.getViewFields().stream().anyMatch(field -> field.getChartId() != null)))) return false;
         if (appData == null || !isV1Eligible(appData)) {
             return false;
         }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getCanvasStyle, getShapeItemStyle } from '@/utils/style'
+import DashboardParameterBar from '@/components/visualization/DashboardParameterBar.vue'
 import ComponentWrapper from './ComponentWrapper.vue'
 import { changeStyleWithScale } from '@/utils/translate'
 import { computed, nextTick, ref, toRefs, watch, onBeforeUnmount, onMounted, reactive } from 'vue'
@@ -669,108 +670,122 @@ defineExpose({
 
 <template>
   <div
-    :id="domId"
-    class="canvas-container"
-    :style="canvasStyle"
+    class="preview-frame"
     :class="{
-      'de-download-custom': downloadStatus,
-      'datav-preview': dataVPreview,
-      'datav-preview-unpublish': showUnpublishFlag,
-      // company: same inset token as editor DeCanvas .db-canvas
-      'bi-tab-inner-preview': isTabInnerPreview
+      'dashboard-preview-layout': canvasId === 'canvas-main' && dvInfo.type === 'dashboard'
     }"
-    ref="previewCanvas"
-    @mousedown="handleMouseDown"
-    @scroll="scrollPreview"
-    v-if="state.initState"
   >
-    <!--弹框触发区域-->
-    <canvas-filter-btn :is-fixed="isOverSize" v-if="filterBtnShow"></canvas-filter-btn>
-    <!-- 弹框区域 -->
-    <PopArea
-      v-if="popAreaAvailable"
-      :dv-info="dvInfo"
-      :canvas-id="canvasId"
-      :canvas-style-data="canvasStyleData"
-      :canvasViewInfo="canvasViewInfo"
-      :pop-component-data="popComponentData"
-      :scale="scaleMin"
-      :canvas-state="canvasState"
-      :show-position="'preview'"
-    ></PopArea>
-    <canvas-opt-bar
-      v-if="showLinkageButton"
-      :canvas-id="canvasId"
-      :canvas-style-data="canvasStyleData"
-      :component-data="baseComponentData"
-      :is-fixed="isFixedFlag"
-    ></canvas-opt-bar>
-    <!--
+    <DashboardParameterBar
+      v-if="canvasId === 'canvas-main' && dvInfo.type === 'dashboard'"
+      :info="dvInfo"
+      :components="componentData"
+      :views="canvasViewInfo"
+    />
+    <div
+      :id="domId"
+      v-bind="$attrs"
+      class="canvas-container"
+      :style="canvasStyle"
+      :class="{
+        'de-download-custom': downloadStatus,
+        'datav-preview': dataVPreview,
+        'datav-preview-unpublish': showUnpublishFlag,
+        // company: same inset token as editor DeCanvas .db-canvas
+        'bi-tab-inner-preview': isTabInnerPreview
+      }"
+      ref="previewCanvas"
+      @mousedown="handleMouseDown"
+      @scroll="scrollPreview"
+      v-if="state.initState"
+    >
+      <!--弹框触发区域-->
+      <canvas-filter-btn :is-fixed="isOverSize" v-if="filterBtnShow"></canvas-filter-btn>
+      <!-- 弹框区域 -->
+      <PopArea
+        v-if="popAreaAvailable"
+        :dv-info="dvInfo"
+        :canvas-id="canvasId"
+        :canvas-style-data="canvasStyleData"
+        :canvasViewInfo="canvasViewInfo"
+        :pop-component-data="popComponentData"
+        :scale="scaleMin"
+        :canvas-state="canvasState"
+        :show-position="'preview'"
+      ></PopArea>
+      <canvas-opt-bar
+        v-if="showLinkageButton"
+        :canvas-id="canvasId"
+        :canvas-style-data="canvasStyleData"
+        :component-data="baseComponentData"
+        :is-fixed="isFixedFlag"
+      ></canvas-opt-bar>
+      <!--
       Tab/group preview: always mount .preview-grid-root (measure + containing
       block). Inset via margin on the root — NOT padding on .canvas-container —
       so abspos wrappers' left:0 matches the measured width box.
     -->
-    <div v-if="isTabInnerPreview" ref="previewGridRoot" class="preview-grid-root">
-      <component-wrapper
-        v-for="(item, index) in baseComponentData"
-        v-show="renderReady && !showUnpublishFlag && item.isShow"
-        :active="item.id === (curComponent || {})['id']"
-        :canvas-id="canvasId"
-        :canvas-style-data="canvasStyleData"
-        :dv-info="dvInfo"
-        :cur-style="getShapeItemShowStyle(item)"
-        :canvas-view-info="canvasViewInfo"
-        :view-info="canvasViewInfo[item.id]"
-        :key="index"
-        :config="item"
-        :style="getShapeItemShowStyle(item)"
-        :show-position="showPosition"
-        :search-count="curSearchCount"
-        :scale="mobileInPc && isDashboard() ? 100 : scaleMin"
-        :is-selector="props.isSelector"
-        :font-family="canvasStyleData.fontFamily || fontFamily"
-        :scroll-main="state.scrollMain"
-        @userViewEnlargeOpen="userViewEnlargeOpen($event, item)"
-        @datasetParamsInit="datasetParamsInit(item)"
-        @onPointClick="onPointClick"
-        :index="index"
-      />
+      <div v-if="isTabInnerPreview" ref="previewGridRoot" class="preview-grid-root">
+        <component-wrapper
+          v-for="(item, index) in baseComponentData"
+          v-show="renderReady && !showUnpublishFlag && item.isShow"
+          :active="item.id === (curComponent || {})['id']"
+          :canvas-id="canvasId"
+          :canvas-style-data="canvasStyleData"
+          :dv-info="dvInfo"
+          :cur-style="getShapeItemShowStyle(item)"
+          :canvas-view-info="canvasViewInfo"
+          :view-info="canvasViewInfo[item.id]"
+          :key="index"
+          :config="item"
+          :style="getShapeItemShowStyle(item)"
+          :show-position="showPosition"
+          :search-count="curSearchCount"
+          :scale="mobileInPc && isDashboard() ? 100 : scaleMin"
+          :is-selector="props.isSelector"
+          :font-family="canvasStyleData.fontFamily || fontFamily"
+          :scroll-main="state.scrollMain"
+          @userViewEnlargeOpen="userViewEnlargeOpen($event, item)"
+          @datasetParamsInit="datasetParamsInit(item)"
+          @onPointClick="onPointClick"
+          :index="index"
+        />
+      </div>
+      <template v-else-if="renderReady && !showUnpublishFlag">
+        <component-wrapper
+          v-for="(item, index) in baseComponentData"
+          v-show="item.isShow"
+          :active="item.id === (curComponent || {})['id']"
+          :canvas-id="canvasId"
+          :canvas-style-data="canvasStyleData"
+          :dv-info="dvInfo"
+          :cur-style="getShapeItemShowStyle(item)"
+          :canvas-view-info="canvasViewInfo"
+          :view-info="canvasViewInfo[item.id]"
+          :key="index"
+          :config="item"
+          :style="getShapeItemShowStyle(item)"
+          :show-position="showPosition"
+          :search-count="curSearchCount"
+          :scale="mobileInPc && isDashboard() ? 100 : scaleMin"
+          :is-selector="props.isSelector"
+          :font-family="canvasStyleData.fontFamily || fontFamily"
+          :scroll-main="state.scrollMain"
+          @userViewEnlargeOpen="userViewEnlargeOpen($event, item)"
+          @datasetParamsInit="datasetParamsInit(item)"
+          @onPointClick="onPointClick"
+          :index="index"
+        />
+      </template>
+      <empty-background
+        v-if="showUnpublishFlag"
+        :description="t('visualization.resource_not_published')"
+        img-type="none"
+      >
+      </empty-background>
+      <user-view-enlarge ref="userViewEnlargeRef"></user-view-enlarge>
     </div>
-    <template v-else-if="renderReady && !showUnpublishFlag">
-      <component-wrapper
-        v-for="(item, index) in baseComponentData"
-        v-show="item.isShow"
-        :active="item.id === (curComponent || {})['id']"
-        :canvas-id="canvasId"
-        :canvas-style-data="canvasStyleData"
-        :dv-info="dvInfo"
-        :cur-style="getShapeItemShowStyle(item)"
-        :canvas-view-info="canvasViewInfo"
-        :view-info="canvasViewInfo[item.id]"
-        :key="index"
-        :config="item"
-        :style="getShapeItemShowStyle(item)"
-        :show-position="showPosition"
-        :search-count="curSearchCount"
-        :scale="mobileInPc && isDashboard() ? 100 : scaleMin"
-        :is-selector="props.isSelector"
-        :font-family="canvasStyleData.fontFamily || fontFamily"
-        :scroll-main="state.scrollMain"
-        @userViewEnlargeOpen="userViewEnlargeOpen($event, item)"
-        @datasetParamsInit="datasetParamsInit(item)"
-        @onPointClick="onPointClick"
-        :index="index"
-      />
-    </template>
-    <empty-background
-      v-if="showUnpublishFlag"
-      :description="t('visualization.resource_not_published')"
-      img-type="none"
-    >
-    </empty-background>
-    <user-view-enlarge ref="userViewEnlargeRef"></user-view-enlarge>
+    <empty-background v-if="!state.initState" description="参数不能为空" img-type="noneWhite" />
   </div>
-  <empty-background v-if="!state.initState" description="参数不能为空" img-type="noneWhite" />
   <de-fullscreen ref="fullScreeRef"></de-fullscreen>
   <dataset-params-component ref="customDatasetParamsRef"></dataset-params-component>
   <XpackComponent ref="openHandler" jsname="L2NvbXBvbmVudC9lbWJlZGRlZC1pZnJhbWUvT3BlbkhhbmRsZXI=" />
@@ -784,6 +799,29 @@ defineExpose({
 </template>
 
 <style lang="less" scoped>
+.preview-frame {
+  display: contents;
+}
+.dashboard-preview-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+
+  > .dashboard-parameter-bar {
+    flex: 0 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  > .canvas-container {
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+  }
+}
 .canvas-container {
   background-size: 100% 100% !important;
   width: 100%;

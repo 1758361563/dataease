@@ -1,6 +1,13 @@
 import request from '@/config/axios'
 import { originNameHandleWithArr, originNameHandleBackWithArr } from '@/utils/CalculateFields'
 import { cloneDeep } from 'lodash-es'
+import {
+  attachDashboardParameters,
+  attachDashboardEditorContext,
+  beginDashboardQuery
+} from '@/utils/dashboardParameterRuntime'
+import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
+import { ensurePivotDimensionInstances } from '@/views/chart/components/js/chartFieldInstance'
 export interface Field {
   id: number | string
   datasourceId: number | string
@@ -54,8 +61,13 @@ export const deleteChartFieldByChartId = async (chartId): Promise<IResponse> => 
 
 // 通过图表对象获取数据
 export const getData = async (data): Promise<IResponse> => {
+  ensurePivotDimensionInstances(data)
   delete data.data
   const copyData = cloneDeep(data)
+  attachDashboardParameters(copyData)
+  const editor = dvMainStoreWithOut()
+  attachDashboardEditorContext(copyData, editor.dvInfo, editor.canvasViewInfo)
+  const query = beginDashboardQuery(copyData)
   const fields = [
     'xAxis',
     'xAxisExt',
@@ -69,26 +81,31 @@ export const getData = async (data): Promise<IResponse> => {
   ]
   const dataFields = ['fields', 'sourceFields']
   originNameHandleWithArr(copyData, fields)
-  return request.post({ url: '/chartData/getData', data: copyData }).then(res => {
-    if (res.code === 0) {
-      originNameHandleBackWithArr(res?.data, fields)
-      // 动态计算字段在数据中，也需要转码
-      originNameHandleWithArr(res?.data?.data, dataFields)
-      originNameHandleBackWithArr(res?.data?.data, dataFields)
-      originNameHandleBackWithArr(res?.data?.data?.left, ['fields'])
-      originNameHandleBackWithArr(res?.data?.data?.right, ['fields'])
-      return res?.data
-    } else {
-      originNameHandleBackWithArr(res, fields)
-      originNameHandleBackWithArr(res?.data, dataFields)
-      originNameHandleBackWithArr(res?.data?.left, ['fields'])
-      originNameHandleBackWithArr(res?.data?.right, ['fields'])
-      return res
-    }
-  })
+  return request
+    .post({ url: '/chartData/getData', data: copyData })
+    .then(res => {
+      query.assertCurrent()
+      if (res.code === 0) {
+        originNameHandleBackWithArr(res?.data, fields)
+        // 动态计算字段在数据中，也需要转码
+        originNameHandleWithArr(res?.data?.data, dataFields)
+        originNameHandleBackWithArr(res?.data?.data, dataFields)
+        originNameHandleBackWithArr(res?.data?.data?.left, ['fields'])
+        originNameHandleBackWithArr(res?.data?.data?.right, ['fields'])
+        return res?.data
+      } else {
+        originNameHandleBackWithArr(res, fields)
+        originNameHandleBackWithArr(res?.data, dataFields)
+        originNameHandleBackWithArr(res?.data?.left, ['fields'])
+        originNameHandleBackWithArr(res?.data?.right, ['fields'])
+        return res
+      }
+    })
+    .finally(query.finish)
 }
 
 export const innerExportDetails = async (data): Promise<IResponse> => {
+  if (data.viewInfo) attachDashboardParameters(data.viewInfo)
   return request.post({
     url: '/chartData/innerExportDetails',
     method: 'post',
@@ -99,6 +116,7 @@ export const innerExportDetails = async (data): Promise<IResponse> => {
 }
 
 export const innerExportDataSetDetails = async (data): Promise<IResponse> => {
+  if (data.viewInfo) attachDashboardParameters(data.viewInfo)
   return request.post({
     url: '/chartData/innerExportDataSetDetails',
     method: 'post',
@@ -126,6 +144,7 @@ export const saveChart = async (data): Promise<IResponse> => {
 // 获取单个字段枚举值
 export const getFieldData = async ({ fieldId, fieldType, data }): Promise<IResponse> => {
   delete data.data
+  attachDashboardParameters(data)
   return request
     .post({ url: `/chartData/getFieldData/${fieldId}/${fieldType}`, data })
     .then(res => {
@@ -136,6 +155,7 @@ export const getFieldData = async ({ fieldId, fieldType, data }): Promise<IRespo
 // 获取下钻字段枚举值
 export const getDrillFieldData = async ({ fieldId, data }): Promise<IResponse> => {
   delete data.data
+  attachDashboardParameters(data)
   return request.post({ url: `/chartData/getDrillFieldData/${fieldId}`, data }).then(res => {
     return res
   })

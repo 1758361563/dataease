@@ -67,6 +67,12 @@ public class SnapshotDataVisualizationInfo implements Serializable {
      */
     private String componentData;
 
+    private String calculationConfig;
+
+    public String getCalculationConfig() { return calculationConfig; }
+
+    public void setCalculationConfig(String calculationConfig) { this.calculationConfig = calculationConfig; }
+
     /**
      * 移动端布局0-关闭 1-开启
      */

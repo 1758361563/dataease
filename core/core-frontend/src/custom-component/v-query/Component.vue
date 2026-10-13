@@ -1,4 +1,8 @@
 <script lang="ts" setup>
+import {
+  applyDashboardParameters,
+  dashboardParameterRuntime
+} from '@/utils/dashboardParameterRuntime'
 import eventBus from '@/utils/eventBus'
 import colorFunctions from 'less/lib/less/functions/color.js'
 import colorTree from 'less/lib/less/tree/color.js'
@@ -964,6 +968,17 @@ const queryData = () => {
   if (!!numName) {
     ElMessage.error(`【${numName}】${t('v_query.the_minimum_value')}`)
     return
+  }
+  if (componentWithSure.value && dashboardParameterRuntime.config.parameters.length) {
+    try {
+      applyDashboardParameters()
+      Object.keys(dvMainStore.canvasViewInfo).forEach(id => {
+        if (!emitterList.includes(id)) emitterList.push(id)
+      })
+    } catch (error) {
+      ElMessage.error(error.message)
+      return
+    }
   }
   if (!emitterList.length) return
   if (!(dvMainStore.mobileInPc && !isMobile())) {

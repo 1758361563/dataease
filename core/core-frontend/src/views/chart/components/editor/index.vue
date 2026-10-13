@@ -1,4 +1,9 @@
 <script lang="ts" setup>
+import {
+  dashboardParameterRuntime,
+  displayDashboardExpression,
+  rebindDashboardTemplate
+} from '@/utils/dashboardParameterRuntime'
 import dvInfoSvg from '@/assets/svg/dv-info.svg'
 import icon_down_outlined1 from '@/assets/svg/icon_down_outlined-1.svg'
 import icon_deleteTrash_outlined from '@/assets/svg/icon_delete-trash_outlined.svg'
@@ -68,7 +73,10 @@ import DatasetSelect from '@/views/chart/components/editor/dataset-select/Datase
 import { useDraggable } from '@vueuse/core'
 import { PluginComponent } from '@/components/plugin'
 import { Field, getFieldByDQ, copyChartField, deleteChartField } from '@/api/chart'
-import { instanceKey } from '@/views/chart/components/js/chartFieldInstance'
+import {
+  instanceKey,
+  ensurePivotDimensionInstances
+} from '@/views/chart/components/js/chartFieldInstance'
 import {
   applyAxisRoleAssignment,
   checkPlacementEligibility,
@@ -302,8 +310,63 @@ watch(
 const getFields = (id, chartId, type) => {
   if (id && chartId) {
     fieldLoading.value = true
-    return getFieldByDQ(id, chartId, { type: type })
-      .then(res => {
+    const templateSource = view.value.sourceTableId
+    const needsTemplateBinding =
+      templateSource &&
+      (String(templateSource) !== String(id) || view.value.dataFrom === 'template') &&
+      view.value.viewFields?.length &&
+      dvInfo.value.calculationConfig &&
+      JSON.parse(dvInfo.value.calculationConfig).datasetFields.some(
+        field => String(field.datasetGroupId) === String(templateSource)
+      )
+    return getFieldByDQ(id, chartId, {
+      type: type,
+      sceneId: dvInfo.value.id,
+      calculationConfig: needsTemplateBinding ? undefined : dvInfo.value.calculationConfig,
+      resourceTable: 'snapshot'
+    })
+      .then(async res => {
+        if (needsTemplateBinding) {
+          const targets = [...res.dimensionList, ...res.quotaList]
+          const pending: any[] = Object.values(dvMainStore.canvasViewInfo).filter(
+            (chart: any) =>
+              String(chart.sourceTableId) === String(templateSource) &&
+              !chart.tableId &&
+              chart.id !== chartId
+          )
+          pending.push(view.value)
+          const bindings = pending.map(chart => ({
+            chart,
+            rebound: rebindDashboardTemplate(
+              dvInfo.value.calculationConfig,
+              templateSource,
+              id,
+              chart.viewFields || view.value.viewFields,
+              targets,
+              chart
+            )
+          }))
+          const nextConfig = bindings[0].rebound.config
+          for (const { chart, rebound } of bindings) {
+            for (const field of rebound.chart.viewFields || []) {
+              if (field.chartId)
+                await saveField({ ...field, chartId: chart.id, datasetGroupId: id })
+            }
+          }
+          for (const { chart, rebound } of bindings)
+            Object.assign(chart, rebound.chart, {
+              tableId: id,
+              sourceTableId: id,
+              dataFrom: 'calc'
+            })
+          dvInfo.value.calculationConfig = nextConfig
+          res = await getFieldByDQ(id, chartId, {
+            type,
+            sceneId: dvInfo.value.id,
+            calculationConfig: nextConfig,
+            resourceTable: 'snapshot'
+          })
+        }
         state.dimension = (res.dimensionList as unknown as Field[]) || []
         state.quota = (res.quotaList as unknown as Field[]) || []
         state.dimensionData = JSON.parse(JSON.stringify(state.dimension))
@@ -312,7 +375,8 @@ const getFields = (id, chartId, type) => {
         fieldLoading.value = false
         emitter.emit('dataset-change')
       })
-      .catch(() => {
+      .catch(error => {
+        if (error instanceof Error && error.name !== 'AbortError') ElMessage.error(error.message)
         state.dimension = []
         state.quota = []
         state.dimensionData = []
@@ -465,6 +529,7 @@ const startToMove = (e: DragEvent, item) => {
 }
 
 const dimensionItemChange = item => {
+  ensurePivotDimensionInstances(view.value)
   recordSnapshotInfo('calcData')
   // do dimensionItemChange
   if (view.value.type === 'bar-range') {
@@ -835,7 +900,8 @@ const addAxis = (e, axis: AxisType) => {
   if (
     itemNewOnAxis &&
     (view.value.type === 'table-pivot' || view.value.type === 'table-normal') &&
-    axis === 'yAxis' &&
+    (axis === 'yAxis' ||
+      (view.value.type === 'table-pivot' && ['xAxis', 'xAxisExt'].includes(axis))) &&
     !itemNewOnAxis.fieldInstanceId
   ) {
     itemNewOnAxis.fieldInstanceId = String(guid())
@@ -1764,7 +1830,15 @@ const addCalcField = groupType => {
   nextTick(() => {
     calcEdit.value.initEdit(
       { groupType, id: guid() },
-      state.dimension,
+      [
+        ...state.dimension,
+        ...dashboardParameterRuntime.config.parameters.map(parameter => ({
+          id: `DVP.${parameter.id}`,
+          name: `DYNAMIC_PARAMS.${parameter.name}`,
+          deType: 1,
+          groupType: 'd'
+        }))
+      ],
       state.quota.filter(ele => ele.id !== '-1')
     )
   })
@@ -1774,8 +1848,19 @@ const editField = item => {
   isCalcFieldAdd.value = false
   nextTick(() => {
     calcEdit.value.initEdit(
-      item,
-      state.dimension,
+      {
+        ...item,
+        originName: displayDashboardExpression(item.originName, dashboardParameterRuntime.config)
+      },
+      [
+        ...state.dimension,
+        ...dashboardParameterRuntime.config.parameters.map(parameter => ({
+          id: `DVP.${parameter.id}`,
+          name: `DYNAMIC_PARAMS.${parameter.name}`,
+          deType: 1,
+          groupType: 'd'
+        }))
+      ],
       state.quota.filter(ele => ele.id !== '-1')
     )
   })
@@ -1802,6 +1887,10 @@ const getIconName = (deType, extField, dimension = false) => {
 }
 
 const chartFieldEdit = param => {
+  if (param.item.fieldScope === 'DASHBOARD') {
+    emitter.emit('dashboard-shared-field-edit', param.item.id)
+    return
+  }
   state.currEditField = JSON.parse(JSON.stringify(param.item))
   switch (param.type) {
     case 'copy':
@@ -1840,6 +1929,13 @@ const setFieldDefaultValue = field => {
   field.columnIndex = state.dimension.length + state.quota.length
   field.deExtractType = field.deType
 }
+
+useEmitt({
+  name: 'dashboard-calculation-changed',
+  callback: () => {
+    if (view.value?.tableId) getFields(view.value.tableId, view.value.id, view.value.type)
+  }
+})
 
 const el = ref<HTMLElement | null>(null)
 const elDrag = ref<HTMLElement | null>(null)

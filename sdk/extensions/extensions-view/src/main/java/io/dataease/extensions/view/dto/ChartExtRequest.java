@@ -28,6 +28,9 @@ public class ChartExtRequest {
 
     private boolean cache = true;
 
+    private java.util.Map<String, String> dashboardParameterValues;
+    private String dashboardParameterReference;
+
     private Long user = null;
 
     // private PermissionProxy proxy;

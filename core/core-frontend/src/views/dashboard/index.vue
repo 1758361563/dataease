@@ -9,6 +9,7 @@ import MobileConfigPanel from './MobileConfigPanel.vue'
 import { useAppStoreWithOut } from '@/store/modules/app'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import DbToolbar from '@/components/dashboard/DbToolbar.vue'
+import DashboardParameterBar from '@/components/visualization/DashboardParameterBar.vue'
 import ViewEditor from '@/views/chart/components/editor/index.vue'
 import { getDatasetTree } from '@/api/dataset'
 import { Tree } from '@/views/visualized/data/dataset/form/CreatDsGroup.vue'
@@ -296,6 +297,7 @@ onMounted(async () => {
         dvMainStore.setCanvasStyle(deTemplateData['canvasStyleData'])
         dvMainStore.setCanvasViewInfo(deTemplateData['canvasViewInfo'])
         dvMainStore.setAppDataInfo(deTemplateData['appData'])
+        dvMainStore.dvInfo.calculationConfig = deTemplateData['calculationConfig'] || null
         setTimeout(() => {
           snapshotStore.recordSnapshotCache('template')
         }, 1500)
@@ -373,7 +375,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="dv-common-layout dv-teleport-query"
+    class="dv-common-layout dv-teleport-query dashboard-editor-layout"
     :class="isDataEaseBi && !newWindowFromDiv && 'dataease-w-h'"
     v-loading="requestStore.loadingMap[permissionStore.currentPath]"
     v-if="loadFinish && !mobileConfig"
@@ -387,6 +389,10 @@ onUnmounted(() => {
       <!--      <SqlAssistant></SqlAssistant>-->
       <!-- 中间画布 -->
       <main class="center" :class="{ 'de-screen-full': fullscreenFlag }">
+        <DashboardParameterBar
+          :editable="editMode !== 'preview'"
+          :collapsible="editMode !== 'preview'"
+        />
         <de-canvas
           style="overflow-x: hidden"
           v-if="dataInitState"
@@ -469,6 +475,27 @@ onUnmounted(() => {
 </template>
 
 <style lang="less">
+.dv-common-layout.dashboard-editor-layout {
+  display: flex;
+  flex-direction: column;
+
+  > .dv-layout-container {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+  .center {
+    min-width: 0;
+    min-height: 0;
+    > .dashboard-parameter-bar {
+      flex: 0 0 auto;
+    }
+    > .content {
+      min-height: 0;
+    }
+  }
+}
+
 .dv-common-layout {
   height: 100vh;
   width: 100vw;

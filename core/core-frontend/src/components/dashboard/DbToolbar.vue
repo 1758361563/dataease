@@ -9,6 +9,7 @@ import dvTab from '@/assets/svg/dv-tab.svg'
 import dvText from '@/assets/svg/dv-text.svg'
 import dvView from '@/assets/svg/dv-view.svg'
 import icon_params_setting from '@/assets/svg/icon_params_setting.svg'
+import dashboardParamsIcon from '@/assets/svg/sys-param.svg'
 import icon_phone_outlined from '@/assets/svg/icon_phone_outlined.svg'
 import icon_copy_filled from '@/assets/svg/icon_copy_filled.svg'
 import icon_left_outlined from '@/assets/svg/icon_left_outlined.svg'
@@ -643,6 +644,18 @@ const initOpenHandler = newWindow => {
 
       <div class="right-area" v-if="!batchOptStatus && !linkageSettingStatus">
         <template v-if="editMode !== 'preview'">
+          <el-tooltip effect="dark" content="参数设置" placement="bottom">
+            <component-button
+              tips="参数设置"
+              :icon-name="dashboardParamsIcon"
+              role="button"
+              tabindex="0"
+              aria-label="参数设置"
+              @custom-click="useEmitt().emitter.emit('dashboard-parameter-settings-open')"
+              @keydown.enter="useEmitt().emitter.emit('dashboard-parameter-settings-open')"
+              @keydown.space.prevent="useEmitt().emitter.emit('dashboard-parameter-settings-open')"
+            />
+          </el-tooltip>
           <el-tooltip
             effect="dark"
             :content="t('visualization.outer_param_set')"
@@ -906,7 +919,9 @@ const initOpenHandler = newWindow => {
   .left-area {
     margin-top: 8px;
     margin-left: 14px;
-    width: 300px;
+    flex: 1 1 120px;
+    min-width: 100px;
+    max-width: 300px;
     display: flex;
     flex-direction: column;
     .name-area {
@@ -914,7 +929,7 @@ const initOpenHandler = newWindow => {
       line-height: 24px;
       height: 24px;
       font-size: 16px;
-      width: 300px;
+      width: 100%;
       overflow: hidden;
       cursor: pointer;
       input {
@@ -931,7 +946,7 @@ const initOpenHandler = newWindow => {
       }
     }
     .opt-area {
-      width: 300px;
+      width: 100%;
       text-align: left;
       color: #a6a6a6;
 
@@ -941,13 +956,16 @@ const initOpenHandler = newWindow => {
     }
   }
   .middle-area {
-    flex: 1;
+    flex: 1 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
   }
   .right-area {
-    width: 400px;
+    width: auto;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-right: 16px;
     display: flex;
     align-items: center;
     justify-content: right;

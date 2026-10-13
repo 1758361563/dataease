@@ -147,6 +147,9 @@ const beforeSort = type => {
 
 const dateStyle = param => {
   item.value.dateStyle = param.type
+  if (param.type === 'M') item.value.sort = 'asc'
+  if (param.type === 'M' && !['month_name', 'month_number'].includes(item.value.dateShowFormat))
+    item.value.dateShowFormat = 'month_name'
   item.value.axisType = props.type
   emit('onDimensionItemChange', item.value)
 }
@@ -158,7 +161,8 @@ const beforeDateStyle = type => {
 }
 
 const datePattern = param => {
-  item.value.datePattern = param.type
+  if (item.value.dateStyle === 'M') item.value.dateShowFormat = param.type
+  else item.value.datePattern = param.type
   item.value.axisType = props.type
   emit('onDimensionItemChange', item.value)
 }
@@ -167,6 +171,25 @@ const beforeDatePattern = type => {
   return {
     type: type
   }
+}
+const dateFormatLabel = (pattern = item.value.datePattern) => {
+  if (item.value.dateStyle === 'M')
+    return item.value.dateShowFormat === 'month_number' ? '01' : '1月'
+  const formats = {
+    y: 'yyyy',
+    y_M: 'yyyy-MM',
+    y_M_d: 'yyyy-MM-dd',
+    H_m_s: 'HH:mm:ss',
+    y_M_d_H: 'yyyy-MM-dd HH',
+    y_M_d_H_m: 'yyyy-MM-dd HH:mm',
+    y_M_d_H_m_s: 'yyyy-MM-dd HH:mm:ss'
+  }
+  const format = formats[item.value.dateStyle]
+  return format
+    ? pattern === 'date_split'
+      ? format.replaceAll('-', '/')
+      : format
+    : t('chart.' + pattern)
 }
 
 const showRename = () => {
@@ -447,7 +470,9 @@ onMounted(() => {
                 <span class="menu-item-content">
                   <el-icon> </el-icon>
                   <span>{{ t('chart.dateStyle') }}</span>
-                  <span class="summary-span-item">({{ t('chart.' + item.dateStyle) }})</span>
+                  <span class="summary-span-item"
+                    >({{ item.dateStyle === 'M' ? '月份' : t('chart.' + item.dateStyle) }})</span
+                  >
                 </span>
                 <el-icon>
                   <Icon name="icon_right_outlined"><icon_right_outlined class="svg-icon" /></Icon>
@@ -500,6 +525,22 @@ onMounted(() => {
                           ><icon_done_outlined class="svg-icon"
                         /></Icon>
                       </el-icon>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="chart.type === 'table-pivot'"
+                    class="menu-item-padding"
+                    :command="beforeDateStyle('M')"
+                  >
+                    <span
+                      class="sub-menu-content"
+                      :class="item.dateStyle === 'M' ? 'content-active' : ''"
+                    >
+                      月份（1—12）
+                      <el-icon class="sub-menu-content--icon"
+                        ><Icon v-if="item.dateStyle === 'M'"
+                          ><icon_done_outlined class="svg-icon" /></Icon
+                      ></el-icon>
                     </span>
                   </el-dropdown-item>
                   <el-dropdown-item
@@ -622,7 +663,7 @@ onMounted(() => {
                 <span class="menu-item-content">
                   <el-icon> </el-icon>
                   <span>{{ t('chart.datePattern') }}</span>
-                  <span class="summary-span-item">({{ t('chart.' + item.datePattern) }})</span>
+                  <span class="summary-span-item">({{ dateFormatLabel() }})</span>
                 </span>
                 <el-icon>
                   <Icon name="icon_right_outlined"><icon_right_outlined class="svg-icon" /></Icon>
@@ -635,6 +676,7 @@ onMounted(() => {
                   :class="themes === 'dark' ? 'dark-dimension-quota' : ''"
                 >
                   <el-dropdown-item
+                    v-if="!['M', 'y'].includes(item.dateStyle)"
                     class="menu-item-padding"
                     :command="beforeDatePattern('date_sub')"
                   >
@@ -642,7 +684,7 @@ onMounted(() => {
                       class="sub-menu-content"
                       :class="'date_sub' === item.datePattern ? 'content-active' : ''"
                     >
-                      {{ t('chart.date_sub') }}(1990-01-01)
+                      {{ dateFormatLabel('date_sub') }}
                       <el-icon class="sub-menu-content--icon">
                         <Icon name="icon_done_outlined" v-if="'date_sub' === item.datePattern"
                           ><icon_done_outlined class="svg-icon"
@@ -651,6 +693,7 @@ onMounted(() => {
                     </span>
                   </el-dropdown-item>
                   <el-dropdown-item
+                    v-if="!['M', 'y'].includes(item.dateStyle)"
                     class="menu-item-padding"
                     :command="beforeDatePattern('date_split')"
                   >
@@ -658,7 +701,7 @@ onMounted(() => {
                       class="sub-menu-content"
                       :class="'date_split' === item.datePattern ? 'content-active' : ''"
                     >
-                      {{ t('chart.date_split') }}(1990/01/01)
+                      {{ dateFormatLabel('date_split') }}
                       <el-icon class="sub-menu-content--icon">
                         <Icon name="icon_done_outlined" v-if="'date_split' === item.datePattern"
                           ><icon_done_outlined class="svg-icon"
@@ -666,6 +709,35 @@ onMounted(() => {
                       </el-icon>
                     </span>
                   </el-dropdown-item>
+                  <el-dropdown-item v-if="item.dateStyle === 'y'" disabled class="menu-item-padding"
+                    >年份（2026）</el-dropdown-item
+                  >
+                  <template v-if="item.dateStyle === 'M'">
+                    <el-dropdown-item
+                      :command="beforeDatePattern('month_name')"
+                      class="menu-item-padding"
+                    >
+                      <span
+                        class="sub-menu-content"
+                        :class="item.dateShowFormat !== 'month_number' ? 'content-active' : ''"
+                        >月份名称（1月）<el-icon class="sub-menu-content--icon"
+                          ><Icon v-if="item.dateShowFormat !== 'month_number'"
+                            ><icon_done_outlined class="svg-icon" /></Icon></el-icon
+                      ></span>
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      :command="beforeDatePattern('month_number')"
+                      class="menu-item-padding"
+                    >
+                      <span
+                        class="sub-menu-content"
+                        :class="item.dateShowFormat === 'month_number' ? 'content-active' : ''"
+                        >两位数字（01）<el-icon class="sub-menu-content--icon"
+                          ><Icon v-if="item.dateShowFormat === 'month_number'"
+                            ><icon_done_outlined class="svg-icon" /></Icon></el-icon
+                      ></span>
+                    </el-dropdown-item>
+                  </template>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>

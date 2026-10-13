@@ -105,7 +105,7 @@ public class Utils {
             }
             // 替换字段引用
             for (DatasetTableFieldDTO ele : originFields) {
-                if (StringUtils.containsIgnoreCase(originField, ele.getId() + "")) {
+                if (originField.contains("[" + ele.getId() + "]")) {
                     // 计算字段允许二次引用，这里递归查询完整引用链
                     if (Objects.equals(ele.getExtField(), ExtFieldConstant.EXT_NORMAL)) {
                         if (isCross) {
@@ -166,6 +166,8 @@ public class Utils {
         }
 
         switch (dateStyle) {
+            case "M":
+                return "MM";
             case "y":
                 return "yyyy";
             case "y_Q":

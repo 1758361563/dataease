@@ -1,4 +1,8 @@
 import { cloneDeep } from 'lodash-es'
+import {
+  emptyDashboardCalculation,
+  initializeDashboardParameters
+} from '@/utils/dashboardParameterRuntime'
 import componentList, {
   ACTION_SELECTION,
   BASE_CAROUSEL,
@@ -12,6 +16,7 @@ import eventBus from '@/utils/eventBus'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import {
   appCanvasNameCheck,
+  calculationRuntime,
   checkCanvasChange,
   decompression,
   dvNameCheck,
@@ -450,8 +455,14 @@ export function initCanvasDataPrepare(dvId, params, callBack) {
     }
   }
   attachInfo['resourceTable'] = params.resourceTable ? params.resourceTable : 'core'
-  method(dvId, busiFlagCustom, attachInfo).then(res => {
+  method(dvId, busiFlagCustom, attachInfo).then(async res => {
     const canvasInfo = res.data
+    const resourceTable = attachInfo['resourceTable']
+    const runtime = canvasInfo.calculationConfig
+      ? (await calculationRuntime(canvasInfo.id, resourceTable)).data
+      : { config: emptyDashboardCalculation(), values: {}, reference: new Date().toISOString() }
+    if (!params.preserveParameterRuntime)
+      initializeDashboardParameters(canvasInfo.id, resourceTable, runtime)
     const watermarkInfo = {
       ...canvasInfo.watermarkInfo,
       settingContent: canvasInfo.watermarkInfo?.settingContent
@@ -474,6 +485,8 @@ export function initCanvasDataPrepare(dvId, params, callBack) {
       weight: canvasInfo.weight,
       ext: canvasInfo.ext,
       contentId: canvasInfo.contentId,
+      calculationConfig: canvasInfo.calculationConfig ?? null,
+      resourceTable,
       mobileLayout: canvasInfo.mobileLayout || false
     }
     const canvasVersion = canvasInfo.version
@@ -1023,6 +1036,9 @@ export async function decompressionPre(params, callBack) {
         canvasStyleData: sourceCanvasStyle,
         componentData: sourceComponentData,
         canvasViewInfo: deTemplateDataTemp['canvasViewInfo'],
+        calculationConfig: deTemplateDataTemp.calculationConfig ?? null,
+        id: deTemplateDataTemp.id,
+        type: deTemplateDataTemp.type,
         appData: appData,
         baseInfo: {
           preName: deTemplateDataTemp.name

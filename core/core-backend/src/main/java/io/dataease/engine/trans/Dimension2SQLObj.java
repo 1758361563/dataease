@@ -108,7 +108,7 @@ public class Dimension2SQLObj {
                         originField = String.format(SQLConstants.DE_STR_TO_DATE, String.format(SQLConstants.CONCAT, "'1970-01-01 '", originField), SQLConstants.DEFAULT_DATE_FORMAT);
                     }
                 }
-                String format = Utils.transDateFormat(x.getDateStyle(), x.getDatePattern());
+                String format = dimensionDateFormat(x);
                 if (StringUtils.equalsIgnoreCase(x.getDateStyle(), "y_Q")) {
                     fieldName = String.format(format,
                             String.format(SQLConstants.DE_DATE_FORMAT, originField, "yyyy"),
@@ -123,7 +123,7 @@ public class Dimension2SQLObj {
             }
         } else {
             if (Objects.equals(x.getDeType(), DeTypeConstants.DE_TIME)) {
-                String format = Utils.transDateFormat(x.getDateStyle(), x.getDatePattern());
+                String format = dimensionDateFormat(x);
                 if (Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_STRING) || Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_LOCATION)) {
                     if (StringUtils.equalsIgnoreCase(x.getDateStyle(), "y_Q")) {
                         fieldName = String.format(format,
@@ -158,10 +158,19 @@ public class Dimension2SQLObj {
                 }
             }
         }
+        if ("M".equals(x.getDateStyle()) && Objects.equals(x.getDeType(), DeTypeConstants.DE_TIME)) {
+            // The bundled dialect converter recognizes yyyy-MM, but treats bare MM as a literal.
+            // Slice a recognized year-month expression so grouping receives real month values.
+            fieldName = "SUBSTRING(" + fieldName + ",6,2)";
+        }
         return SQLObj.builder()
                 .fieldName(fieldName)
                 .fieldAlias(fieldAlias)
                 .build();
+    }
+
+    private static String dimensionDateFormat(ChartViewFieldDTO field) {
+        return Utils.transDateFormat("M".equals(field.getDateStyle()) ? "y_M" : field.getDateStyle(), field.getDatePattern());
     }
 
 }

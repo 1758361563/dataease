@@ -20,6 +20,8 @@ public class TemplateManageFileDTO extends VisualizationTemplateVO {
      */
     private String componentData;
 
+    private String calculationConfig;
+
 
     private String staticResource;
 

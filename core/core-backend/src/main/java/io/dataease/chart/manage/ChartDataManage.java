@@ -53,6 +53,8 @@ import java.util.stream.Collectors;
 @Component
 public class ChartDataManage {
     @Resource
+    private io.dataease.visualization.calculation.DashboardCalculationManage dashboardCalculationManage;
+    @Resource
     private DatasetTableFieldManage datasetTableFieldManage;
     @Resource
     private DatasetGroupManage datasetGroupManage;
@@ -187,7 +189,7 @@ public class ChartDataManage {
                         filterRequest.setFilterType(0);
                         filterRequest.setDatasetTableFieldList(new ArrayList<>());
                         for (Long fId : fieldIds) {
-                            DatasetTableFieldDTO datasetTableField = datasetTableFieldManage.selectById(fId);
+                            DatasetTableFieldDTO datasetTableField = queryField(allFields, fId);
                             if (datasetTableField == null) {
                                 continue;
                             }
@@ -211,7 +213,7 @@ public class ChartDataManage {
                             filterRequest.setFilterType(0);
                             filterRequest.setFieldId(fId + "");
 
-                            DatasetTableFieldDTO datasetTableField = datasetTableFieldManage.selectById(fId);
+                            DatasetTableFieldDTO datasetTableField = queryField(allFields, fId);
                             if (datasetTableField == null) {
                                 continue;
                             }
@@ -274,7 +276,8 @@ public class ChartDataManage {
 
                     }
                 } else {
-                    DatasetTableFieldDTO datasetTableField = datasetTableFieldManage.selectById(Long.valueOf(request.getFieldId()));
+                    DatasetTableFieldDTO datasetTableField = queryField(allFields, Long.valueOf(request.getFieldId()));
+                    if (datasetTableField == null) continue;
                     request.setDatasetTableField(datasetTableField);
                     request.setFilterType(2);
                     // 相同数据集
@@ -303,7 +306,8 @@ public class ChartDataManage {
                     ChartViewFieldDTO viewField = drill.get(i);
                     // 将钻取值作为条件传递，将所有钻取字段作为xAxis并加上下一个钻取字段
                     if (Objects.equals(dim.getId(), viewField.getId())) {
-                        DatasetTableFieldDTO datasetTableField = datasetTableFieldManage.selectById(dim.getId());
+                        DatasetTableFieldDTO datasetTableField = queryField(allFields, dim.getId());
+                        if (datasetTableField == null) continue;
                         ChartViewFieldDTO d = new ChartViewFieldDTO();
                         BeanUtils.copyBean(d, datasetTableField);
 
@@ -835,7 +839,29 @@ public class ChartDataManage {
         List<ChartViewFieldDTO> allFields = new ArrayList<>();
         allFields.addAll(dimensionList);
         allFields.addAll(quotaList);
+        dashboardCalculationManage.bindQuery(view, allFields);
+        Map<Long, ChartViewFieldDTO> shared = allFields.stream().filter(field -> "DASHBOARD".equals(field.getFieldScope()))
+                .collect(Collectors.toMap(ChartViewFieldDTO::getId, field -> field));
+        for (var axis : Arrays.asList(view.getXAxis(), view.getXAxisExt(), view.getYAxis(), view.getYAxisExt(),
+                view.getExtStack(), view.getExtBubble(), view.getExtLabel(), view.getExtTooltip(), view.getExtColor(), view.getDrillFields())) {
+            if (axis == null) continue;
+            for (var field : axis) {
+                var definition = shared.get(field.getId());
+                if (definition == null) continue;
+                field.setOriginName(definition.getOriginName());
+                field.setExtField(definition.getExtField());
+                field.setDeType(definition.getDeType());
+                field.setDataeaseName(definition.getDataeaseName());
+                field.setAgg(definition.isAgg());
+                if (definition.isAgg()) field.setSummary("");
+            }
+        }
         return allFields.stream().filter(ele -> ele.getId() != -1L).collect(Collectors.toList());
+    }
+
+    private DatasetTableFieldDTO queryField(List<ChartViewFieldDTO> fields, Long id) {
+        return fields.stream().filter(field -> Objects.equals(field.getId(), id)).findFirst()
+                .map(field -> (DatasetTableFieldDTO) field).orElseGet(() -> datasetTableFieldManage.selectById(id));
     }
 
     public void saveChartViewFromVisualization(String checkData, Long sceneId, Map<Long, ChartViewDTO> chartViewsInfo) {

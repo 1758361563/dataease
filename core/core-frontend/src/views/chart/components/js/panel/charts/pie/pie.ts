@@ -18,7 +18,7 @@ import {
   getTooltipSeriesTotalMap,
   TOOLTIP_TPL
 } from '@/views/chart/components/js/panel/common/common_antv'
-import { valueFormatter } from '@/views/chart/components/js/formatter'
+import { valueFormatter, formatterItem } from '@/views/chart/components/js/formatter'
 import {
   PIE_AXIS_CONFIG,
   PIE_AXIS_TYPE,
@@ -30,14 +30,37 @@ import { add } from 'mathjs'
 import isEmpty from 'lodash-es/isEmpty'
 import { cloneDeep } from 'lodash-es'
 import { useI18n } from '@/hooks/web/useI18n'
+import { G2 } from '@antv/g2plot'
+import { createApp, h, ref } from 'vue'
+import PiePresentationPanel from './PiePresentationPanel.vue'
+import { normalizePieLayout } from '@/views/chart/components/editor/util/chartPalettes'
+import {
+  largePiePresentation,
+  shortenPieName,
+  pieColorMap,
+  readablePieTooltip,
+  PIE_CATEGORY_COLORS,
+  preparePiePresentation
+} from './piePresentation'
 const { t } = useI18n()
 const DEFAULT_DATA = []
+// G2's spider layout does not accept the null items created by suppressed labels.
+// Run layouts sequentially over visible labels, keeping every sector in the geometry.
+G2.registerGeometryLabelLayout('de-pie-priority', async (items, labels, shapes, region, cfg) => {
+  const visibleItems = items.filter(Boolean)
+  const layouts = cfg?.compact
+    ? ['hide-overlap', 'limit-in-canvas']
+    : ['pie-spider', 'hide-overlap', 'limit-in-canvas']
+  for (const type of layouts) {
+    await G2.getGeometryLabelLayout(type)(visibleItems, labels, shapes, region)
+  }
+})
 export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
   axis: AxisType[] = PIE_AXIS_TYPE
   properties = PIE_EDITOR_PROPERTY
   propertyInner: EditorPropertyInner = {
     ...PIE_EDITOR_PROPERTY_INNER,
-    'basic-style-selector': ['colors', 'alpha', 'radius', 'topN', 'seriesColor'],
+    'basic-style-selector': ['piePresentation', 'colors', 'alpha', 'radius', 'topN', 'seriesColor'],
     'tooltip-selector': [...PIE_EDITOR_PROPERTY_INNER['tooltip-selector'], 'carousel']
   }
   axisConfig = PIE_AXIS_CONFIG
@@ -50,9 +73,87 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
       return
     }
     // data
-    const data = chart.data.data
+    let data = cloneDeep(chart.data.data)
     // custom color
     const customAttr = parseJson(chart.customAttr)
+    customAttr.basicStyle.pieLayout = normalizePieLayout(customAttr.basicStyle.pieLayout)
+    chart.customAttr = customAttr
+    const modern = ['large', 'ranking'].includes(customAttr.basicStyle.pieLayout)
+    const presentation = modern
+      ? preparePiePresentation(
+          data,
+          customAttr.basicStyle.calcTopN,
+          customAttr.basicStyle.topN,
+          customAttr.basicStyle.topNLabel
+        )
+      : null
+    if (presentation) data = presentation.sectors
+    const displayColors = pieColorMap(
+      data,
+      customAttr.basicStyle.colors,
+      customAttr.basicStyle.seriesColor
+    )
+    const activeKey = ref<string | null>(null)
+    const detailsOpen = ref(false)
+    let panelApp: ReturnType<typeof createApp>
+    let panelHost: HTMLElement
+    let plotContainer = container
+    const highlight = (key: string | null) => {
+      activeKey.value = key
+      newChart.setState('active', datum => datum.pieKey === key, true)
+      newChart.setState('active', datum => datum.pieKey !== key, false)
+      newChart.setState('inactive', datum => !!key && datum.pieKey !== key, true)
+      newChart.setState('inactive', datum => !key || datum.pieKey === key, false)
+    }
+    const selectDatum = (datum: any, event?: MouseEvent) => {
+      if (datum?.pieMembers) {
+        detailsOpen.value = true
+        return
+      }
+      const bounds = document.getElementById(container).getBoundingClientRect()
+      detailsOpen.value = false
+      action?.({
+        data: { data: datum },
+        x: event ? event.clientX - bounds.left : 0,
+        y: event ? event.clientY - bounds.top : 0
+      })
+    }
+    if (
+      presentation &&
+      (customAttr.basicStyle.pieLayout === 'ranking' || presentation.members.length)
+    ) {
+      plotContainer = `${container}-pie-plot`
+      panelHost = document.createElement('div')
+      panelHost.style.cssText = 'width:100%;height:100%;min-height:0'
+      document.getElementById(container).appendChild(panelHost)
+      panelApp = createApp({
+        render: () =>
+          h(PiePresentationPanel, {
+            plotId: plotContainer,
+            ranking: customAttr.basicStyle.pieLayout === 'ranking',
+            compact: document.getElementById(container).clientWidth < 600,
+            rows: [...presentation.sectors].sort((a, b) => Number(b.value) - Number(a.value)),
+            categoryCount: presentation.rows.length,
+            total: presentation.total,
+            excluded: presentation.excluded,
+            members: presentation.members,
+            activeKey: activeKey.value,
+            detailsOpen: detailsOpen.value,
+            color: datum =>
+              hexColorToRGBA(displayColors.get(datum.pieKey), customAttr.basicStyle.alpha),
+            format: value =>
+              String(valueFormatter(value, chart.yAxis?.[0]?.formatterCfg || formatterItem)),
+            decimals: customAttr.label.reserveDecimalCount ?? 2,
+            textColor: parseJson(chart.customStyle)?.legend?.color || '#475569',
+            onHover: highlight,
+            onSelect: selectDatum,
+            onCloseDetails: () => {
+              detailsOpen.value = false
+            }
+          })
+      })
+      panelApp.mount(panelHost)
+    }
     const color = customAttr.basicStyle.colors.map(i =>
       hexColorToRGBA(i, customAttr.basicStyle.alpha)
     )
@@ -60,7 +161,7 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
     const initOptions: PieOptions = {
       data: data,
       angleField: 'value',
-      colorField: 'field',
+      colorField: modern ? 'pieKey' : 'field',
       appendPadding: getPadding(chart),
       color,
       animation: false,
@@ -118,7 +219,7 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
         }
       ],
       meta: {
-        field: {
+        [modern ? 'pieKey' : 'field']: {
           type: 'cat'
         }
       },
@@ -126,30 +227,93 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
         active: {
           style: {
             lineWidth: 2,
-            fillOpacity: 0.5
+            fillOpacity: modern ? 1 : 0.5
           }
-        }
+        },
+        inactive: { style: { fillOpacity: 0.25 } }
       }
     }
     const options = this.setupOptions(chart, initOptions)
     const { Pie: G2Pie } = await import('@antv/g2plot/esm/plots/pie')
-    const newChart = new G2Pie(container, options)
+    const newChart = new G2Pie(plotContainer, options)
     newChart.on('interval:click', d => {
-      if (customAttr.basicStyle.calcTopN && d.data?.data?.others) {
+      if (d.data?.data?.pieMembers) {
+        detailsOpen.value = true
         return
       }
-      action(d)
+      if (!modern && customAttr.basicStyle.calcTopN && d.data?.data?.others) {
+        return
+      }
+      action?.(d)
     })
+    newChart.on('interval:mouseenter', event => highlight(event.data?.data?.pieKey || null))
+    newChart.on('interval:mouseleave', () => highlight(null))
+    if (panelApp) {
+      const destroy = newChart.destroy.bind(newChart)
+      newChart.destroy = () => {
+        try {
+          destroy()
+        } finally {
+          panelApp.unmount()
+          panelHost.remove()
+        }
+      }
+    }
     configPlotTooltipEvent(chart, newChart)
     return newChart
   }
 
   protected configLabel(chart: Chart, options: PieOptions): PieOptions {
-    const { label: labelAttr } = parseJson(chart.customAttr)
+    const { label: labelAttr, basicStyle } = parseJson(chart.customAttr)
+    if (basicStyle.pieLayout === 'ranking') return { ...options, label: false }
     if (!labelAttr?.show) {
       return {
         ...options,
         label: false
+      }
+    }
+    if (basicStyle.pieLayout === 'large') {
+      const container = document.getElementById(chart.container)
+      const presentation = largePiePresentation(
+        options.data,
+        container?.clientWidth || 600,
+        container?.clientHeight || 400,
+        labelAttr.fontSize,
+        basicStyle.pieLabelLimit
+      )
+      return {
+        ...options,
+        label: {
+          type: presentation.compact ? 'inner' : 'no',
+          offset: presentation.compact ? -20 : 12,
+          layout: [{ type: 'de-pie-priority', cfg: { compact: presentation.compact } }],
+          labelLine: presentation.compact
+            ? false
+            : { style: { stroke: hexColorToRGBA(labelAttr.color || '#64748b', 40), lineWidth: 1 } },
+          style: { fill: labelAttr.color, fontSize: presentation.fontSize },
+          formatter: (datum: Datum) => {
+            if (!presentation.showLabel(datum)) return ''
+            const percent = `${(Number(datum.percent || 0) * 100).toFixed(
+              labelAttr.reserveDecimalCount ?? 2
+            )}%`
+            if (presentation.compact) return percent
+            const content = []
+            if (labelAttr.showDimension)
+              content.push(
+                shortenPieName(
+                  datum.pieMembers
+                    ? `${datum.field}（${datum.pieMembers.length} 类）`
+                    : datum.field,
+                  presentation.labelWidth,
+                  presentation.fontSize
+                )
+              )
+            if (labelAttr.showQuota)
+              content.push(valueFormatter(datum.value, labelAttr.quotaLabelFormatter))
+            if (labelAttr.showProportion) content.push(percent)
+            return content.join(' ')
+          }
+        }
       }
     }
     const layout = []
@@ -208,7 +372,14 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
 
   protected configTooltip(chart: Chart, options: PieOptions): PieOptions {
     if (parseJson(chart.customAttr).tooltip.contentMode === 'explicit') {
-      return { ...options, tooltip: getExplicitChartTooltip(chart) }
+      return {
+        ...options,
+        tooltip: readablePieTooltip(
+          getExplicitChartTooltip(chart),
+          options.data,
+          parseJson(chart.customAttr).tooltip.fontSize
+        )
+      }
     }
     const { tooltip: tooltipAttr, label } = parseJson(chart.customAttr)
     const { yAxis } = chart
@@ -270,7 +441,7 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
     }
     return {
       ...options,
-      tooltip
+      tooltip: readablePieTooltip(tooltip, options.data, tooltipAttr.fontSize)
     }
   }
 
@@ -278,7 +449,12 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
     const customAttr = parseJson(chart.customAttr)
     const { basicStyle } = customAttr
     const { data } = options
-    if (data?.length && basicStyle.calcTopN && data.length > basicStyle.topN) {
+    if (
+      !['large', 'ranking'].includes(basicStyle.pieLayout) &&
+      data?.length &&
+      basicStyle.calcTopN &&
+      data.length > basicStyle.topN
+    ) {
       data.sort((a, b) => b.value - a.value)
       const otherItems = data.splice(basicStyle.topN)
       const initOtherItem = {
@@ -305,13 +481,59 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
       }
       data.push(initOtherItem)
     }
+    if (basicStyle.pieLayout === 'ranking')
+      return {
+        ...options,
+        padding: 12,
+        appendPadding: 0,
+        radius: 0.94,
+        innerRadius: 0.66,
+        statistic: { title: false, content: false },
+        legend: false,
+        pieStyle: { lineWidth: 1, stroke: hexColorToRGBA(customAttr.label?.color || '#64748b', 15) }
+      }
+    if (basicStyle.pieLayout === 'large') {
+      const container = document.getElementById(chart.container)
+      const presentation = largePiePresentation(
+        data,
+        container?.clientWidth || 600,
+        container?.clientHeight || 400,
+        customAttr.label?.fontSize,
+        basicStyle.pieLabelLimit
+      )
+      return {
+        ...options,
+        data,
+        padding: presentation.padding,
+        appendPadding: 0,
+        radius: presentation.radius,
+        pieStyle: {
+          lineWidth: 1,
+          stroke: hexColorToRGBA(customAttr.label?.color || '#64748b', 15)
+        }
+      }
+    }
     return {
       ...options,
       radius: basicStyle.radius / 100
     }
   }
+  protected configSingleDimensionColor(chart: Chart, options: PieOptions): PieOptions {
+    const { basicStyle } = parseJson(chart.customAttr)
+    if (!['large', 'ranking'].includes(basicStyle.pieLayout))
+      return super.configSingleDimensionColor(chart, options)
+    const colors = basicStyle.colors || PIE_CATEGORY_COLORS
+    const colorsByKey = pieColorMap(options.data, colors, basicStyle.seriesColor)
+    return {
+      ...options,
+      color: (datum: Datum) => {
+        return hexColorToRGBA(colorsByKey.get(datum.pieKey) || colors[0], basicStyle.alpha)
+      }
+    }
+  }
   setupDefaultOptions(chart: ChartObj): ChartObj {
     const { customAttr, customStyle } = chart
+    customAttr.basicStyle.pieLayout = normalizePieLayout(customAttr.basicStyle.pieLayout)
     const { label } = customAttr
     if (!['inner', 'outer'].includes(label.position)) {
       label.position = 'outer'
@@ -353,6 +575,12 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
     )(chart, options, {}, this)
   }
 
+  protected configLegend(chart: Chart, options: PieOptions): PieOptions {
+    if (['large', 'ranking'].includes(parseJson(chart.customAttr).basicStyle.pieLayout))
+      return { ...options, legend: false }
+    return super.configLegend(chart, options)
+  }
+
   constructor(name = 'pie') {
     super(name, DEFAULT_DATA)
   }
@@ -361,12 +589,22 @@ export class Pie extends G2PlotChartView<PieOptions, G2Pie> {
 export class PieDonut extends Pie {
   propertyInner: EditorPropertyInner = {
     ...PIE_EDITOR_PROPERTY_INNER,
-    'basic-style-selector': ['colors', 'alpha', 'radius', 'innerRadius', 'topN', 'seriesColor'],
+    'basic-style-selector': [
+      'piePresentation',
+      'colors',
+      'alpha',
+      'radius',
+      'innerRadius',
+      'topN',
+      'seriesColor'
+    ],
     'tooltip-selector': [...PIE_EDITOR_PROPERTY_INNER['tooltip-selector'], 'carousel']
   }
   protected configBasicStyle(chart: Chart, options: PieOptions): PieOptions {
     const tmp = super.configBasicStyle(chart, options)
     const { basicStyle } = parseJson(chart.customAttr)
+    if (basicStyle.pieLayout === 'large') return { ...tmp, innerRadius: 0 }
+    if (basicStyle.pieLayout === 'ranking') return tmp
     return {
       ...tmp,
       radius: basicStyle.radius / 100,

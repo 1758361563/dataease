@@ -554,7 +554,7 @@ const datasetParamsInit = () => {
 }
 
 const copyComponent = () => {
-  copyStore.copy()
+  copyStore.copy(element.value)
   copyStore.paste(false)
 }
 

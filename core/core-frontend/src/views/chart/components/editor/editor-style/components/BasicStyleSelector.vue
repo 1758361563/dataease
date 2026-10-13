@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { normalizePieLayout } from '../../util/chartPalettes'
 import { computed, onMounted, PropType, reactive, watch, ref } from 'vue'
 import {
   COLOR_PANEL,
@@ -69,6 +70,11 @@ const state = reactive({
   treeRowWidth: 10
 })
 const emit = defineEmits(['onBasicStyleChange', 'onMiscChange'])
+const changePieLayout = (layout: 'large' | 'ranking') => {
+  state.basicStyleForm.pieLayout = layout
+  changeBasicStyle('pieLayout')
+}
+
 const changeBasicStyle = (prop?: string, requestData = false, render = true) => {
   emit('onBasicStyleChange', { data: state.basicStyleForm, requestData, render }, prop)
 }
@@ -138,6 +144,8 @@ const init = () => {
     file && (state.fileList[0] = { url: file })
   }
   state.basicStyleForm = defaultsDeep(basicStyle, cloneDeep(DEFAULT_BASIC_STYLE)) as ChartBasicStyle
+  if (['pie', 'pie-donut'].includes(props.chart.type))
+    state.basicStyleForm.pieLayout = normalizePieLayout(state.basicStyleForm.pieLayout)
   const mapStyle = basicStyle.mapStyle
   if (mapStyle && !find(mapStyleOptions.value, s => s.value === mapStyle)) {
     state.basicStyleForm.mapStyle = 'normal'
@@ -404,6 +412,65 @@ onMounted(async () => {
 </script>
 <template>
   <el-form size="small" style="width: 100%">
+    <template v-if="showProperty('piePresentation')">
+      <el-form-item label="布局样式" class="form-item" :class="'form-item-' + themes">
+        <div class="pie-layout-picker">
+          <button
+            type="button"
+            :aria-pressed="state.basicStyleForm.pieLayout === 'large'"
+            @click="changePieLayout('large')"
+          >
+            <svg viewBox="0 0 80 50" aria-hidden="true">
+              <circle cx="40" cy="25" r="21" fill="currentColor" opacity=".55" />
+              <path d="M40 4v21l17 12" fill="none" stroke="currentColor" stroke-width="2" />
+            </svg>
+            <span>大饼图</span>
+          </button>
+          <button
+            type="button"
+            :aria-pressed="state.basicStyleForm.pieLayout === 'ranking'"
+            @click="changePieLayout('ranking')"
+          >
+            <svg viewBox="0 0 80 50" aria-hidden="true">
+              <circle
+                cx="23"
+                cy="25"
+                r="15"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="8"
+                opacity=".65"
+              />
+              <path d="M48 14h23M48 25h18M48 36h12" stroke="currentColor" stroke-width="3" />
+            </svg>
+            <span>环图榜单</span>
+          </button>
+        </div>
+      </el-form-item>
+      <template v-if="['large', 'ranking'].includes(state.basicStyleForm.pieLayout)">
+        <el-form-item
+          v-if="state.basicStyleForm.pieLayout === 'large'"
+          label="重点标签数"
+          class="form-item"
+          :class="'form-item-' + themes"
+        >
+          <el-input-number
+            v-model="state.basicStyleForm.pieLabelLimit"
+            :min="1"
+            :max="20"
+            :precision="0"
+            @change="changeBasicStyle('pieLabelLimit')"
+          />
+        </el-form-item>
+        <p class="pie-layout-note">
+          {{
+            state.basicStyleForm.pieLayout === 'ranking'
+              ? '环图与榜单同步高亮，榜单可滚动查看全部分类；窄卡片自动改为上下排列。'
+              : '优先显示主要标签，所有扇区仍保留。窄卡片显示重点占比，悬停查看完整名称与数值。'
+          }}
+        </p>
+      </template>
+    </template>
     <template v-if="showProperty('colors')">
       <custom-color-style-select
         v-model="state"
@@ -475,6 +542,29 @@ onMounted(async () => {
         <el-radio value="col" :effect="themes">{{ t('chart.quota_position_col') }}</el-radio>
         <el-radio value="row" :effect="themes">{{ t('chart.quota_position_row') }}</el-radio>
       </el-radio-group>
+    </el-form-item>
+    <el-form-item
+      v-if="showProperty('pivotHeaderOrder') && state.basicStyleForm.quotaPosition !== 'row'"
+      class="form-item"
+      label="表头顺序"
+      :class="'form-item-' + themes"
+    >
+      <el-radio-group
+        size="small"
+        :effect="themes"
+        v-model="state.basicStyleForm.pivotHeaderOrder"
+        @change="changeBasicStyle('pivotHeaderOrder')"
+      >
+        <el-radio value="dimension-first" :effect="themes">维度优先</el-radio>
+        <el-radio value="measure-first" :effect="themes">指标优先</el-radio>
+      </el-radio-group>
+      <div class="pivot-header-order-hint">
+        {{
+          state.basicStyleForm.pivotHeaderOrder === 'measure-first'
+            ? '指标在上方，列维度在下方；例如：业绩 → 月份。'
+            : '列维度在上方，指标在下方；例如：月份 → 业绩。'
+        }}
+      </div>
     </el-form-item>
     <el-form-item
       v-if="showProperty('quotaColLabel') && state.basicStyleForm.quotaPosition === 'row'"
@@ -1483,7 +1573,11 @@ onMounted(async () => {
           v-model="state.basicStyleForm.calcTopN"
           @change="changeBasicStyle('calcTopN')"
         >
-          {{ $t('chart.top_n_desc') }}
+          {{
+            ['large', 'ranking'].includes(state.basicStyleForm.pieLayout)
+              ? '将尾部分类合并为其他（可查看明细）'
+              : $t('chart.top_n_desc')
+          }}
         </el-checkbox>
       </el-form-item>
       <el-form-item
@@ -1533,7 +1627,13 @@ onMounted(async () => {
         </template>
       </el-form-item>
     </div>
-    <div class="alpha-setting" v-if="showProperty('innerRadius')">
+    <div
+      class="alpha-setting"
+      v-if="
+        showProperty('innerRadius') &&
+        !['large', 'ranking'].includes(state.basicStyleForm.pieLayout)
+      "
+    >
       <label class="alpha-label" :class="{ dark: 'dark' === themes }">
         {{ t('chart.pie_inner_radius_percent') }}
       </label>
@@ -1570,7 +1670,12 @@ onMounted(async () => {
       </el-row>
     </div>
 
-    <div class="alpha-setting" v-if="showProperty('radius')">
+    <div
+      class="alpha-setting"
+      v-if="
+        showProperty('radius') && !['large', 'ranking'].includes(state.basicStyleForm.pieLayout)
+      "
+    >
       <label class="alpha-label" :class="{ dark: 'dark' === themes }">
         {{ t('chart.pie_outer_radius') }}
       </label>
@@ -1673,6 +1778,53 @@ onMounted(async () => {
   </el-form>
 </template>
 <style scoped lang="less">
+.pivot-header-order-hint {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ed-text-color-secondary);
+}
+.pie-layout-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    color: var(--ed-text-color-regular);
+    background: var(--ed-fill-color-blank);
+    border: 1px solid var(--ed-border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    svg {
+      width: 100%;
+      height: 48px;
+      color: #94a3b8;
+    }
+    &[aria-pressed='true'] {
+      border-color: var(--ed-color-primary);
+      color: var(--ed-color-primary);
+      svg {
+        color: var(--ed-color-primary);
+      }
+    }
+    &:focus-visible {
+      outline: 2px solid var(--ed-color-primary);
+      outline-offset: 2px;
+    }
+  }
+}
+.pie-layout-note {
+  margin: 0 0 12px;
+  color: var(--ed-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
 .color-picker-style {
   cursor: pointer;
   z-index: 1003;

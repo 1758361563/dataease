@@ -59,6 +59,9 @@ declare interface ChartAttr {
  * 基础样式设置
  */
 declare interface ChartBasicStyle {
+  pieLayout?: 'legacy' | 'large' | 'ranking'
+  pieLabelLimit?: number
+  piePalette?: 'categorical' | 'theme'
   /**
    * 透明度
    */
@@ -120,6 +123,8 @@ declare interface ChartBasicStyle {
    * 表格指标展示位置
    */
   quotaPosition: 'col' | 'row'
+  /** Column header hierarchy; absent retains dimension-first for saved charts. */
+  pivotHeaderOrder?: 'dimension-first' | 'measure-first'
   /**
    * 行头指标列名称
    */

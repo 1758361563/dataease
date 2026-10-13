@@ -802,7 +802,8 @@ onMounted(() => {
   const { offsetWidth, offsetHeight } = containerDom
   const preSize = [offsetWidth, offsetHeight]
   resizeObserver = new ResizeObserver(([entry] = []) => {
-    if (!RESIZE_MONITOR_CHARTS.includes(view.value.type)) {
+    const responsivePie = ['pie', 'pie-donut'].includes(view.value.type)
+    if (!RESIZE_MONITOR_CHARTS.includes(view.value.type) && !responsivePie) {
       return
     }
     const [size] = entry.borderBoxSize || []

@@ -8,6 +8,8 @@ import FileSaver from 'file-saver'
 import { deepCopy } from '@/utils/utils'
 import { domToPng } from 'modern-screenshot'
 import { initCanvasDataPrepare } from '@/utils/canvasUtils'
+import { getFieldByDQ } from '@/api/chart'
+import { dashboardTemplateStyle, stripDashboardQueryState } from '@/utils/dashboardParameterRuntime'
 const embeddedStore = useEmbedded()
 const dvMainStore = dvMainStoreWithOut()
 const { canvasStyleData, componentData, canvasViewInfo, canvasViewDataInfo, dvInfo } =
@@ -40,7 +42,7 @@ function prePareTemplateBaseData(dvId, callback) {
   if (dvInfo.value.type === 'dataV' && canvasStyleData.value.screenAdaptor === 'full') {
     initCanvasDataPrepare(
       dvId,
-      { busiFlag: 'dataV', resourceTable: 'core' },
+      { busiFlag: 'dataV', resourceTable: 'core', preserveParameterRuntime: true },
       function ({ canvasDataResult, canvasStyleResult }) {
         callback({
           canvasDataResult: JSON.stringify(canvasDataResult),
@@ -59,11 +61,24 @@ function prePareTemplateBaseData(dvId, callback) {
 export function download2AppTemplate(downloadType, canvasDom, name, attachParams, callBack?) {
   try {
     findStaticSource(function (staticResource) {
-      html2canvas(canvasDom).then(canvas => {
+      html2canvas(canvasDom).then(async canvas => {
         const canvasViewDataTemplate = deepCopy(canvasViewInfo.value)
         Object.keys(canvasViewDataTemplate).forEach(viewId => {
           canvasViewDataTemplate[viewId].data = canvasViewDataInfo.value[viewId]
+          stripDashboardQueryState(canvasViewDataTemplate[viewId])
         })
+        for (const chart of Object.values(canvasViewDataTemplate) as any[]) {
+          if (!chart.tableId) continue
+          const fields = await getFieldByDQ(chart.tableId, chart.id, {
+            sceneId: dvInfo.value.id,
+            resourceTable: dvInfo.value.resourceTable || 'core',
+            calculationConfig:
+              dvInfo.value.resourceTable === 'snapshot' ? dvInfo.value.calculationConfig : undefined
+          })
+          chart.viewFields = [...fields.dimensionList, ...fields.quotaList].filter(
+            field => field.id !== '-1'
+          )
+        }
         const snapshot = canvas.toDataURL('image/jpeg', 0.1) // 0.1是图片质量
         const templateName = attachParams?.appName ? attachParams.appName : name
         if (snapshot !== '') {
@@ -77,7 +92,11 @@ export function download2AppTemplate(downloadType, canvasDom, name, attachParams
                 dvType: dvInfo.value.type,
                 nodeType: downloadType,
                 version: 3,
-                canvasStyleData: canvasStyleResult,
+                canvasStyleData: dashboardTemplateStyle(
+                  canvasStyleResult,
+                  dvInfo.value.calculationConfig
+                ),
+                calculationConfig: dvInfo.value.calculationConfig,
                 componentData: canvasDataResult,
                 dynamicData: JSON.stringify(canvasViewDataTemplate),
                 staticResource: JSON.stringify(staticResource || {}),

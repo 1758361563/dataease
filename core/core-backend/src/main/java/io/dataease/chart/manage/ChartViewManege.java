@@ -63,6 +63,8 @@ import java.util.stream.Collectors;
 @Component
 public class ChartViewManege {
     @Resource
+    private io.dataease.visualization.calculation.DashboardCalculationManage dashboardCalculationManage;
+    @Resource
     private CoreChartViewMapper coreChartViewMapper;
     @Resource
     private SnapshotCoreChartViewMapper snapshotCoreChartViewMapper;
@@ -160,6 +162,7 @@ public class ChartViewManege {
             }
         }
         ChartViewDTO dto = transRecord2DTO(coreChartView);
+        dto.setResourceTable(resourceTable);
         return dto;
     }
 
@@ -197,6 +200,7 @@ public class ChartViewManege {
         wrapper.eq("scene_id", sceneId);
         List<ChartViewDTO> chartViewDTOS = transChart(extChartViewMapper.selectListCustom(sceneId, resourceTable));
         if (!CollectionUtils.isEmpty(chartViewDTOS)) {
+            chartViewDTOS.forEach(chart -> chart.setResourceTable(resourceTable));
             List<Long> tableIds = chartViewDTOS.stream()
                     .map(ChartViewDTO::getTableId)
                     .filter(tableId -> tableId != null) // 过滤掉空值
@@ -316,6 +320,8 @@ public class ChartViewManege {
             return dto;
         }).collect(Collectors.toList());
         list.addAll(transFieldDTO(chartFields));
+
+        list.addAll(dashboardCalculationManage.sharedFields(id, chartId, chartViewDTO));
 
         // 获取list中的聚合函数，将字段的summary设置成空
         SQLObj tableObj = new SQLObj();

@@ -30,13 +30,18 @@ import {
 } from '../../common/common_table'
 import Decimal from 'decimal.js'
 import { DEFAULT_TABLE_HEADER } from '@/views/chart/components/editor/util/chart'
-import { resultKey } from '@/views/chart/components/js/chartFieldInstance'
+import {
+  resultKey,
+  formatPivotDate,
+  ensurePivotDimensionInstances
+} from '@/views/chart/components/js/chartFieldInstance'
 import {
   decodeGlobalPivotValue,
   isGlobalPivotSort,
   prepareGlobalPivotData
 } from './pivotGlobalSort'
 import { isBlockedMeasureOnlyTree, readGridColTotal } from './pivotMeasureRows'
+import { pivotHeaderFields } from './pivotHeaderLayout'
 
 function mapTotalCfg(cfgList = [], yAxis: Axis[] = []) {
   const map = {}
@@ -141,6 +146,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
       'tableLayoutMode',
       'showHoverStyle',
       'quotaPosition',
+      'pivotHeaderOrder',
       'quotaColLabel',
       'tableRowHeaderMode'
     ]
@@ -165,6 +171,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
 
   public drawChart(drawOption: S2DrawOptions<PivotSheet>): PivotSheet {
     const { container, chart, chartObj, action } = drawOption
+    ensurePivotDimensionInstances(chart)
     const containerDom = document.getElementById(container)
 
     const { xAxis: rowFields, xAxisExt: columnFields, yAxis: valueFields } = chart
@@ -204,6 +211,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
           if (value === null || value === undefined) {
             return '-'
           }
+          if (f.deType === 1) return formatPivotDate(value, f)
           if (![2, 3, 4].includes(f.deType) || !isNumeric(value)) {
             return value
           }
@@ -283,12 +291,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
     const sortParams = globalRowSort ? [] : this.configSortParams(chart, newData)
     // data config
     const s2DataConfig: S2DataConfig = {
-      fields: {
-        rows: r,
-        columns: c,
-        values: v,
-        valueInCols: !(basicStyle.quotaPosition === 'row')
-      },
+      fields: pivotHeaderFields(r, c, v, basicStyle),
       meta: meta,
       data: newData,
       sortParams: sortParams
@@ -366,8 +369,9 @@ export class TablePivot extends S2ChartView<PivotSheet> {
         const colTotalCfgMap = mapTotalCfg(tableTotal.col.calcTotals.cfg, chart.yAxis)
         s2Options.layoutCoordinate = (_, __, col) => {
           if (col?.isGrandTotals) {
-            if (colTotalCfgMap[col.value]?.label) {
-              col.label = colTotalCfgMap[col.value].label
+            const measure = col.query?.[EXTRA_FIELD] ?? col.value
+            if (colTotalCfgMap[measure]?.label) {
+              col.label = colTotalCfgMap[measure].label
             }
           }
         }
@@ -1080,10 +1084,10 @@ export class TablePivot extends S2ChartView<PivotSheet> {
       customAttr.basicStyle.tableColumnMode = 'custom'
     }
     if (customAttr.tableHeader.tableHeaderAlign === 'custom') {
-      customAttr.tableHeader.tableHeaderAlign = 'left'
+      customAttr.tableHeader.tableHeaderAlign = 'center'
     }
     if (customAttr.tableCell.tableItemAlign === 'custom') {
-      customAttr.tableCell.tableItemAlign = 'left'
+      customAttr.tableCell.tableItemAlign = 'center'
     }
     return chart
   }

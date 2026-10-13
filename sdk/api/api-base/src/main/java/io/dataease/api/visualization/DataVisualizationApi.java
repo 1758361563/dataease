@@ -175,4 +175,15 @@ public interface DataVisualizationApi {
 
     @Hidden
     List<DatasetPermissionTemplate> queruDatasetPermissionTemplate(Long resourceId);
+
+    @PostMapping("/validateCalculationConfig")
+    @DePermit(value = {"#p0.id + ':manage'"}, busiFlag = "#p0.type")
+    io.dataease.api.visualization.dto.DashboardCalculationConfig validateCalculationConfig(@RequestBody DataVisualizationBaseRequest request);
+
+    @PostMapping("/resolveCalculationDefaults")
+    @DePermit(value = {"#p0.id + ':manage'"}, busiFlag = "#p0.type")
+    Map<String, String> resolveCalculationDefaults(@RequestBody DataVisualizationBaseRequest request);
+
+    @PostMapping("/calculationRuntime")
+    Map<String, Object> calculationRuntime(@RequestBody DataVisualizationBaseRequest request);
 }

@@ -225,6 +225,10 @@ const changeColorOption = (option?) => {
     state.value.basicStyleForm[colorsName.value] = [...items[0].colors]
     state.value.customColor = state.value.basicStyleForm[colorsName.value][0]
     state.value.colorIndex = 0
+    if (['pie', 'pie-donut'].includes(props.chart?.type)) {
+      // Choosing a palette replaces old per-category overrides as well.
+      state.value.basicStyleForm[seriesColorName.value] = []
+    }
     state.value.basicStyleForm[seriesColorName.value]?.forEach((c, i) => {
       const length = items[0].colors.length
       c.color = items[0].colors[i % length]
@@ -243,8 +247,9 @@ const resetCustomColor = () => {
     basicStyleForm[seriesColorName.value] = []
     changeBasicStyle(seriesColorName.value)
     const colorScheme = basicStyleForm[colorSchemeName.value]
-    basicStyleForm[colorsName.value] =
+    basicStyleForm[colorsName.value] = cloneDeep(
       colorCases.find(ele => ele.value === colorScheme)?.colors ?? colorCases[0].colors
+    )
     changeBasicStyle(colorsName.value)
     setupSeriesColor()
   }
@@ -336,7 +341,7 @@ const colorItemBorderColor = (index, state) => {
         <el-popover
           placement="bottom-start"
           ref="colorCaseSelectorRef"
-          width="268"
+          width="320"
           :offset="4"
           trigger="click"
           :persistent="false"
@@ -731,11 +736,12 @@ const colorItemBorderColor = (index, state) => {
   }
 
   .cases-list__text {
-    margin-left: 4px;
+    margin-left: 12px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 40px;
+    flex: 1;
+    min-width: 70px;
   }
 }
 .series-color-picker-wrapper {

@@ -10,6 +10,7 @@ import io.dataease.api.dataset.union.DatasetTableInfoDTO;
 import io.dataease.api.dataset.union.UnionDTO;
 import io.dataease.api.report.bo.DatasetPermissionTemplate;
 import io.dataease.api.template.dto.TemplateManageFileDTO;
+import io.dataease.visualization.calculation.DashboardCalculationLifecycle;
 import io.dataease.api.template.dto.VisualizationTemplateExtendDataDTO;
 import io.dataease.api.visualization.DataVisualizationApi;
 import io.dataease.api.visualization.dto.VisualizationViewTableDTO;
@@ -37,6 +38,7 @@ import io.dataease.dataset.manage.DatasetDataManage;
 import io.dataease.dataset.manage.DatasetGroupManage;
 import io.dataease.dataset.manage.DatasetSQLManage;
 import io.dataease.dataset.utils.DatasetUtils;
+import io.dataease.dataset.utils.TableUtils;
 import io.dataease.datasource.dao.auto.entity.CoreDatasource;
 import io.dataease.datasource.dao.auto.mapper.CoreDatasourceMapper;
 import io.dataease.datasource.provider.ExcelUtils;
@@ -96,6 +98,26 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/dataVisualization")
 public class DataVisualizationServer implements DataVisualizationApi {
+    @Resource
+    private io.dataease.visualization.calculation.DashboardCalculationManage dashboardCalculationManage;
+    @Resource
+    private io.dataease.visualization.calculation.DashboardCalculationCopyRelations dashboardCalculationCopyRelations;
+
+    @Override
+    public io.dataease.api.visualization.dto.DashboardCalculationConfig validateCalculationConfig(DataVisualizationBaseRequest request) {
+        return dashboardCalculationManage.validateForEdit(request);
+    }
+
+    @Override
+    public Map<String, String> resolveCalculationDefaults(DataVisualizationBaseRequest request) {
+        return dashboardCalculationManage.defaults(request);
+    }
+
+    @Override
+    @DeLinkPermit("#p0.id")
+    public Map<String, Object> calculationRuntime(DataVisualizationBaseRequest request) {
+        return dashboardCalculationManage.runtime(request);
+    }
 
     @Resource
     private DataVisualizationInfoMapper visualizationInfoMapper;
@@ -104,6 +126,9 @@ public class DataVisualizationServer implements DataVisualizationApi {
     private ChartViewManege chartViewManege;
     @Resource
     private CoreChartViewMapper coreChartViewMapper;
+
+    @Resource
+    private SnapshotCoreChartViewMapper snapshotCoreChartViewMapper;
 
     @Resource
     private ExtDataVisualizationMapper extDataVisualizationMapper;
@@ -602,6 +627,11 @@ public class DataVisualizationServer implements DataVisualizationApi {
             });
             request.setComponentData(componentDataStr.get());
         }
+        if (request.getCalculationConfig() != null) {
+            if (isAppSave) request.setCalculationConfig((String) JsonUtil.toJSONString(
+                    DashboardCalculationLifecycle.rebind(request.getCalculationConfig(), dsGroupIdMap, dsTableFieldsIdMap)));
+            request.setCalculationConfig((String) JsonUtil.toJSONString(dashboardCalculationManage.normalizeForCanvas(request)));
+        }
         DataVisualizationInfo visualizationInfo = new DataVisualizationInfo();
         BeanUtils.copyBean(visualizationInfo, request);
         visualizationInfo.setNodeType(request.getNodeType() == null ? DataVisualizationConstants.NODE_TYPE.LEAF : request.getNodeType());
@@ -628,25 +658,13 @@ public class DataVisualizationServer implements DataVisualizationApi {
         Map<Long, ChartViewDTO> canvasViews = request.getCanvasViewInfo();
         if (isAppSave) {
             Map<Long, String> canvasViewsStr = VisualizationUtils.viewTransToStr(canvasViews);
-            canvasViewsStr.forEach((viewId, viewInfoStr) -> {
-                AtomicReference<String> mutableViewInfoStr = new AtomicReference<>(viewInfoStr);
-                datasourceIdMap.forEach((key, value) -> {
-                    mutableViewInfoStr.set(mutableViewInfoStr.get().replaceAll(key.toString(), value.toString()));
-                });
-                dsTableIdMap.forEach((key, value) -> {
-                    mutableViewInfoStr.set(mutableViewInfoStr.get().replaceAll(key.toString(), value.toString()));
-                });
-                dsTableFieldsIdMap.forEach((key, value) -> {
-                    mutableViewInfoStr.set(mutableViewInfoStr.get().replaceAll(key.toString(), value.toString()));
-                });
-                dsGroupIdMap.forEach((key, value) -> {
-                    mutableViewInfoStr.set(mutableViewInfoStr.get().replaceAll(key.toString(), value.toString()));
-                });
-                dsTableFieldsDatasetNameMap.forEach((key, value) -> {
-                    mutableViewInfoStr.set(mutableViewInfoStr.get().replaceAll(key, value));
-                });
-                canvasViewsStr.put(viewId, mutableViewInfoStr.get());
-            });
+            Map<Long, Long> importedIds = new HashMap<>();
+            importedIds.putAll(datasourceIdMap);
+            importedIds.putAll(dsTableIdMap);
+            importedIds.putAll(dsTableFieldsIdMap);
+            importedIds.putAll(dsGroupIdMap);
+            canvasViewsStr.replaceAll((viewId, viewInfoStr) -> DashboardCalculationLifecycle.json(
+                    viewInfoStr, importedIds, dsTableFieldsDatasetNameMap, newDvId));
             canvasViews = VisualizationUtils.viewTransToObj(canvasViewsStr);
             canvasViews.forEach((key, viewInfo) -> {
                 viewInfo.setDataFrom("dataset");
@@ -675,8 +693,8 @@ public class DataVisualizationServer implements DataVisualizationApi {
                 BeanUtils.copyBean(visualizationLinkageField, visualizationLinkageFieldVO);
                 visualizationLinkageField.setId(newId);
                 visualizationLinkageField.setLinkageId(linkageIdMap.get(visualizationLinkageField.getLinkageId()));
-                visualizationLinkageField.setSourceField(dsTableFieldsIdMap.get(visualizationLinkageField.getSourceField()));
-                visualizationLinkageField.setTargetField(dsTableFieldsIdMap.get(visualizationLinkageField.getTargetField()));
+                visualizationLinkageField.setSourceField(dsTableFieldsIdMap.getOrDefault(visualizationLinkageField.getSourceField(), visualizationLinkageField.getSourceField()));
+                visualizationLinkageField.setTargetField(dsTableFieldsIdMap.getOrDefault(visualizationLinkageField.getTargetField(), visualizationLinkageField.getTargetField()));
                 linkageFieldIdMap.put(oldId, newId);
                 snapshotVisualizationLinkageFieldMapper.insert(visualizationLinkageField);
             });
@@ -701,7 +719,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
                     BeanUtils.copyBean(visualizationLinkJumpInfo, visualizationLinkJumpInfoVO);
                     visualizationLinkJumpInfo.setId(newId);
                     visualizationLinkJumpInfo.setLinkJumpId(linkJumpIdMap.get(visualizationLinkJumpInfo.getLinkJumpId()));
-                    visualizationLinkJumpInfo.setSourceFieldId(dsTableFieldsIdMap.get(visualizationLinkJumpInfo.getSourceFieldId()));
+                    visualizationLinkJumpInfo.setSourceFieldId(dsTableFieldsIdMap.getOrDefault(visualizationLinkJumpInfo.getSourceFieldId(), visualizationLinkJumpInfo.getSourceFieldId()));
                     linkJumpInfoIdMap.put(oldId, newId);
 
 
@@ -721,6 +739,16 @@ public class DataVisualizationServer implements DataVisualizationApi {
         }
         //保存图表信息
         chartDataManage.saveChartViewFromVisualization(request.getComponentData(), newDvId, canvasViews);
+        for (var chart : canvasViews.values()) {
+            if (chart.getViewFields() == null) continue;
+            for (var field : chart.getViewFields()) {
+                if (field.getChartId() == null) continue;
+                field.setChartId(chart.getId()); field.setDatasetGroupId(null);
+                var existingField = coreDatasetTableFieldMapper.selectById(field.getId());
+                if (existingField == null) coreDatasetTableFieldMapper.insert(BeanUtils.copyBean(new CoreDatasetTableField(), field));
+                else if (!Objects.equals(existingField.getChartId(), chart.getId())) DEException.throwException("模板私有字段不属于当前卡片");
+            }
+        }
         return newDvId.toString();
     }
 
@@ -790,6 +818,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
         for (Map.Entry<Long, ChartViewDTO> ele : request.getCanvasViewInfo().entrySet()) {
             DatasetUtils.viewDecode(ele.getValue());
         }
+        dashboardCalculationManage.prepareSave(request);
         Long dvId = request.getId();
         if (dvId == null) {
             DEException.throwException("ID can not be null");
@@ -1005,29 +1034,69 @@ public class DataVisualizationServer implements DataVisualizationApi {
         Long copyId = IDUtils.snowID() / 100; // 本次复制执行ID
         // 复制仪表板
         DataVisualizationInfo newDv = visualizationInfoMapper.selectById(sourceDvId);
+        boolean unpublishedCopy = Objects.equals(newDv.getStatus(), CommonConstants.DV_STATUS.UNPUBLISHED);
+        if (unpublishedCopy) {
+            var draft = snapshotMapper.selectById(sourceDvId);
+            if (draft != null) BeanUtils.copyBean(newDv, draft);
+        }
         newDv.setName(request.getName());
         newDv.setId(newDvId);
         newDv.setPid(request.getPid());
         newDv.setCreateTime(System.currentTimeMillis());
         // 复制图表 chart_view
-        extDataVisualizationMapper.viewCopyWithDv(sourceDvId, newDvId, copyId, CommonConstants.RESOURCE_TABLE.CORE);
+        if (!unpublishedCopy) extDataVisualizationMapper.viewCopyWithDv(sourceDvId, newDvId, copyId, CommonConstants.RESOURCE_TABLE.CORE);
         extDataVisualizationMapper.viewCopyWithDv(sourceDvId, newDvId, copyId, CommonConstants.RESOURCE_TABLE.SNAPSHOT);
-        List<CoreChartView> viewList = extDataVisualizationMapper.findViewInfoByCopyId(copyId);
+        List<CoreChartView> viewList;
+        if (unpublishedCopy) {
+            QueryWrapper<SnapshotCoreChartView> draftCopies = new QueryWrapper<>(); draftCopies.eq("scene_id", newDvId);
+            viewList = snapshotCoreChartViewMapper.selectList(draftCopies).stream()
+                    .map(draft -> BeanUtils.copyBean(new CoreChartView(), draft)).toList();
+        } else viewList = extDataVisualizationMapper.findViewInfoByCopyId(copyId);
+        var calculationCopy = DashboardCalculationLifecycle.fresh(newDv.getCalculationConfig());
+        Map<Long, Long> copiedCharts = new HashMap<>();
+        viewList.forEach(chart -> copiedCharts.put(chart.getCopyFrom(), chart.getId()));
+        List<CoreDatasetTableField> privateFields = new ArrayList<>();
+        if (!copiedCharts.isEmpty()) {
+            QueryWrapper<CoreDatasetTableField> privateQuery = new QueryWrapper<>();
+            privateQuery.in("chart_id", copiedCharts.keySet());
+            privateFields = coreDatasetTableFieldMapper.selectList(privateQuery);
+        }
+        for (var field : privateFields) {
+            Long next = IDUtils.snowID();
+            calculationCopy.ids().put(field.getId(), next);
+            calculationCopy.aliases().put(field.getDataeaseName(), TableUtils.fieldNameShort(next.toString()));
+            calculationCopy.aliases().put(field.getFieldShortName(), TableUtils.fieldNameShort(next.toString()));
+        }
+        for (var field : privateFields) {
+            Long next = calculationCopy.ids().get(field.getId());
+            field.setId(next); field.setChartId(copiedCharts.get(field.getChartId()));
+            field.setOriginName(DashboardCalculationLifecycle.expression(field.getOriginName(), calculationCopy.ids()));
+            field.setDataeaseName(TableUtils.fieldNameShort(next.toString())); field.setFieldShortName(field.getDataeaseName());
+            coreDatasetTableFieldMapper.insert(field);
+        }
+        newDv.setCalculationConfig(newDv.getCalculationConfig() == null ? null : (String) JsonUtil.toJSONString(calculationCopy.config()));
+        // A copy starts from the published revision, including its private/shared field references.
+        QueryWrapper<SnapshotCoreChartView> copiedDrafts = new QueryWrapper<>();
+        copiedDrafts.eq("scene_id", newDvId);
+        snapshotCoreChartViewMapper.delete(copiedDrafts);
+        for (var view : viewList) {
+            var mapped = DashboardCalculationLifecycle.object(view, CoreChartView.class, calculationCopy, newDvId);
+            mapped.setSceneId(newDvId);
+            if (unpublishedCopy) coreChartViewMapper.insert(mapped); else coreChartViewMapper.updateById(mapped);
+            snapshotCoreChartViewMapper.insert(BeanUtils.copyBean(new SnapshotCoreChartView(), mapped));
+        }
         if (!CollectionUtils.isEmpty(viewList)) {
             String componentData = newDv.getComponentData();
             // componentData viewId 数据  并保存
             for (CoreChartView viewInfo : viewList) {
-                componentData = componentData.replace(String.valueOf(viewInfo.getCopyFrom()), String.valueOf(viewInfo.getId()));
+                componentData = DashboardCalculationLifecycle.json(componentData,
+                        Map.of(viewInfo.getCopyFrom(), viewInfo.getId()), Map.of(), newDvId);
             }
             newDv.setComponentData(componentData);
         }
+        newDv.setComponentData(DashboardCalculationLifecycle.json(newDv.getComponentData(), calculationCopy.ids(), calculationCopy.aliases(), newDvId));
         // 复制图表联动信息
-        extDataVisualizationMapper.copyLinkage(copyId);
-        extDataVisualizationMapper.copyLinkageField(copyId);
-        // 复制图表跳转信息
-        extDataVisualizationMapper.copyLinkJump(copyId);
-        extDataVisualizationMapper.copyLinkJumpInfo(copyId);
-        extDataVisualizationMapper.copyLinkJumpTargetInfo(copyId);
+        dashboardCalculationCopyRelations.copy(sourceDvId, newDvId, copyId, unpublishedCopy, copiedCharts, calculationCopy);
         DataVisualizationInfo visualizationInfoTarget = new DataVisualizationInfo();
         BeanUtils.copyBean(visualizationInfoTarget, newDv);
         visualizationInfoTarget.setPid(-1L);
@@ -1082,6 +1151,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
             String templateStyle = null;
             String templateData = null;
             String dynamicData = null;
+            String calculationConfig = request.getCalculationConfig();
             String staticResource = null;
             String appDataStr = null;
             String name = null;
@@ -1116,6 +1186,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
                     DEException.throwException("Can't find the template's info from market,please check");
                 }
                 templateStyle = templateFileInfo.getCanvasStyleData();
+                calculationConfig = templateFileInfo.getCalculationConfig();
                 templateData = templateFileInfo.getComponentData();
                 dynamicData = templateFileInfo.getDynamicData();
                 staticResource = templateFileInfo.getStaticResource();
@@ -1132,7 +1203,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
                     String dvInfo = appDataFormat.getVisualizationInfo();
                     VisualizationBaseInfoVO baseInfoVO = JsonUtil.parseObject(dvInfo, VisualizationBaseInfoVO.class);
                     Long sourceDvId = baseInfoVO.getId();
-                    appDataStr = appDataStr.replaceAll(sourceDvId.toString(), newDvId.toString());
+                    appDataStr = DashboardCalculationLifecycle.json(appDataStr, Map.of(sourceDvId, newDvId), Map.of(), newDvId);
                 } catch (Exception e) {
                     LogUtil.error(e);
                     appDataStr = null;
@@ -1141,11 +1212,31 @@ public class DataVisualizationServer implements DataVisualizationApi {
                 appDataStr = null;
             }
             // 解析动态数据
-            Map<String, String> dynamicDataMap = JsonUtil.parseObject(dynamicData, Map.class);
+            if (templateStyle != null) {
+                Map<String, Object> style = JsonUtil.parseObject(templateStyle, Map.class);
+                if (style != null && style.containsKey("dashboardCalculation")) {
+                    var embedded = style.remove("dashboardCalculation");
+                    if (calculationConfig == null) calculationConfig = (String) JsonUtil.toJSONString(embedded);
+                    templateStyle = (String) JsonUtil.toJSONString(style);
+                }
+            }
+            var importedCalculation = DashboardCalculationLifecycle.fresh(calculationConfig);
+            Map<String, Object> dynamicDataMap = JsonUtil.parseObject(dynamicData, Map.class);
+            for (var value : dynamicDataMap.values()) {
+                var sourceChart = JsonUtil.parseObject((String) JsonUtil.toJSONString(value), ChartViewDTO.class);
+                if (sourceChart == null || sourceChart.getViewFields() == null) continue;
+                for (var field : sourceChart.getViewFields()) {
+                    if (field.getChartId() == null) continue;
+                    Long next = IDUtils.snowID(); importedCalculation.ids().put(field.getId(), next);
+                    importedCalculation.aliases().put(field.getDataeaseName(), TableUtils.fieldNameShort(next.toString()));
+                    importedCalculation.aliases().put(field.getFieldShortName(), TableUtils.fieldNameShort(next.toString()));
+                }
+            }
+            if (appDataStr != null) appDataStr = DashboardCalculationLifecycle.json(appDataStr, importedCalculation.ids(), importedCalculation.aliases(), newDvId);
             List<ChartViewDTO> chartViews = new ArrayList<>();
             Map<Long, ChartViewDTO> canvasViewInfo = new HashMap<>();
             Map<Long, VisualizationTemplateExtendDataDTO> extendDataInfo = new HashMap<>();
-            for (Map.Entry<String, String> entry : dynamicDataMap.entrySet()) {
+            for (Map.Entry<String, Object> entry : dynamicDataMap.entrySet()) {
                 String originViewId = entry.getKey();
                 Object viewInfo = entry.getValue();
                 try {
@@ -1157,12 +1248,16 @@ public class DataVisualizationServer implements DataVisualizationApi {
                     LogUtil.error("History Adaptor Error", e);
                 }
                 String originViewData = JsonUtil.toJSONString(entry.getValue()).toString();
+                originViewData = DashboardCalculationLifecycle.json(originViewData, importedCalculation.ids(), importedCalculation.aliases(), newDvId);
                 ChartViewDTO chartView = JsonUtil.parseObject(originViewData, ChartViewDTO.class);
                 if (chartView == null) {
                     continue;
                 }
                 Long newViewId = IDUtils.snowID();
                 chartView.setId(newViewId);
+                if (chartView.getViewFields() != null) chartView.getViewFields().forEach(field -> {
+                    if (field.getChartId() != null) field.setChartId(newViewId);
+                });
                 chartView.setSceneId(newDvId);
                 chartView.setSourceTableId(chartView.getTableId());
                 chartView.setTableId(null);
@@ -1171,11 +1266,11 @@ public class DataVisualizationServer implements DataVisualizationApi {
                 // 数据处理 1.替换viewId 2.加入模板view data数据
                 VisualizationTemplateExtendDataDTO extendDataDTO = new VisualizationTemplateExtendDataDTO(newDvId, newViewId, originViewData);
                 extendDataInfo.put(newViewId, extendDataDTO);
-                templateData = templateData.replaceAll(originViewId, newViewId.toString());
+                templateData = DashboardCalculationLifecycle.json(templateData, Map.of(Long.valueOf(originViewId), newViewId), Map.of(), newDvId);
                 viewIdsMap.put(originViewId,Long.toString(newViewId));
                 if (StringUtils.isNotEmpty(appDataStr)) {
                     chartView.setTableId(chartView.getSourceTableId());
-                    appDataStr = appDataStr.replaceAll(originViewId, newViewId.toString());
+                    appDataStr = DashboardCalculationLifecycle.json(appDataStr, Map.of(Long.valueOf(originViewId), newViewId), Map.of(), newDvId);
                 }
                 canvasViewInfo.put(chartView.getId(), chartView);
                 //插入模板数据 此处预先插入减少数据交互量
@@ -1186,7 +1281,10 @@ public class DataVisualizationServer implements DataVisualizationApi {
             request.setCanvasStyleData(templateStyle);
             //Store static resource into the server
             staticResourceServer.saveFilesToServe(staticResource);
-            return new DataVisualizationVO(newDvId, name, dvType, version, templateStyle, templateData, appDataStr, canvasViewInfo, null,viewIdsMap);
+            DataVisualizationVO result = new DataVisualizationVO(newDvId, name, dvType, version, templateStyle, templateData, appDataStr, canvasViewInfo, null,viewIdsMap);
+            result.setCalculationConfig(calculationConfig == null ? null : (String) JsonUtil.toJSONString(importedCalculation.config()));
+            result.setComponentData(DashboardCalculationLifecycle.json(result.getComponentData(), importedCalculation.ids(), importedCalculation.aliases(), newDvId));
+            return result;
         } catch (Exception e) {
             e.printStackTrace();
             DEException.throwException("解析错误");

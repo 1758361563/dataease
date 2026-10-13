@@ -62,6 +62,9 @@ public class DataVisualizationVO implements Serializable {
      */
     private String componentData;
 
+    /** Versioned parameter/shared-field definitions, serialized as JSON. */
+    private String calculationConfig;
+
     /**
      * 移动端布局
      */

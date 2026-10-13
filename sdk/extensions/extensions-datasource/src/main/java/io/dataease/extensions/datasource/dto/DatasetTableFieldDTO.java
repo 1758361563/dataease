@@ -42,6 +42,12 @@ public class DatasetTableFieldDTO implements Serializable {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long chartId;
 
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long dashboardId;
+
+    /** DASHBOARD for visualization-scoped fields; absent for legacy fields. */
+    private String fieldScope;
+
     /**
      * 原始字段名
      */

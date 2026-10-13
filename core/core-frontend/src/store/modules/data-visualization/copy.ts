@@ -80,9 +80,9 @@ export const copyStore = defineStore('copy', {
         _this.paste()
       })
     },
-    copy() {
-      if (curComponent.value && curComponent.value.component !== 'GroupArea') {
-        this.copyDataInfo([curComponent.value])
+    copy(sourceComponent = curComponent.value) {
+      if (sourceComponent && sourceComponent.component !== 'GroupArea') {
+        this.copyDataInfo([sourceComponent])
       } else if (composeStore.areaData.components.length) {
         this.copyDataInfo(composeStore.areaData.components)
       }
@@ -134,7 +134,7 @@ export const copyStore = defineStore('copy', {
           ) {
             dvMainStore.setCurComponent({
               component: newComponent,
-              index: componentData.value.length - 1
+              index: findCopiedComponentIndex(componentData.value, newComponent.id)
             })
           }
           i++
@@ -199,6 +199,25 @@ export function deepCopyTabItemHelper(newCanvasId, tabComponentData, idMap) {
     resultComponentData.push(newItem)
   })
   return resultComponentData
+}
+
+/** Selection indices belong to the containing canvas, including cards inside a Tab. */
+export function findCopiedComponentIndex(components, id): number {
+  for (let index = 0; index < (components || []).length; index++) {
+    const component = components[index]
+    if (component.id === id) return index
+    const containers =
+      component.component === 'DeTabs'
+        ? (component.propValue || []).map(tab => tab.componentData)
+        : component.component === 'Group'
+        ? [component.propValue]
+        : []
+    for (const children of containers) {
+      const childIndex = findCopiedComponentIndex(children, id)
+      if (childIndex >= 0) return childIndex
+    }
+  }
+  return -1
 }
 
 function deepCopyHelper(data, idMap) {

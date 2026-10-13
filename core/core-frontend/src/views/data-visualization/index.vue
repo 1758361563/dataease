@@ -445,6 +445,8 @@ onMounted(async () => {
         dvMainStore.setComponentData(deTemplateData['componentData'])
         dvMainStore.setCanvasStyle(deTemplateData['canvasStyleData'])
         dvMainStore.setCanvasViewInfo(deTemplateData['canvasViewInfo'])
+        dvMainStore.dvInfo.calculationConfig = deTemplateData.calculationConfig
+        if (deTemplateData.type) dvMainStore.dvInfo.type = deTemplateData.type
         dvMainStore.setAppDataInfo(deTemplateData['appData'])
         setTimeout(() => {
           snapshotStore.recordSnapshotCache('template')

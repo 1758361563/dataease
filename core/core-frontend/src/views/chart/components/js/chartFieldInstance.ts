@@ -11,6 +11,31 @@ export type ChartFieldIdentity = {
   metricInstanceId?: string
 }
 
+/** Legacy pivot row/column placements can share a dataset key, but not a result column. */
+export function ensurePivotDimensionInstances(chart: any) {
+  if (chart?.type !== 'table-pivot') return
+  const placements = ['xAxis', 'xAxisExt'].flatMap(axis =>
+    (chart[axis] || []).map((field, index) => ({ field, axis, index }))
+  )
+  const counts = new Map<string, number>()
+  placements.forEach(({ field }) => {
+    const key = resultKey(field)
+    if (key) counts.set(key, (counts.get(key) || 0) + 1)
+  })
+  placements.forEach(({ field, axis, index }) => {
+    if ((counts.get(resultKey(field)) || 0) > 1)
+      field.fieldInstanceId = `pd_${axis}_${index}_${field.id}`
+  })
+}
+
+export function formatPivotDate(value: any, field: any) {
+  if (value == null || value === '') return value
+  if (field?.deType !== 1 || field.dateStyle !== 'M') return value
+  const month = Number(value)
+  if (!Number.isInteger(month) || month < 1 || month > 12) return value
+  return field.dateShowFormat === 'month_number' ? String(month).padStart(2, '0') : `${month}月`
+}
+
 export function instanceKey(f?: ChartFieldIdentity | null): string | undefined {
   if (!f) {
     return undefined

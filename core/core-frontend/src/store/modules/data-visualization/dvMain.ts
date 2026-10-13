@@ -1,4 +1,5 @@
 import { supportsTooltipShelf } from '@/views/chart/components/js/tooltipContent'
+import { attachDashboardParameters } from '@/utils/dashboardParameterRuntime'
 import { defineStore } from 'pinia'
 import { store } from '../../index'
 import { deepCopy } from '@/utils/utils'
@@ -87,6 +88,8 @@ export const dvMainStore = defineStore('dataVisualization', {
       isClickComponent: false,
       // 大屏基础信息
       dvInfo: {
+        calculationConfig: null as string | null,
+        resourceTable: 'core',
         dataState: null,
         optType: null,
         id: null,
@@ -1729,6 +1732,8 @@ export const dvMainStore = defineStore('dataVisualization', {
     },
     resetDvInfo() {
       this.dvInfo = {
+        calculationConfig: null,
+        resourceTable: 'core',
         dataState: null,
         optType: null,
         id: null,
@@ -1779,7 +1784,9 @@ export const dvMainStore = defineStore('dataVisualization', {
       return this.canvasViewInstanceInfo[viewId]
     },
     setLastViewRequestInfo(viewId, viewRequestInfo) {
-      this.lastViewRequestInfo[viewId] = viewRequestInfo
+      const request = { sceneId: this.dvInfo.id, chartExtRequest: { ...(viewRequestInfo || {}) } }
+      attachDashboardParameters(request)
+      this.lastViewRequestInfo[viewId] = request.chartExtRequest
     },
     getLastViewRequestInfo(viewId) {
       return this.lastViewRequestInfo[viewId]
@@ -1819,6 +1826,8 @@ export const dvMainStore = defineStore('dataVisualization', {
       this.hiddenListStatus = false
       this.dvInfo = {
         dataState: 'prepare',
+        resourceTable: 'snapshot',
+        calculationConfig: null,
         optType: null,
         id: resourceId,
         name: name,
@@ -1863,6 +1872,8 @@ export const dvMainStore = defineStore('dataVisualization', {
       this.componentData = []
       this.dvInfo = {
         dataState: null,
+        calculationConfig: null,
+        resourceTable: 'core',
         optType: null,
         id: null,
         name: null,

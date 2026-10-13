@@ -39,4 +39,12 @@ public class ChartViewDTO extends ChartViewBaseDTO {
 
     // 数据下载模式 dataset 指的是现在原始数据
     private String downloadType;
+
+    /** Matches visualization source: core (published) or snapshot (editor). */
+    private String resourceTable = "core";
+
+    /** Editor definitions and per-query values are transient, never stored in core_chart_view. */
+    private String calculationConfig;
+    private java.util.Map<String, String> dashboardParameterValues;
+    private String dashboardParameterReference;
 }

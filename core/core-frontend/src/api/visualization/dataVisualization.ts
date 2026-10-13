@@ -2,6 +2,42 @@ import request from '@/config/axios'
 import type { BusiTreeRequest } from '@/models/tree/TreeNode'
 import { originNameHandleWithArr } from '@/utils/CalculateFields'
 import { cloneDeep } from 'lodash-es'
+import type { DashboardCalculationConfig } from '@/models/dashboardCalculation'
+
+export const calculationRuntime = (
+  id,
+  resourceTable = 'core',
+  calculationConfig?: string,
+  canvasViewInfo?: Record<string, any>
+) =>
+  request.post({
+    url: '/dataVisualization/calculationRuntime',
+    data: { id, type: 'dashboard', resourceTable, calculationConfig, canvasViewInfo }
+  })
+
+export const validateCalculationConfig = (
+  id: string,
+  calculationConfig: DashboardCalculationConfig,
+  canvasViewInfo?: Record<string, any>
+) =>
+  request.post({
+    url: '/dataVisualization/validateCalculationConfig',
+    data: {
+      id,
+      type: 'dashboard',
+      calculationConfig: JSON.stringify(calculationConfig),
+      canvasViewInfo
+    }
+  })
+
+export const resolveCalculationDefaults = (
+  id: string,
+  calculationConfig: DashboardCalculationConfig
+) =>
+  request.post({
+    url: '/dataVisualization/resolveCalculationDefaults',
+    data: { id, type: 'dashboard', calculationConfig: JSON.stringify(calculationConfig) }
+  })
 export interface ResourceOrFolder {
   name: string
   id?: number | string
