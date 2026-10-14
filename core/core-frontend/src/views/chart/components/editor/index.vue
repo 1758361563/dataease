@@ -75,6 +75,7 @@ import { PluginComponent } from '@/components/plugin'
 import { Field, getFieldByDQ, copyChartField, deleteChartField } from '@/api/chart'
 import {
   instanceKey,
+  allowsRepeatedPivotDate,
   ensurePivotDimensionInstances
 } from '@/views/chart/components/js/chartFieldInstance'
 import {
@@ -570,6 +571,14 @@ const dimensionItemRemove = item => {
 }
 
 const quotaItemChange = (axis: Axis, axisType: AxisType) => {
+  if (
+    view.value.type === 'table-pivot' &&
+    axisType === 'yAxis' &&
+    axis.pivotDisplayScope === 'totals'
+  ) {
+    view.value.customAttr.tableTotal.col.showGrandTotals = true
+    view.value.customAttr.tableTotal.col.reverseLayout = true
+  }
   recordSnapshotInfo('calcData')
   // do quotaItemChange
   emitter.emit('updateAxis', { axisType, axis: [axis], editType: 'update' })
@@ -893,7 +902,10 @@ const addAxis = (e, axis: AxisType) => {
     return
   }
 
-  if (!duplicate) {
+  if (
+    !duplicate &&
+    !allowsRepeatedPivotDate(view.value, axis, view.value[axis]?.[e.newDraggableIndex])
+  ) {
     dup = dragMoveDuplicate(view.value[axis], e, 'chart')
   }
   const itemNewOnAxis = view.value[axis]?.[e.newDraggableIndex]
@@ -2196,7 +2208,7 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
     }
     if (
       (view.value.type === 'table-pivot' || view.value.type === 'table-normal') &&
-      type === 'yAxis'
+      (type === 'yAxis' || allowsRepeatedPivotDate(view.value, type, obj))
     ) {
       obj.fieldInstanceId = String(guid())
     }
@@ -2204,7 +2216,8 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
     view.value[type] ??= []
     const targetId = ev.srcElement.offsetParent?.querySelector('.node-id_private')?.dataset?.id
     const index =
-      (view.value.type === 'table-pivot' || view.value.type === 'table-normal') && type === 'yAxis'
+      (view.value.type === 'table-pivot' || view.value.type === 'table-normal') &&
+      (type === 'yAxis' || allowsRepeatedPivotDate(view.value, type, obj))
         ? view.value[type].findIndex(
             ele => instanceKey(ele) === String(targetId) || String(ele.id) === String(targetId)
           )
@@ -2229,6 +2242,9 @@ const drop = (ev: MouseEvent, type = 'xAxis') => {
 }
 
 /** 对比指标卡 yAxis 用稳定 metricInstanceId；table yAxis 用 fieldInstanceId；其它图表仍用 field.id */
+const dimensionItemKey = (item: any) =>
+  view.value.type === 'table-pivot' ? instanceKey(item) : item.id
+
 const yAxisItemKey = (item: any) => {
   if (view.value.type === 'indicator-combo') {
     if (!item.metricInstanceId) {
@@ -2560,7 +2576,7 @@ const chartStyleScroll = (val: any) => {
                               <draggable
                                 :list="view.xAxis"
                                 :move="onMove"
-                                item-key="id"
+                                :item-key="dimensionItemKey"
                                 group="drag"
                                 animation="300"
                                 class="drag-block-style"
@@ -2626,7 +2642,7 @@ const chartStyleScroll = (val: any) => {
                             <draggable
                               :list="view.xAxisExt"
                               :move="onMove"
-                              item-key="id"
+                              :item-key="dimensionItemKey"
                               group="drag"
                               animation="300"
                               class="drag-block-style"
@@ -2952,7 +2968,7 @@ const chartStyleScroll = (val: any) => {
                               <draggable
                                 :list="view.xAxis"
                                 :move="onMove"
-                                item-key="id"
+                                :item-key="dimensionItemKey"
                                 group="drag"
                                 animation="300"
                                 class="drag-block-style"

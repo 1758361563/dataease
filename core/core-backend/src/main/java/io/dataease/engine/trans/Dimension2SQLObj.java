@@ -95,6 +95,29 @@ public class Dimension2SQLObj {
     }
 
     public static SQLObj getXFields(ChartViewFieldDTO x, String originField, String fieldAlias, boolean isCross) {
+        if ("y_W".equals(x.getDateStyle()) && Objects.equals(x.getDeType(), DeTypeConstants.DE_TIME)) {
+            // Group by the ISO week's Monday, independently of the presentation format.
+            String date = originField;
+            if (!Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_TIME)) {
+                if (Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_STRING)
+                        || Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_LOCATION)) {
+                    date = String.format(SQLConstants.DE_STR_TO_DATE, originField,
+                            StringUtils.isEmpty(x.getDateFormat()) ? SQLConstants.DEFAULT_DATE_FORMAT : x.getDateFormat());
+                } else {
+                    date = String.format(SQLConstants.FROM_UNIXTIME,
+                            String.format(SQLConstants.CAST, originField, SQLConstants.DEFAULT_INT_FORMAT),
+                            SQLConstants.DEFAULT_DATE_FORMAT);
+                    date = String.format(SQLConstants.DE_STR_TO_DATE, date, SQLConstants.DEFAULT_DATE_FORMAT);
+                }
+            } else if (isCross && StringUtils.equalsIgnoreCase(x.getType(), "date")) {
+                date = String.format(SQLConstants.DE_STR_TO_DATE,
+                        String.format(SQLConstants.CONCAT, originField, "' 00:00:00'"), SQLConstants.DEFAULT_DATE_FORMAT);
+            }
+            return SQLObj.builder().fieldAlias(fieldAlias).fieldName(
+                    String.format(SQLConstants.DE_DATE_FORMAT,
+                            "TIMESTAMPADD(DAY, -MOD(DAYOFWEEK(" + date + ") + 5, 7), " + date + ")", "yyyy-MM-dd")
+            ).build();
+        }
         String fieldName = "";
         if (Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_TIME)) {
             if (Objects.equals(x.getDeType(), DeTypeConstants.DE_INT) || Objects.equals(x.getDeType(), DeTypeConstants.DE_FLOAT)) {

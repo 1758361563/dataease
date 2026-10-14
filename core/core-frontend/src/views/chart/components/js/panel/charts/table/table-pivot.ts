@@ -42,6 +42,10 @@ import {
 } from './pivotGlobalSort'
 import { isBlockedMeasureOnlyTree, readGridColTotal } from './pivotMeasureRows'
 import { pivotHeaderFields } from './pivotHeaderLayout'
+import { isScopedPercent, pivotPercentValue } from './pivotPercent'
+import { fitPivotTotalColumns } from './pivotTotalWidth'
+import { expandMeasureFirstTotals } from './pivotMeasureTotals'
+import { configurePivotDisplayScope, fitSummaryOnlyHeader } from './pivotDisplayScope'
 
 function mapTotalCfg(cfgList = [], yAxis: Axis[] = []) {
   const map = {}
@@ -73,7 +77,29 @@ type DataItem = Record<string, any>
 const { t } = useI18n()
 
 class CustomPivotDataset extends PivotDataSet {
+  percentContext?: { chart: Pick<Chart, 'xAxis' | 'xAxisExt' | 'yAxis'>; basis: any[] }
+  percentTotalsCache = new Map()
+  setDataCfg(dataCfg: S2DataConfig) {
+    this.percentTotalsCache.clear()
+    super.setDataCfg(dataCfg)
+  }
   getTotalValue(query: Query, totalStatus?: TotalStatus) {
+    const context = this.percentContext
+    const field = context?.chart.yAxis.find(field => resultKey(field) === query[EXTRA_FIELD])
+    if (field && isScopedPercent(field)) {
+      const decoded = Object.fromEntries(
+        Object.entries(query).map(([key, value]) => [key, decodeGlobalPivotValue(value)])
+      )
+      const value = pivotPercentValue(
+        decoded,
+        context.basis,
+        context.chart.xAxis.map(resultKey),
+        context.chart.xAxisExt.map(resultKey),
+        { ...field, resultKey: resultKey(field) },
+        this.percentTotalsCache
+      )
+      return { ...query, [VALUE_FIELD]: value, [query[EXTRA_FIELD]]: value }
+    }
     const { options } = this.spreadsheet
     const effectiveStatus = some(totalStatus)
     const status = effectiveStatus ? totalStatus : this.getTotalStatus(query)
@@ -236,6 +262,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
       return
     }
     const tableTotal = cloneDeep(parsedAttr.tableTotal)
+    const summaryLayoutArrange = configurePivotDisplayScope(chart, basicStyle, tableTotal)
     const globalRowSort = isGlobalPivotSort(chart)
     if (globalRowSort) {
       tableTotal.row.showSubTotals = false
@@ -306,7 +333,12 @@ export class TablePivot extends S2ChartView<PivotSheet> {
         getContainer: () => containerDom
       },
       hierarchyType: basicStyle.tableLayoutMode ?? 'grid',
-      dataSet: spreadSheet => new CustomPivotDataset(spreadSheet),
+      dataSet: spreadSheet => {
+        const dataset = new CustomPivotDataset(spreadSheet)
+        if (Array.isArray(chart.data?.percentBasis))
+          dataset.percentContext = { chart, basis: chart.data.percentBasis }
+        return dataset
+      },
       interaction: {
         hoverHighlight: !(basicStyle.showHoverStyle === false),
         hoverFocus: false
@@ -316,6 +348,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
       },
       frozenRowHeader: !(tableHeader.rowHeaderFreeze === false)
     }
+    if (summaryLayoutArrange) s2Options.layoutArrange = summaryLayoutArrange
     // options
     s2Options.style = this.configStyle(chart, s2DataConfig)
     if (basicStyle.tableLayoutMode === 'tree') {
@@ -398,6 +431,25 @@ export class TablePivot extends S2ChartView<PivotSheet> {
     this.configTooltip(chart, s2Options)
     // 开始渲染
     const s2 = new PivotSheet(containerDom, s2DataConfig, s2Options as unknown as S2Options)
+    if (summaryLayoutArrange)
+      s2.on(S2Event.LAYOUT_AFTER_HEADER_LAYOUT, layout =>
+        fitSummaryOnlyHeader(
+          s2,
+          layout,
+          chart.yAxis.every(field => field.pivotDisplayScope === 'totals')
+        )
+      )
+    if (
+      basicStyle.quotaPosition !== 'row' &&
+      basicStyle.pivotHeaderOrder === 'measure-first' &&
+      c.length &&
+      v.length > 1
+    ) {
+      s2.on(S2Event.LAYOUT_AFTER_HEADER_LAYOUT, layout => expandMeasureFirstTotals(s2, layout))
+    }
+    if (basicStyle.tableColumnMode === 'colAdapt') {
+      s2.on(S2Event.LAYOUT_AFTER_HEADER_LAYOUT, layout => fitPivotTotalColumns(s2, layout))
+    }
     // 自适应铺满
     if (basicStyle.tableColumnMode === 'adapt') {
       s2.on(S2Event.LAYOUT_RESIZE_COL_WIDTH, () => {

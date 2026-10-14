@@ -59,8 +59,15 @@ core/core-frontend/src/assets/fsSvg.html
 !/core/core-backend/src/test/java/io/dataease/visualization/
 /core/core-backend/src/test/java/io/dataease/visualization/*
 !/core/core-backend/src/test/java/io/dataease/visualization/calculation/
+!/core/core-backend/src/test/java/io/dataease/chart/
+/core/core-backend/src/test/java/io/dataease/chart/*
+!/core/core-backend/src/test/java/io/dataease/chart/utils/
+/core/core-backend/src/test/java/io/dataease/chart/utils/*
+!/core/core-backend/src/test/java/io/dataease/chart/utils/PivotPercentCalculatorTest.java
+!/core/core-backend/src/test/java/io/dataease/chart/utils/PivotWeekSqlTest.java
 !/core/core-backend/src/main/java/io/dataease/visualization/calculation/
 !/core/core-backend/src/main/java/io/dataease/visualization/calculation/*.java
+!/core/core-backend/src/main/java/io/dataease/chart/utils/PivotPercentCalculator.java
 !/core/core-backend/src/main/resources/db/migration/V2.10.26__dashboard_calculation.sql
 !/core/core-backend/src/main/resources/db/desktop/V2.10.26__dashboard_calculation.sql
 /core/frontend/

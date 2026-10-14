@@ -8,6 +8,7 @@ import io.dataease.chart.manage.ChartDataManage;
 import io.dataease.chart.manage.ChartViewManege;
 import io.dataease.chart.utils.ChartDataBuild;
 import io.dataease.chart.utils.SingleCategoryRank;
+import io.dataease.chart.utils.PivotPercentCalculator;
 import io.dataease.constant.SQLConstants;
 import io.dataease.dataset.manage.DatasetTableFieldManage;
 import io.dataease.engine.sql.SQLProvider;
@@ -134,7 +135,13 @@ public class DefaultChartHandler extends AbstractChartPlugin {
         Dimension2SQLObj.dimension2sqlObj(sqlMeta, xAxis, FieldUtil.transFields(allFields), crossDs, dsMap, Utils.getParams(FieldUtil.transFields(allFields)), view.getCalParams(), pluginManage);
         Quota2SQLObj.quota2sqlObj(sqlMeta, yAxis, FieldUtil.transFields(allFields), crossDs, dsMap, Utils.getParams(FieldUtil.transFields(allFields)), view.getCalParams(), pluginManage);
         boolean fullRanking = SingleCategoryRank.required(view, xAxis, yAxis);
-        String querySql = SQLProvider.createQuerySQL(sqlMeta, true, needOrder, fullRanking ? SingleCategoryRank.fullView(view) : view);
+        boolean scopedPercent = PivotPercentCalculator.required(view, yAxis);
+        if (scopedPercent) {
+            PivotPercentCalculator.validate(view, xAxis, yAxis);
+            var masked = (Map<String, ColumnPermissionItem>) filterResult.getContext().get("desensitizationList");
+            PivotPercentCalculator.validateMasked(xAxis, yAxis, masked == null ? null : masked.keySet());
+        }
+        String querySql = SQLProvider.createQuerySQL(sqlMeta, true, needOrder, fullRanking || scopedPercent ? SingleCategoryRank.fullView(view) : view);
         querySql = provider.rebuildSQL(querySql, sqlMeta, crossDs, dsMap);
         datasourceRequest.setQuery(querySql);
         logger.debug("calcite chart sql: " + querySql);
@@ -145,9 +152,12 @@ public class DefaultChartHandler extends AbstractChartPlugin {
         //快速计算
         var extStack = formatResult.getAxisMap().get(ChartAxis.extStack);
         var xAxisExt = formatResult.getAxisMap().get(ChartAxis.xAxisExt);
+        var percentRaw = scopedPercent ? data.stream().map(String[]::clone).collect(Collectors.toList()) : null;
         quickCalc(xAxis, yAxis, xAxisExt, extStack, view.getType(), data);
+        var percentBasis = scopedPercent ? PivotPercentCalculator.apply(view, xAxis, yAxis, percentRaw, data) : null;
         //数据重组逻辑可重载
         var result = this.buildResult(view, formatResult, filterResult, data);
+        if (scopedPercent) result.put("percentBasis", percentBasis);
         T calcResult = (T) new ChartCalcDataResult();
         calcResult.setData(result);
         calcResult.setContext(filterResult.getContext());
@@ -170,6 +180,7 @@ public class DefaultChartHandler extends AbstractChartPlugin {
         if (view.getIsExcelExport()) {
             Map<String, Object> sourceInfo = ChartDataBuild.transTableNormal(xAxis, yAxis, view, calcResult.getOriginData(), extStack, desensitizationList);
             sourceInfo.put("sourceData", calcResult.getOriginData());
+            if (calcResult.getData().get("percentBasis") != null) sourceInfo.put("percentBasis", calcResult.getData().get("percentBasis"));
             // 将汇总计算结果传递到导出数据中
             if (calcResult.getData() != null && calcResult.getData().get("customSumResult") != null) {
                 sourceInfo.put("customSumResult", calcResult.getData().get("customSumResult"));
@@ -569,6 +580,7 @@ public class DefaultChartHandler extends AbstractChartPlugin {
                         }
                     }
                 } else if (StringUtils.equalsIgnoreCase(compareCalc.getType(), "percent")) {
+                    if ("table-pivot".equals(chartType) && PivotPercentCalculator.scoped(compareCalc)) continue;
                     // 求和
                     BigDecimal sum = new BigDecimal(0);
                     for (int index = 0; index < data.size(); index++) {
@@ -586,7 +598,7 @@ public class DefaultChartHandler extends AbstractChartPlugin {
                         if (StringUtils.isEmpty(cValue)) {
                             continue;
                         }
-                        item[dataIndex] = new BigDecimal(cValue)
+                        item[dataIndex] = sum.signum() == 0 ? null : new BigDecimal(cValue)
                                 .divide(sum, 8, RoundingMode.HALF_UP)
                                 .toString();
                     }

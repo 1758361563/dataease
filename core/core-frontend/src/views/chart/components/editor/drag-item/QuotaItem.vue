@@ -1,5 +1,6 @@
 <script lang="tsx" setup>
 import { activeSortFields } from '../../js/chartDisplayLimit'
+import { resultKey } from '../../js/chartFieldInstance'
 import {
   clearOtherMixSorts,
   supportsMixMetricSort
@@ -86,6 +87,60 @@ const emit = defineEmits([
 ])
 
 const { item, chart } = toRefs(props)
+const percentDialog = ref(false)
+const percentChoice = ref('table')
+const percentScopeLabel = computed(() => {
+  const calc = item.value.compareCalc || {}
+  if (calc.percentScope === 'row') return '按行'
+  if (calc.percentScope === 'column') return '按列'
+  if (calc.percentScope === 'rowGroup') {
+    const group = (chart.value.xAxis || []).find(field => resultKey(field) === calc.percentGroup)
+    return group ? `按${group.chartShowName || group.name}分组` : '分组失效'
+  }
+  return '全表'
+})
+const additivePercent = computed(() =>
+  ['sum', 'count'].includes(String(item.value.summary).toLowerCase())
+)
+const percentOptions = computed(() => [
+  { value: 'table', label: '全表占比' },
+  { value: 'column', label: '按列：同一列内合计 100%' },
+  { value: 'row', label: '按行：同一行内合计 100%' },
+  ...(chart.value.xAxis || []).slice(0, -1).map((field, index) => ({
+    value: `group:${resultKey(field)}`,
+    label: `按分组：${field.chartShowName || field.name}（${chart.value.xAxis
+      .slice(0, index + 1)
+      .map(f => f.chartShowName || f.name)
+      .join(' → ')}）`
+  }))
+])
+const openPercentScope = () => {
+  const calc = item.value.compareCalc || {}
+  const selected =
+    calc.percentScope === 'rowGroup' ? `group:${calc.percentGroup}` : calc.percentScope || 'table'
+  percentChoice.value = percentOptions.value.some(option => option.value === selected)
+    ? selected
+    : ''
+  percentDialog.value = true
+}
+const savePercentScope = () => {
+  const selected = percentChoice.value
+  if (
+    !percentOptions.value.some(option => option.value === selected) ||
+    (!additivePercent.value && selected !== 'table')
+  )
+    return
+  item.value.compareCalc = {
+    ...item.value.compareCalc,
+    type: 'percent',
+    percentScope: selected.startsWith('group:') ? 'rowGroup' : selected,
+    percentGroup: selected.startsWith('group:') ? selected.slice(6) : undefined
+  }
+  item.value.formatterCfg.type = 'percent'
+  item.value.formatterCfg.decimalCount = 2
+  emit('onQuotaItemChange', item.value)
+  percentDialog.value = false
+}
 const toolTip = computed(() => {
   return props.themes || 'dark'
 })
@@ -231,6 +286,18 @@ const summary = param => {
   emit('onQuotaItemChange', item.value)
 }
 
+const scopeInColumns = computed(() => {
+  const attr =
+    typeof props.chart.customAttr === 'string'
+      ? JSON.parse(props.chart.customAttr)
+      : props.chart.customAttr
+  return attr?.basicStyle?.quotaPosition !== 'row'
+})
+const displayScope = param => {
+  item.value.pivotDisplayScope = param.type
+  emit('onQuotaItemChange', item.value)
+}
+
 const beforeSummary = type => {
   return {
     type: type
@@ -277,6 +344,10 @@ const quickCalc = param => {
       editCompare()
       break
     case 'percent':
+      if (chart.value.type === 'table-pivot') {
+        openPercentScope()
+        break
+      }
       // 选择占比，自动将数值格式设置为百分比并保留2位小数
       item.value.formatterCfg.type = 'percent'
       item.value.formatterCfg.decimalCount = 2
@@ -417,6 +488,12 @@ onMounted(() => {
               ({{ t('chart.' + item.summary) }})
             </span>
             <span :data-id="item.fieldInstanceId || item.id" class="node-id_private"></span>
+            <span
+              v-if="chart.type === 'table-pivot' && item.pivotDisplayScope === 'totals'"
+              class="item-right-summary"
+            >
+              · 仅汇总</span
+            >
           </span>
         </el-tooltip>
         <span
@@ -464,6 +541,60 @@ onMounted(() => {
           class="drop-style"
           :class="themes === 'dark' ? 'dark-dimension-quota' : ''"
         >
+          <el-dropdown-item @click.prevent v-if="chart.type === 'table-pivot'">
+            <el-dropdown
+              :effect="themes"
+              placement="right-start"
+              popper-class="data-dropdown_popper_mr9"
+              style="width: 100%; height: 100%"
+              @command="displayScope"
+            >
+              <span class="inner-dropdown-menu menu-item-padding">
+                <span class="menu-item-content"
+                  ><el-icon /> 显示范围（{{
+                    item.pivotDisplayScope === 'totals' ? '仅汇总列' : '所有列'
+                  }}）
+                </span>
+                <el-icon
+                  ><Icon name="icon_right_outlined"><icon_right_outlined class="svg-icon" /></Icon
+                ></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu
+                  :effect="themes"
+                  class="drop-style sub"
+                  :class="themes === 'dark' ? 'dark-dimension-quota' : ''"
+                >
+                  <el-dropdown-item
+                    v-for="scope in [
+                      { value: 'all', label: '所有列' },
+                      { value: 'totals', label: '仅汇总列' }
+                    ]"
+                    :key="scope.value"
+                    :command="{ type: scope.value }"
+                    :disabled="scope.value === 'totals' && !scopeInColumns"
+                    class="menu-item-padding"
+                  >
+                    <span
+                      class="sub-menu-content"
+                      :class="
+                        (item.pivotDisplayScope || 'all') === scope.value ? 'content-active' : ''
+                      "
+                    >
+                      {{ scope.label
+                      }}<el-icon class="sub-menu-content--icon"
+                        ><Icon v-if="(item.pivotDisplayScope || 'all') === scope.value"
+                          ><icon_done_outlined class="svg-icon" /></Icon
+                      ></el-icon>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item disabled class="menu-item-padding"
+                    >仅汇总列在指标列头模式下显示于日期列前方</el-dropdown-item
+                  >
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </el-dropdown-item>
           <el-dropdown-item
             @click.prevent
             v-if="!['table-info', 'multi-scatter'].includes(chart.type) && item.summary !== ''"
@@ -729,7 +860,10 @@ onMounted(() => {
                       :class="'percent' === item.compareCalc.type ? 'content-active' : ''"
                       :disabled="state.quotaViews.indexOf(chart.type) > -1"
                     >
-                      {{ t('chart.percent') }}
+                      {{ t('chart.percent')
+                      }}{{
+                        chart.type === 'table-pivot' ? `（${percentScopeLabel}） · 设置范围` : ''
+                      }}
                       <el-icon class="sub-menu-content--icon">
                         <Icon name="icon_done_outlined" v-if="'percent' === item.compareCalc.type"
                           ><icon_done_outlined class="svg-icon"
@@ -904,6 +1038,30 @@ onMounted(() => {
       </template>
     </el-dropdown>
   </span>
+  <el-dialog v-model="percentDialog" title="占比计算范围" width="520px" append-to-body>
+    <el-select v-model="percentChoice" placeholder="请选择计算范围" style="width: 100%">
+      <el-option
+        v-for="option in percentOptions"
+        :key="option.value"
+        :value="option.value"
+        :label="option.label"
+        :disabled="option.value !== 'table' && !additivePercent"
+      />
+    </el-select>
+    <p style="font-size: 13px; line-height: 1.6; color: var(--ed-text-color-secondary)">
+      按行分组时，保留所选层级及其上级，比较下级分类。月份列分别计算；总计按原始数值重新计算比例。分组占比使用当前筛选的完整结果，不截取前
+      N 条。
+    </p>
+    <p v-if="!additivePercent" style="font-size: 13px; color: var(--ed-text-color-secondary)">
+      分组占比目前支持求和、计数。平均值和去重计数不能直接相加作为分母。
+    </p>
+    <template #footer
+      ><el-button @click="percentDialog = false">取消</el-button
+      ><el-button type="primary" :disabled="!percentChoice" @click="savePercentScope"
+        >确定</el-button
+      ></template
+    >
+  </el-dialog>
 </template>
 
 <style lang="less" scoped>

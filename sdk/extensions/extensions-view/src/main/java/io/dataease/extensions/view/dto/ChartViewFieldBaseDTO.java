@@ -49,6 +49,9 @@ public class ChartViewFieldBaseDTO extends DatasetTableFieldDTO implements Seria
 
     private String chartShowName;
 
+    /** Pivot measure placement: all detail/total columns, or totals only. */
+    private String pivotDisplayScope = "all";
+
     /**
      * 图表 placement 身份。同一 Dataset Field 在轴上多次出现时各有独立实例。
      * 不进 Dataset 表；由前后端 JSON round-trip。

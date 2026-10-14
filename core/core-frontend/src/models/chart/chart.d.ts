@@ -13,6 +13,8 @@ declare interface Chart {
   refreshUnit: string
   data: {
     data: any[]
+    /** Original filtered aggregates used to recompute scoped percentage totals. */
+    percentBasis?: Record<string, any>[]
     series?: any[]
     dynamicAssistLines?: AssistLine[]
     fields: ChartViewField[]
@@ -185,6 +187,8 @@ declare interface Axis extends ChartViewField {
   hide: boolean
 }
 declare interface ChartViewField {
+  /** Pivot column measures can be restricted to summary columns. */
+  pivotDisplayScope?: 'all' | 'totals'
   /**
    * 字段名称
    */
