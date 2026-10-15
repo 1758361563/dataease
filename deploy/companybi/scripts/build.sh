@@ -50,6 +50,18 @@ if [ "$DIRTY" = dirty ] && [ "$ALLOW_DIRTY" -ne 1 ]; then
   die "refusing to build a release from a dirty tree. Commit first, or pass --allow-dirty for a local test image."
 fi
 
+# The release is built from what Git TRACKS (git archive). A source/SQL/resource file that sits in the work tree
+# but is git-ignored (the .gitignore of this repo whitelists paths under core-backend/src/main one by one, so a NEW
+# file there is silently ignored) is therefore missing from the image. A missing Java class breaks the compile and is
+# caught anyway; a missing SQL migration or resource would NOT be. So: warn loudly. Warning only - the build goes on.
+IGN="$(git ls-files --others --ignored --exclude-standard -- 'core/*/src/main/*' 'sdk/*' 2>/dev/null \
+       | grep -E '\.(java|sql|xml|yml|yaml|properties|json|vue|ts|js)$' | grep -v -E '/(static|node_modules|target|dist)/|\.flattened-pom\.xml$' || true)"
+if [ -n "$IGN" ]; then
+  echo "build: WARNING - these files exist in the work tree, are git-IGNORED and will NOT be in the release:" >&2
+  printf '%s\n' "$IGN" | head -20 | sed 's/^/           /' >&2
+  echo "           If any of them is needed at run time: whitelist it in .gitignore and commit it, then rebuild." >&2
+fi
+
 DE_VERSION="$(sed -n 's|.*<dataease.version>\(.*\)</dataease.version>.*|\1|p' pom.xml | head -1)"
 [ -n "$DE_VERSION" ] || die "cannot read <dataease.version> from pom.xml"
 COMMIT_DATE="$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y%m%d)"

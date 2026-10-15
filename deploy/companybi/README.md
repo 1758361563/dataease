@@ -10,9 +10,10 @@ Company BI 是公司定制的 DataEase（仓库 `1758361563/dataease`，分支 `
 | 独立 Compose 栈（应用 + 专用 MySQL 元数据库 + 持久化目录） | `compose.yaml`、`mysql/my.cnf`、`.env.example` |
 | 首次安装 / 升级 / 回滚 / 备份 / 健康检查 / 状态 | `scripts/{install,upgrade,rollback,backup-db,health-check,status}.sh` |
 | Schema 变更感知（决定回滚是否安全） | `schema-compat.txt`、镜像内 `SCHEMA` / `COMPAT` |
-| 本地隔离测试 | `tests/` |
+| 本地隔离测试 | `tests/`：`static-audit.sh`（静态审计）、`local-e2e.sh`（A–F 全量）、`release-verify.sh`（**正式发布文件**的冒烟 + 数据库真实恢复） |
+| 服务器检查方案（尚未执行） | [docs/plan-A-personal-server-test.md](docs/plan-A-personal-server-test.md)（个人服务器隔离部署）、[docs/plan-B-tower-readonly-check.md](docs/plan-B-tower-readonly-check.md)（塔内只读检查）+ `scripts/tower-readonly-check.sh` |
 
-文档：[docs/deployment.md](docs/deployment.md)（完整流程）、[docs/rollback.md](docs/rollback.md)（回滚与故障恢复）。
+文档：[docs/release-process.md](docs/release-process.md)（**怎么基于 `company/bi` 发布**）、[docs/deployment.md](docs/deployment.md)（完整流程）、[docs/rollback.md](docs/rollback.md)（回滚与故障恢复）。
 
 ## 一图看懂
 
