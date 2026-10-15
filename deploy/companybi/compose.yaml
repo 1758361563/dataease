@@ -23,7 +23,8 @@ services:
       MYSQL_PASSWORD: ${COMPANY_BI_DB_PASSWORD:?set COMPANY_BI_DB_PASSWORD in .env}
     volumes:
       - ${COMPANY_BI_HOME:?set COMPANY_BI_HOME in .env}/mysql/data:/var/lib/mysql
-      - ./mysql/my.cnf:/etc/mysql/conf.d/companybi.cnf:ro
+      # private 644 copy made by install.sh (ensure_dirs) from mysql/my.cnf; see lib.sh for why
+      - ${COMPANY_BI_HOME}/mysql/conf/companybi.cnf:/etc/mysql/conf.d/companybi.cnf:ro
     # No `ports:` on purpose: MySQL is reachable only from <project>-net.
     healthcheck:
       test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -uroot --silent"]

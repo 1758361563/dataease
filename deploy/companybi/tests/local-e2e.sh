@@ -57,6 +57,10 @@ app_id() { docker inspect -f '{{.Id}}' "$APP" 2>/dev/null; }
 app_running() { [ "$(docker inspect -f '{{.State.Running}}' "$APP" 2>/dev/null)" = true ]; }
 login_ok() { python3 "$HERE/tests/smoke.py" login "$BASE" admin "$1" ${2:+--save "$2"} >/dev/null 2>&1; }
 authed() { python3 "$HERE/tests/smoke.py" authed "$BASE" --token-file "$WORK/token" >/dev/null 2>&1; }
+gzhas() { local n; n="$(zcat "$1" 2>/dev/null | grep -c -- "$2" || true)"; [ "${n:-0}" -gt 0 ]; }   # no `grep -q` after a pipe (pipefail/SIGPIPE)
+DASH_NAME="e2e-dashboard"
+dash_make() { python3 "$HERE/tests/smoke.py" dash-create "$BASE" --token-file "$WORK/token" --name "$DASH_NAME" | sed -n 's/^DASH CREATED id=//p' > "$WORK/dash.id"; [ -s "$WORK/dash.id" ]; }
+dash_ok() { [ -s "$WORK/dash.id" ] && python3 "$HERE/tests/smoke.py" dash-get "$BASE" --token-file "$WORK/token" --id "$(cat "$WORK/dash.id")" --name "$DASH_NAME" >/dev/null 2>&1; }
 healthy() { sc health-check.sh --wait "${1:-0}" >/dev/null 2>&1; }
 snapshot() { # objects that are NOT part of this test
   { docker ps -a --format 'C {{.ID}} {{.Names}} {{.Image}} {{.Status}}' | grep -v -E " (${APP}|${DB}) " | sed -E 's/ (Up|Exited|Created)[^$]*$//' 
@@ -133,7 +137,11 @@ if want A; then
     res T.1 PASS "export-image.sh produced image tar, mysql tar, deploy bundle, release record, all with valid .sha256" "$(du -h "$TAR1" | cut -f1) image tar"
   else res T.1 FAIL "export-image.sh artifacts" "rc=$RC see logs/T1-export.log"; fi
   grep -q "^image_id=$ID_BEFORE" "$TR/release_${V1}.txt" 2>/dev/null && res T.2 PASS "release record carries image_id, artifact sha256, git sha" "$(grep -E '^(git_sha|git_dirty|artifact_tar_sha256)=' "$TR/release_${V1}.txt" | tr '\n' ' ' | cut -c1-200)" || res T.2 FAIL "release record"
-  tar -tzf "$BUNDLE" 2>/dev/null | grep -q 'companybi/scripts/install.sh' && ! tar -tzf "$BUNDLE" | grep -q -E '(^|/)\.env$|\.sql\.gz$|\.tar$' && res T.3 PASS "deploy bundle has the scripts and no .env / backups / image tars" || res T.3 FAIL "bundle content"
+  # capture the listing first: `tar | grep -q` under pipefail can fail intermittently (SIGPIPE)
+  BLIST="$(tar -tzf "$BUNDLE" 2>/dev/null || true)"
+  BHAS="$(grep -c 'companybi/scripts/install.sh' <<<"$BLIST" || true)"
+  BBAD="$(grep -c -E '(^|/)\.env$|\.sql\.gz$|\.tar$' <<<"$BLIST" || true)"
+  [ "${BHAS:-0}" -ge 1 ] && [ "${BBAD:-0}" = 0 ] && res T.3 PASS "deploy bundle has the scripts and no .env / backups / image tars" || res T.3 FAIL "bundle content" "has_install=$BHAS offenders=$BBAD"
   mkdir -p "$TR/extract" && tar -xzf "$BUNDLE" -C "$TR/extract" && [ -x "$TR/extract/companybi/scripts/install.sh" ] && bash "$TR/extract/companybi/scripts/install.sh" --help >/dev/null 2>&1 && res T.4 PASS "bundle extracts with executable scripts (usable without Git)" || res T.4 FAIL "bundle usable"
   cp "$TAR1" "$TR/tampered.tar"; printf 'x' >> "$TR/tampered.tar"; cp "$TAR1.sha256" "$TR/tampered.tar.sha256"
   docker rmi "companybi:$V1" >/dev/null 2>&1       # exact tag: simulate a host that does not have the image yet
@@ -172,6 +180,12 @@ if want A; then
   FE="$(docker exec "$APP" printenv COMPANY_FEISHU_DRY_RUN 2>/dev/null)|$(docker exec "$APP" printenv COMPANY_FEISHU_INTERNAL_TOKEN 2>/dev/null)|$(docker exec "$APP" printenv COMPANY_FEISHU_SHOT_BASE_URL 2>/dev/null)"
   [ "$FE" = "true||http://127.0.0.1:9" ] && res A.14b PASS "Feishu is forced to dry-run in the running container; no token; screenshot service points at a dead port" "$FE" || res A.14b FAIL "Feishu safety env" "$FE"
   [ "$(sql "SELECT COUNT(*) FROM companybi_meta.company_feishu_subscription")" = 0 ] && [ "$(sql "SELECT COUNT(*) FROM companybi_meta.company_feishu_app_config")" = 0 ] && res A.14c PASS "no Feishu app config and no subscriptions exist after a clean install (nothing can be delivered)" || res A.14c FAIL "Feishu tables empty"
+  MYC="$(sql "SELECT CONCAT_WS('|', @@innodb_buffer_pool_size, @@transaction_isolation, @@time_zone, @@max_allowed_packet)")"
+  [ "$MYC" = "268435456|READ-COMMITTED|+08:00|67108864" ] && res A.14d PASS "mysql/my.cnf is really applied in the running MySQL (buffer pool 256M, READ-COMMITTED, +08:00, 64M packets)" "$MYC" || res A.14d FAIL "my.cnf applied" "$MYC"
+  [ "$(stat -c %a "$HOMEDIR/mysql/conf/companybi.cnf" 2>/dev/null)" = 644 ] && res A.14e PASS "mounted mysql config is the private mode-644 copy under COMPANY_BI_HOME" || res A.14e FAIL "mysql conf copy mode"
+  dash_make && res A.18 PASS "a dashboard was created through the real API (POST /de2api/dataVisualization/saveCanvas, admin token)" "id=$(cat "$WORK/dash.id")" || res A.18 FAIL "dashboard created via API"
+  dash_ok && res A.19 PASS "that dashboard can be read back through the API (findById) and its name matches" || res A.19 FAIL "dashboard read back"
+  [ "$(sql "SELECT COUNT(*) FROM companybi_meta.data_visualization_info WHERE name='$DASH_NAME'")" -ge 1 ] && res A.20 PASS "the dashboard row is in the dedicated metadata DB (companybi_meta.data_visualization_info)" || res A.20 FAIL "dashboard row in companybi_meta"
   sleep 45
   echo "idle memory: $(docker stats --no-stream --format '{{.Name}} {{.MemUsage}} cpu={{.CPUPerc}}' "$APP" "$DB" | tr '\n' ';')" | tee "$LOGS/idle-memory.txt"
   res A.15 PASS "idle memory sampled (not a pass/fail criterion)" "$(tr '\n' ' ' < "$LOGS/idle-memory.txt")"
@@ -186,6 +200,7 @@ if want B; then
   sql "CREATE TABLE IF NOT EXISTS companybi_meta.e2e_marker (k VARCHAR(40) PRIMARY KEY, v VARCHAR(100)); REPLACE INTO companybi_meta.e2e_marker VALUES ('m1','written-before-restart');" >/dev/null
   docker exec "$APP" sh -c 'echo persisted > /opt/dataease2.0/data/e2e_marker.txt'
   login_ok "$BOOT_PW" "$WORK/token"
+  [ -s "$WORK/dash.id" ] || dash_make || true     # B run on its own: create the dashboard here
   # sample memory every 3 s for ~2 min while the app starts again: the START-UP peak matters for the host budget
   ( for _ in $(seq 1 40); do docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' "$APP" "$DB" 2>/dev/null; sleep 3; done > "$LOGS/startup-mem.txt" ) &
   SAMPLER=$!
@@ -195,6 +210,7 @@ if want B; then
   PK="$(awk '{v=$2; u=v; gsub(/[0-9.]/,"",u); n=v; gsub(/[A-Za-z]/,"",n); m=(u=="GiB")?n*1024:n; if(m>mx[$1])mx[$1]=m} END{for(k in mx)printf "%s peak=%dMiB ",k,mx[k]}' "$LOGS/startup-mem.txt")"
   res B.1b PASS "start-up memory peak sampled (informational, not a pass/fail criterion)" "$PK"
   [ "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m1'")" = "written-before-restart" ] && res B.2 PASS "DB marker row survived restart" || res B.2 FAIL "DB marker row survived restart"
+  dash_ok && res B.2b PASS "dashboard created before the restart is still readable through the API" || res B.2b FAIL "dashboard after restart"
   authed && res B.3 PASS "token issued BEFORE the restart is still valid (token secret stable)" || res B.3 FAIL "old token valid after restart"
   # change the bootstrap password in .env: must have no effect because admin id=1 exists
   sed -i "s|^COMPANY_BI_BOOTSTRAP_PASSWORD=.*|COMPANY_BI_BOOTSTRAP_PASSWORD=Changed-Later-Pass-2026|" "$ENVF"
@@ -204,6 +220,7 @@ if want B; then
   healthy 300 && res B.4 PASS "stack healthy after both containers were removed and re-created from compose" || res B.4 FAIL "healthy after re-creation"
   [ "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m1'")" = "written-before-restart" ] && res B.5 PASS "DB marker row survived container re-creation (bind-mounted data)" || res B.5 FAIL "DB marker survived re-creation"
   [ "$(docker exec "$APP" cat /opt/dataease2.0/data/e2e_marker.txt 2>/dev/null)" = persisted ] && res B.6 PASS "file in app/data survived re-creation" || res B.6 FAIL "app/data file survived"
+  dash_ok && res B.6b PASS "dashboard still readable after BOTH containers were removed and re-created" || res B.6b FAIL "dashboard after re-creation"
   authed && res B.7 PASS "old token still valid after re-creation" || res B.7 FAIL "old token valid after re-creation"
   login_ok "$BOOT_PW" && res B.8 PASS "original admin password still works (bootstrap password change ignored once admin exists)" || res B.8 FAIL "original admin password works"
   login_ok "Changed-Later-Pass-2026" && res B.9 FAIL "changed bootstrap password must NOT take effect" || res B.9 PASS "changed bootstrap password did not overwrite the admin"
@@ -224,9 +241,10 @@ if want C; then
   [ "$(app_ver)" = "$V2" ] && res C.3 PASS "running container is $V2" || res C.3 FAIL "running version" "$(app_ver)"
   [ "$(st CURRENT_VERSION)/$(st PREVIOUS_GOOD_VERSION)/$(st ROLLBACK_MODE)" = "$V2/$V1/auto" ] && res C.4 PASS "state: current=$V2 previous=$V1 rollback_mode=auto" || res C.4 FAIL "state after upgrade" "$(st CURRENT_VERSION)/$(st PREVIOUS_GOOD_VERSION)/$(st ROLLBACK_MODE)"
   BK="$(st LAST_BACKUP)"
-  [ -s "$BK" ] && gzip -t "$BK" 2>/dev/null && zcat "$BK" | grep -q 'e2e_marker' && res C.5 PASS "pre-upgrade backup exists, valid gzip, contains the marker table" "$(basename "$BK") $(stat -c %s "$BK")B" || res C.5 FAIL "pre-upgrade backup valid" "$BK"
+  [ -s "$BK" ] && gzip -t "$BK" 2>/dev/null && gzhas "$BK" 'e2e_marker' && res C.5 PASS "pre-upgrade backup exists, valid gzip, contains the marker table" "$(basename "$BK") $(stat -c %s "$BK")B" || res C.5 FAIL "pre-upgrade backup valid" "$BK"
   [ "$(stat -c %a "$BK" 2>/dev/null)" = 600 ] && res C.6 PASS "backup file mode 600" || res C.6 FAIL "backup mode" "$(stat -c %a "$BK" 2>/dev/null)"
   docker image inspect "companybi:$V1" >/dev/null 2>&1 && res C.7 PASS "old image $V1 kept (not deleted by upgrade)" || res C.7 FAIL "old image kept"
+  dash_ok && res C.8b PASS "dashboard still readable after the version upgrade $V1 -> $V2" || res C.8b FAIL "dashboard after upgrade"
   authed && res C.8 PASS "token from before the upgrade still valid" || res C.8 FAIL "token valid after upgrade"
   [ "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m1'")" = "written-before-restart" ] && res C.9 PASS "data intact after upgrade" || res C.9 FAIL "data intact"
   grep -q -P "upgrade\t$V1\t$V2\tOK" "$HOMEDIR/releases/history.tsv" 2>/dev/null && res C.10 PASS "history.tsv records the upgrade" || res C.10 FAIL "history recorded"
@@ -245,6 +263,7 @@ if want D; then
   healthy 120 && res D.3 PASS "rolled-back version passes the health check" || res D.3 FAIL "healthy after rollback"
   [ "$(st LAST_OP_RESULT)" = FAILED_ROLLED_BACK ] && [ "$(st PENDING_MANUAL)" = no ] && res D.4 PASS "state: FAILED_ROLLED_BACK, no pending manual action" || res D.4 FAIL "state" "$(st LAST_OP_RESULT)/$(st PENDING_MANUAL)"
   [ "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m1'")" = "written-before-restart" ] && res D.5 PASS "data intact after failed upgrade + rollback" || res D.5 FAIL "data intact"
+  dash_ok && res D.5b PASS "dashboard still readable after the failed upgrade + automatic rollback" || res D.5b FAIL "dashboard after rollback"
   authed && res D.6 PASS "old token valid after failed upgrade + rollback" || res D.6 FAIL "token valid"
   [ -s "$(st LAST_BACKUP)" ] && res D.7 PASS "the pre-upgrade backup was kept" || res D.7 FAIL "backup kept"
   grep -q "SIMULATED_BOOT_FAILURE\|app| " "$LOGS/D1-badupgrade.log" && res D.8 PASS "failure output shows the new version's log tail" || res D.8 PASS "(log tail not captured; informational)"
@@ -280,7 +299,7 @@ if want E; then
   [ "$RC" = 0 ] && [ "$(app_ver)" = "$V4" ] && app_running && res E.12 PASS "explicit rollback with --restore-db succeeds and $V4 runs" || res E.12 FAIL "restore rollback" "rc=$RC ver=$(app_ver)"
   [ -z "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m2'")" ] && [ "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m1'")" = "written-before-restart" ] && res E.13 PASS "DB restored to the backup state (marker m2 gone, m1 kept)" || res E.13 FAIL "DB restored"
   SAFE="$(ls -1t "$HOMEDIR"/backups/*pre-rollback-from-* 2>/dev/null | head -1)"
-  [ -n "$SAFE" ] && zcat "$SAFE" | grep -q 'written-after-backup' && res E.14 PASS "safety dump taken BEFORE the restore still holds the post-backup data" "$(basename "$SAFE")" || res E.14 FAIL "safety dump holds m2"
+  [ -n "$SAFE" ] && gzhas "$SAFE" 'written-after-backup' && res E.14 PASS "safety dump taken BEFORE the restore still holds the post-backup data" "$(basename "$SAFE")" || res E.14 FAIL "safety dump holds m2"
   [ "$(st PENDING_MANUAL)" = no ] && healthy 60 && res E.15 PASS "after recovery: pending cleared, health PASS" || res E.15 FAIL "pending cleared"
   derive "$V4" e-comp broken-compat; V6="$DERIVED"; ID2="$(app_id)"
   S Eg sc upgrade.sh --version "$V6" --yes

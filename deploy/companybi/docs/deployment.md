@@ -20,6 +20,7 @@
 | 路径 | 内容 | 丢失后果 |
 |---|---|---|
 | `mysql/data` | MySQL 数据目录 | 元数据全丢 → 靠 `backups/` 恢复 |
+| `mysql/conf/companybi.cnf` | `mysql/my.cnf` 的私有副本（`install.sh` 以 644 生成；MySQL 会**静默忽略 world-writable 的配置文件**，所以不直接挂载 checkout 里的文件）。改 `my.cnf` 后需重新执行 `ensure_dirs` 逻辑并手动重建 mysql 容器 | MySQL 回落到默认参数（内存超预算风险） |
 | `app/data` | 上传的静态资源、地图、自定义字体、**`company-bi-token.secret`（若未用环境变量）** | 图片/地图丢失 |
 | `app/conf` | `share-secret.json` 等配置 | 已分享链接失效 |
 | `app/cache` / `app/logs` | 缓存 / 日志 | 可重建 |
@@ -45,7 +46,7 @@ bash deploy/companybi/scripts/build.sh
 - 构建上下文来自 `git archive HEAD`：**只含已提交内容**，本地未提交/被忽略的文件不会混入。工作区不干净则拒绝（`--allow-dirty` 仅限调试，镜像标记 `-dirty`，安装/升级脚本会拒绝它）。
 - 全部在 Docker 内完成：`npm ci && npm run build:base` → `mvn install`（sdk）→ `mvn -P standalone package` → 内容校验 → 运行镜像。构建机不需要装 Maven/Node。
 - 版本号 = `<dataease.version>-<提交日期UTC>-<commit前8位>`；镜像 `companybi:<v>`；**没有 `latest`**。
-- "可追溯"指：镜像里的 `RELEASE` 文件与标签记录了 commit、分支、dirty 标记、构建时间，且构建输入只来自该 commit。**不保证逐位可复现**：同一 commit 两次构建得到的 jar 字节不同（Maven 写入时间戳），所以以"镜像 ID + tar 的 SHA256"作为一次具体发布物的身份，而不是用 commit 去重。
+- "可追溯"指：镜像里的 `RELEASE` 文件与标签记录了 commit、分支、dirty 标记、构建时间，且构建输入只来自该 commit。**不承诺逐位可复现**：Docker 层缓存命中时，同一份源码会得到字节相同的 jar（实测 V1 与 RC 的 `jar_sha256` 相同）；但改了源码或加 `--no-cache` 重建后是否仍逐位相同，没有验证。因此以"镜像 ID + tar 的 SHA256"作为一次具体发布物的身份，而不是只看 commit。
 - 构建期强制检查（任一失败则构建失败）：jar 含前端 `index.html`/`panel.html` 及全部 dist 文件、公司定制类、全部 `db/company/*.sql` 与 Flyway 迁移；jar 内不含 `application-standalone.yml` 历史上硬编码的远程数据源地址与密码（对 jar 内所有类/资源做字面量扫描）；`application-standalone.yml` 中数据源已被替换为必填占位符。
 - 产物：镜像 + `deploy/companybi/dist/<v>/companybi_<v>.manifest`（版本、commit、分支、dirty、构建时间、镜像 ID、jar SHA256、schema 指纹、与上一版 schema 是否变化）。
 - `--previous-manifest <旧 manifest>`：对比上一版，写入 `schema_changed_vs_previous`。

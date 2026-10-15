@@ -70,6 +70,7 @@ compose() {
   for a in "$@"; do
     case "$a" in -v|--volumes|--remove-orphans|--rmi|down|rm|kill) die "compose argument '$a' is not allowed by the Company BI scripts" ;; esac
   done
+  case "$verb" in up|start|restart) ensure_mysql_conf ;; esac
   local envs=()
   [ -f "$VERSION_ENV" ] && envs=(--env-file "$VERSION_ENV")
   docker compose --project-name "$PROJECT" --project-directory "$DEPLOY_DIR" -f "$DEPLOY_DIR/compose.yaml" \
@@ -263,6 +264,21 @@ ensure_dirs() {
   chmod 700 "$COMPANY_BI_HOME" "$BAK_DIR" "$REL_DIR"
   # app dirs are written by the container user (root in this image); keep them private to the host owner/root
   chmod 755 "$COMPANY_BI_HOME/app" "$COMPANY_BI_HOME/app/data" "$COMPANY_BI_HOME/app/conf" "$COMPANY_BI_HOME/app/cache" "$COMPANY_BI_HOME/app/logs"
+  # MySQL silently IGNORES a world-writable config file, and a file unpacked from a tar/scp (or
+  # mounted from a Windows drive) may well be one. So the stack mounts a private copy that we
+  # create with mode 644 instead of the checkout's file.
+  ensure_mysql_conf force
+}
+
+# ensure_mysql_conf [force]: (re)create the private copy of mysql/my.cnf. Without "force" it only
+# creates it when missing (so a missing file is never turned into a directory by Docker).
+ensure_mysql_conf() {
+  local dst="$COMPANY_BI_HOME/mysql/conf/companybi.cnf"
+  [ "${1:-}" = "force" ] || [ ! -f "$dst" ] || return 0
+  [ -f "$DEPLOY_DIR/mysql/my.cnf" ] || die "mysql/my.cnf is missing from $DEPLOY_DIR"
+  mkdir -p "$COMPANY_BI_HOME/mysql/conf"
+  cp "$DEPLOY_DIR/mysql/my.cnf" "$dst"
+  chmod 755 "$COMPANY_BI_HOME/mysql/conf"; chmod 644 "$dst"
 }
 
 # load_image_tar <file>: verify <file>.sha256 when present (or --sha256 given), then docker load.
