@@ -86,7 +86,7 @@ bash scripts/status.sh
 | A8 | 创建仪表板 | 在界面里新建仪表板并保存 | 刷新后仍在 |
 | A9 | MySQL 参数生效 | `docker exec companybi-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -N -uroot -e "select @@innodb_buffer_pool_size,@@transaction_isolation"'` | `268435456`、`READ-COMMITTED` |
 | A10 | 飞书不外发 | `docker exec companybi-app printenv COMPANY_FEISHU_DRY_RUN` | `true` |
-| A11 | 没有旧生产数据源残留 | `docker exec companybi-app sh -c 'env' \| grep -c -E 'Password123\|39\.101'` | `0` |
+| A11 | 没有旧生产数据源残留 | `docker exec companybi-app sh -c 'env' \| grep -iE 'jdbc\|mysql\|db_host' \| sed -E 's/((PASSWORD\|SECRET)[A-Z_]*=).*/\1***/'`（口令已打码，不要去掉 sed） | 数据库主机只出现 `companybi-mysql`，没有任何其它主机/IP |
 
 ## 5. 持久化演练
 
