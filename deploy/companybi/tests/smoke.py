@@ -98,6 +98,19 @@ def main(argv):
         ok = status == 200 and '"code":0' in text.replace(" ", "")
         print("AUTHED %s (HTTP %d)" % ("OK" if ok else "FAIL", status))
         return 0 if ok else 1
+    if cmd == "call":
+        # smoke.py call BASE --method M --path /de2api/... [--token-file F] [--body JSON]
+        # prints "HTTP <status>" and then the raw response body; exit 0 unless the request itself failed
+        method = argv[argv.index("--method") + 1]
+        path = argv[argv.index("--path") + 1]
+        hdr = {"Content-Type": "application/json"}
+        if "--token-file" in argv:
+            hdr["X-DE-TOKEN"] = open(argv[argv.index("--token-file") + 1]).read().strip()
+        data = argv[argv.index("--body") + 1].encode() if "--body" in argv else None
+        status, text = http(method, base + path, data, hdr)
+        print("HTTP %d" % status)
+        print(text)
+        return 0
     if cmd in ("dash-create", "dash-get"):
         token = open(argv[argv.index("--token-file") + 1]).read().strip()
         hdr = {"X-DE-TOKEN": token, "Content-Type": "application/json"}
