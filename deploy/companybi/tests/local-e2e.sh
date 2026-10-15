@@ -207,7 +207,7 @@ if want B; then
   docker restart "$APP" "$DB" >/dev/null
   healthy 240 && res B.1 PASS "stack healthy after docker restart (both containers)" || res B.1 FAIL "healthy after restart"
   wait "$SAMPLER" 2>/dev/null
-  PK="$(awk '{v=$2; u=v; gsub(/[0-9.]/,"",u); n=v; gsub(/[A-Za-z]/,"",n); m=(u=="GiB")?n*1024:n; if(m>mx[$1])mx[$1]=m} END{for(k in mx)printf "%s peak=%dMiB ",k,mx[k]}' "$LOGS/startup-mem.txt")"
+  PK="$(awk '{v=$2; u=v; gsub(/[0-9.]/,"",u); n=v; gsub(/[A-Za-z]/,"",n); m=n+0; if(u=="GiB")m=n*1024; if(m>mx[$1])mx[$1]=m} END{for(k in mx)printf "%s peak=%dMiB ",k,mx[k]}' "$LOGS/startup-mem.txt")"
   res B.1b PASS "start-up memory peak sampled (informational, not a pass/fail criterion)" "$PK"
   [ "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m1'")" = "written-before-restart" ] && res B.2 PASS "DB marker row survived restart" || res B.2 FAIL "DB marker row survived restart"
   dash_ok && res B.2b PASS "dashboard created before the restart is still readable through the API" || res B.2b FAIL "dashboard after restart"

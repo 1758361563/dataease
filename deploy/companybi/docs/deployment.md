@@ -20,7 +20,7 @@
 | 路径 | 内容 | 丢失后果 |
 |---|---|---|
 | `mysql/data` | MySQL 数据目录 | 元数据全丢 → 靠 `backups/` 恢复 |
-| `mysql/conf/companybi.cnf` | `mysql/my.cnf` 的私有副本（`install.sh` 以 644 生成；MySQL 会**静默忽略 world-writable 的配置文件**，所以不直接挂载 checkout 里的文件）。改 `my.cnf` 后需重新执行 `ensure_dirs` 逻辑并手动重建 mysql 容器 | MySQL 回落到默认参数（内存超预算风险） |
+| `mysql/conf/companybi.cnf` | `mysql/my.cnf` 的私有副本（`install.sh` 以 644 生成；MySQL 会**静默忽略 world-writable 的配置文件**，所以不直接挂载 checkout 里的文件）。`upgrade.sh` 不会刷新它（只在文件缺失时补建）；要改 MySQL 参数请手工替换该文件并重启 mysql 容器 | MySQL 回落到默认参数（内存超预算风险） |
 | `app/data` | 上传的静态资源、地图、自定义字体、**`company-bi-token.secret`（若未用环境变量）** | 图片/地图丢失 |
 | `app/conf` | `share-secret.json` 等配置 | 已分享链接失效 |
 | `app/cache` / `app/logs` | 缓存 / 日志 | 可重建 |
