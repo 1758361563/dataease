@@ -23,7 +23,7 @@ const validatePwd = (_: any, value: any, callback: any) => {
     callback(new Error(t('system.be_the_same')))
   }
   const pattern =
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[~!@#$%^&*()_+\-\={}|":<>?`[\];',.\/])[a-zA-Z0-9~!@#$%^&*()_+\-\={}|":<>?`[\];',.\/]{8,20}$/
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[~!@#$%^&*()_+\-\={}|":<>?`[\];',.\/])[a-zA-Z0-9~!@#$%^&*()_+\-\={}|":<>?`[\];',.\/]{8,128}$/
   const regep = new RegExp(pattern)
   if (!regep.test(value)) {
     const msg = t('user.pwd_pattern_error')
@@ -50,8 +50,8 @@ const rule = {
     },
     {
       min: 6,
-      max: 20,
-      message: t('commons.input_limit', [6, 20]),
+      max: 128,
+      message: t('commons.input_limit', [6, 128]),
       trigger: 'blur'
     }
   ],
@@ -71,8 +71,8 @@ const rule = {
     },
     {
       min: 8,
-      max: 20,
-      message: t('commons.input_limit', [8, 20]),
+      max: 128,
+      message: t('commons.input_limit', [8, 128]),
       trigger: 'blur'
     },
     { validator: validateConfirmPwd, trigger: 'blur' }

@@ -756,7 +756,7 @@ export default {
     modify_cur_pwd: '修改目前使用者密碼後需要重新登入',
     switch_success: '切換成功',
     user_name_pattern_error: "只允許數字字母以及{'@'}._-且必須數字或字母開頭",
-    pwd_pattern_error: '6-20位元且至少一位大寫字母、小寫字母、數字、特殊字元',
+    pwd_pattern_error: '8-128位元且至少一位大寫字母、小寫字母、數字、特殊字元',
     special_characters_are_not_supported: '不允許特殊字元',
     phone_format: '請填入正確格式手機號碼',
     email_format_is_incorrect: '請填寫正確格式信箱',

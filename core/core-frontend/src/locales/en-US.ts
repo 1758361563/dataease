@@ -677,7 +677,7 @@ export default {
     user_name_pattern_error:
       "Only numbers and letters and {'@'}._- are allowed, and must start with a number or letter",
     pwd_pattern_error:
-      '6-20 characters and at least one uppercase letter, lowercase letter, number, special character',
+      '8-128 characters and at least one uppercase letter, lowercase letter, number, special character',
     special_characters_are_not_supported: 'Special characters are not allowed',
     phone_format: 'Please fill in the correct format of the mobile phone number',
     email_format_is_incorrect: 'Please fill in the correct format of the email address',
