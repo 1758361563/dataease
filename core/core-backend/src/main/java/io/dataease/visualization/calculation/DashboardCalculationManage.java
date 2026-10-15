@@ -279,6 +279,7 @@ public class DashboardCalculationManage {
             dto.setDeExtractType(field.getDeType());
             dto.setGroupType(field.getGroupType());
             dto.setChecked(true);
+            dto.setSort("none");
             dto.setSummary("q".equals(field.getGroupType()) ? "sum" : "");
             result.add(dto);
         }

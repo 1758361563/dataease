@@ -830,7 +830,11 @@ export class TablePivot extends S2ChartView<PivotSheet> {
   }
   private configSortParams(chart: Chart, newData: []) {
     // 行列分开处理，先行后列，样式设置中汇总总计排序的优先级最高，剩下的按照字段的排序优先级设置进行排序
-    const { xAxis: rowFields, xAxisExt: columnFields, yAxis: valueFields } = chart
+    // Shared and legacy fields can omit sort; missing settings mean no sorting.
+    // Normalize copies so rendering does not rewrite the saved chart definition.
+    const [rowFields, columnFields, valueFields] = [chart.xAxis, chart.xAxisExt, chart.yAxis].map(
+      fields => fields.map(field => ({ ...field, sort: field.sort || 'none' }))
+    )
     const [r, c, v] = [rowFields, columnFields, valueFields].map(arr => arr.map(i => resultKey(i)))
     const { tableTotal } = parseJson(chart.customAttr)
     const rowTotalSortKey = resolveStoredKey(valueFields, tableTotal.row.totalSortField)

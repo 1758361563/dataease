@@ -12,7 +12,6 @@ import { getFieldByDQ } from '@/api/chart'
 import {
   applyDashboardParameters,
   dashboardParameterRuntime as runtime,
-  displayDashboardExpression,
   emptyDashboardCalculation,
   hasDashboardQueryButton,
   initializeDashboardParameters
@@ -21,6 +20,11 @@ import type { DashboardCalculationConfig } from '@/models/dashboardCalculation'
 import { previewRelativeDate } from '@/utils/dashboardRelativeDate'
 import Icon from '@/components/icon-custom/src/Icon.vue'
 import chevronUp from '@/assets/svg/icon_down_outlined.svg'
+import DashboardFormulaInput from './DashboardFormulaInput.vue'
+import {
+  displayFormulaReferences,
+  normalizeFormulaReferences
+} from '@/utils/dashboardFormulaReferences'
 
 const props = defineProps<{
   editable?: boolean
@@ -41,6 +45,8 @@ const collapsed = ref(false)
 const saving = ref(false)
 const definition = ref<DashboardCalculationConfig>(emptyDashboardCalculation())
 const availableFields = ref<any[]>([])
+const datasetFieldsById = ref<Record<string, any[]>>({})
+let fieldLoadVersion = 0
 const activeDataset = ref('')
 const activeField = ref(-1)
 const activeTab = ref('parameters')
@@ -101,10 +107,15 @@ const open = () => {
   definition.value = JSON.parse(
     info.value.calculationConfig || JSON.stringify(emptyDashboardCalculation())
   )
-  definition.value.datasetFields.forEach(field => {
-    field.expression = displayDashboardExpression(field.expression, definition.value)
-  })
+  datasetFieldsById.value = {}
+  availableFields.value = []
+  activeField.value = -1
+  fieldLoadVersion++
   drawer.value = true
+  const ids = [...new Set(definition.value.datasetFields.map(field => field.datasetGroupId))]
+  void Promise.all(ids.map(loadDatasetFields)).catch(() => {
+    ElMessage.warning('数据集字段名称加载失败，部分引用暂时显示原始编号，请重新打开设置重试')
+  })
 }
 const addParameter = () => {
   definition.value.parameters.push({
@@ -153,26 +164,60 @@ const relativePosition = rule => periods.find(period => period.value === rule.pe
 const setRelativeOffset = (rule, offset) => {
   rule.offset = offset === 'CUSTOM' ? -2 : offset
 }
-const selectField = async (index: number) => {
-  activeField.value = index
-  activeDataset.value = definition.value.datasetFields[index]?.datasetGroupId || ''
-  availableFields.value = []
+const loadDatasetFields = async (datasetId: string) => {
+  if (datasetFieldsById.value[datasetId]) return datasetFieldsById.value[datasetId]
+  const version = fieldLoadVersion
   const chart: any =
     Object.values(store.canvasViewInfo).find(
-      (item: any) => String(item.tableId) === activeDataset.value
-    ) || (String(extraChart.value?.tableId) === activeDataset.value ? extraChart.value : null)
-  if (!chart) return
-  const fields = await getFieldByDQ(activeDataset.value, chart.id, {
+      (item: any) => String(item.tableId) === String(datasetId)
+    ) || (String(extraChart.value?.tableId) === String(datasetId) ? extraChart.value : null)
+  if (!chart) return []
+  const fields = await getFieldByDQ(datasetId, chart.id, {
     sceneId: info.value.id,
     resourceTable: 'snapshot'
   })
-  availableFields.value = [...fields.dimensionList, ...fields.quotaList].filter(
+  const available = [...fields.dimensionList, ...fields.quotaList].filter(
     field => field.id !== '-1'
+  )
+  if (version === fieldLoadVersion) datasetFieldsById.value[datasetId] = available
+  return available
+}
+const selectField = async (index: number) => {
+  activeField.value = index
+  const datasetId = definition.value.datasetFields[index]?.datasetGroupId || ''
+  activeDataset.value = datasetId
+  availableFields.value = []
+  const version = fieldLoadVersion
+  try {
+    const fields = await loadDatasetFields(datasetId)
+    if (
+      version === fieldLoadVersion &&
+      activeField.value === index &&
+      activeDataset.value === datasetId
+    )
+      availableFields.value = fields
+  } catch {
+    ElMessage.warning('数据集字段名称加载失败，请重新选择字段重试')
+  }
+}
+const displayExpression = field =>
+  displayFormulaReferences(
+    field.expression,
+    definition.value,
+    field.datasetGroupId,
+    datasetFieldsById.value[field.datasetGroupId]
+  )
+const updateExpression = (field, expression: string) => {
+  field.expression = normalizeFormulaReferences(
+    expression,
+    definition.value,
+    field.datasetGroupId,
+    datasetFieldsById.value[field.datasetGroupId]
   )
 }
 const insert = (token: string) => {
   const field = definition.value.datasetFields[activeField.value]
-  if (field) field.expression += token
+  if (field) updateExpression(field, field.expression + token)
 }
 const save = async () => {
   saving.value = true
@@ -541,10 +586,12 @@ useEmitt({
             </div>
             <div class="form-item full-width">
               <span class="form-label">计算公式</span>
-              <el-input
-                v-model="field.expression"
-                type="textarea"
-                :rows="4"
+              <DashboardFormulaInput
+                :model-value="displayExpression(field)"
+                @update:model-value="updateExpression(field, $event)"
+                :config="definition"
+                :dataset-id="field.datasetGroupId"
+                :fields="datasetFieldsById[field.datasetGroupId]"
                 placeholder="if(and([取值时间]>=[DYNAMIC_PARAMS.期初],[取值时间]<=[DYNAMIC_PARAMS.期末]),1,0)"
                 @focus="selectField(index)"
               />

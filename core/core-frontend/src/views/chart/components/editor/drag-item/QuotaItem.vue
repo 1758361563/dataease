@@ -26,6 +26,14 @@ import { quotaViews, notSupportAccumulateViews } from '@/views/chart/components/
 import { SUPPORT_Y_M } from '@/views/chart/components/editor/util/chart'
 import { fieldType } from '@/utils/attr'
 import { iconFieldMap } from '@/components/icon-group/field-list'
+import { useFieldNameTooltip } from './useFieldNameTooltip'
+
+const {
+  fieldNameTooltip,
+  fieldNameTooltipBlocked,
+  dismissFieldNameTooltip,
+  resumeFieldNameTooltip
+} = useFieldNameTooltip()
 
 const { t } = useI18n()
 
@@ -425,7 +433,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <span class="item-style">
+  <span
+    class="item-style"
+    @mouseenter="resumeFieldNameTooltip"
+    @mouseleave="dismissFieldNameTooltip"
+  >
     <el-dropdown :effect="themes" trigger="click" @command="clickItem">
       <el-tag
         class="item-axis father"
@@ -456,7 +468,17 @@ onMounted(() => {
             ></Icon>
           </el-icon>
         </span>
-        <el-tooltip :effect="toolTip" placement="top">
+        <el-tooltip
+          ref="fieldNameTooltip"
+          :effect="toolTip"
+          placement="top"
+          :disabled="fieldNameTooltipBlocked"
+          :enterable="false"
+          :show-after="350"
+          :hide-after="0"
+          :popper-style="{ pointerEvents: 'none' }"
+          transition=""
+        >
           <template #content>
             <table>
               <tbody>
@@ -1037,31 +1059,31 @@ onMounted(() => {
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    <el-dialog v-model="percentDialog" title="占比计算范围" width="520px" append-to-body>
+      <el-select v-model="percentChoice" placeholder="请选择计算范围" style="width: 100%">
+        <el-option
+          v-for="option in percentOptions"
+          :key="option.value"
+          :value="option.value"
+          :label="option.label"
+          :disabled="option.value !== 'table' && !additivePercent"
+        />
+      </el-select>
+      <p style="font-size: 13px; line-height: 1.6; color: var(--ed-text-color-secondary)">
+        按行分组时，保留所选层级及其上级，比较下级分类。月份列分别计算；总计按原始数值重新计算比例。分组占比使用当前筛选的完整结果，不截取前
+        N 条。
+      </p>
+      <p v-if="!additivePercent" style="font-size: 13px; color: var(--ed-text-color-secondary)">
+        分组占比目前支持求和、计数。平均值和去重计数不能直接相加作为分母。
+      </p>
+      <template #footer
+        ><el-button @click="percentDialog = false">取消</el-button
+        ><el-button type="primary" :disabled="!percentChoice" @click="savePercentScope"
+          >确定</el-button
+        ></template
+      >
+    </el-dialog>
   </span>
-  <el-dialog v-model="percentDialog" title="占比计算范围" width="520px" append-to-body>
-    <el-select v-model="percentChoice" placeholder="请选择计算范围" style="width: 100%">
-      <el-option
-        v-for="option in percentOptions"
-        :key="option.value"
-        :value="option.value"
-        :label="option.label"
-        :disabled="option.value !== 'table' && !additivePercent"
-      />
-    </el-select>
-    <p style="font-size: 13px; line-height: 1.6; color: var(--ed-text-color-secondary)">
-      按行分组时，保留所选层级及其上级，比较下级分类。月份列分别计算；总计按原始数值重新计算比例。分组占比使用当前筛选的完整结果，不截取前
-      N 条。
-    </p>
-    <p v-if="!additivePercent" style="font-size: 13px; color: var(--ed-text-color-secondary)">
-      分组占比目前支持求和、计数。平均值和去重计数不能直接相加作为分母。
-    </p>
-    <template #footer
-      ><el-button @click="percentDialog = false">取消</el-button
-      ><el-button type="primary" :disabled="!percentChoice" @click="savePercentScope"
-        >确定</el-button
-      ></template
-    >
-  </el-dialog>
 </template>
 
 <style lang="less" scoped>

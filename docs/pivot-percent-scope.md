@@ -13,3 +13,7 @@
 验证已完成：编译更新的 SDK Compare DTO、后端计算器和 DefaultChartHandler；Java 测试覆盖多个渠道/年份/月、SUM/COUNT、行/列分母、placement 身份、原始基数不变、过期分组与非可加聚合拒绝、零分母和脱敏保护。前端测试实际调用项目 CustomPivotDataset 与安装的 S2，验证 7月 80%、8月 10% 的品类总计为 33.33% 而非 90% 或 45%，并验证分组总计为 100%、缓存清理、旧配置以及设置组件编译。既有透视表表头和参数回归测试及修改文件 ESLint 通过。
 
 已通过实际 S2 数据查询和 Excel 工作簿导出回归，尚未自动验收真实仪表板页面。修改涉及前端、SDK 和后端，部署时需要一并构建更新；本批透视表配置无数据库迁移。本地后端已编译并重启加载。
+
+指标条需保留单个 DOM 根节点：占比范围弹窗放在根节点内部，并通过 append-to-body 展示。此前将弹窗与指标条并列导致 Vue 无法透传 Sortable 的 `data-draggable` 属性，指标不能抓取。已修复，新增 `quotaItemDrag.test.cjs` 防止多根节点回归，并在浏览器验证指标向下、向上拖动排序。
+
+指标和维度名称提示为被动提示：浮层 pointer-events 为 none、不可进入，悬停 350ms 显示，移出立即关闭。捕获 pointerdown/mousedown/dragstart 时同时取消待显示提示并立即隐藏已显示提示，拖动中经过其他字段不会重新启用；鼠标释放后重新悬停才恢复。`fieldNameTooltip.test.cjs` 覆盖这套交互和卸载监听清理。

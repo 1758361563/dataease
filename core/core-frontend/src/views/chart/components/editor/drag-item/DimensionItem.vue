@@ -16,6 +16,14 @@ import { computed, onMounted, ref, toRefs, watch } from 'vue'
 import { getItemType } from '@/views/chart/components/editor/drag-item/utils'
 import { fieldType } from '@/utils/attr'
 import { iconFieldMap } from '@/components/icon-group/field-list'
+import { useFieldNameTooltip } from './useFieldNameTooltip'
+
+const {
+  fieldNameTooltip,
+  fieldNameTooltipBlocked,
+  dismissFieldNameTooltip,
+  resumeFieldNameTooltip
+} = useFieldNameTooltip()
 
 const { t } = useI18n()
 
@@ -278,7 +286,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <span class="item-style">
+  <span
+    class="item-style"
+    @mouseenter="resumeFieldNameTooltip"
+    @mouseleave="dismissFieldNameTooltip"
+  >
     <el-dropdown :effect="themes" trigger="click" @command="clickItem">
       <el-tag
         class="item-axis father"
@@ -322,7 +334,17 @@ onMounted(() => {
             ></Icon>
           </el-icon>
         </span>
-        <el-tooltip :effect="toolTip" placement="top">
+        <el-tooltip
+          ref="fieldNameTooltip"
+          :effect="toolTip"
+          placement="top"
+          :disabled="fieldNameTooltipBlocked"
+          :enterable="false"
+          :show-after="350"
+          :hide-after="0"
+          :popper-style="{ pointerEvents: 'none' }"
+          transition=""
+        >
           <template #content>
             <table>
               <tbody>

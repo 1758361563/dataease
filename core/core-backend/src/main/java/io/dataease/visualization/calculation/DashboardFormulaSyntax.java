@@ -2,7 +2,7 @@ package io.dataease.visualization.calculation;
 
 import java.util.*;
 
-/** Translate logical functions in dashboard formulas without moving aggregation boundaries. */
+/** Translate dashboard formula functions before the existing SQL dialect pipeline. */
 final class DashboardFormulaSyntax {
     static String sql(String expression) {
         StringBuilder result = new StringBuilder();
@@ -35,6 +35,18 @@ final class DashboardFormulaSyntax {
                 case "NOT" -> {
                     if (transformed.size() != 1) throw new IllegalArgumentException("not需要一个参数");
                     result.append("(NOT ").append(transformed.get(0)).append(')');
+                }
+                case "DATE_SUB", "ADD_MONTHS" -> {
+                    if (transformed.size() != 2) throw new IllegalArgumentException(name + "需要两个参数");
+                    // Preserve native SQL intervals; the two-argument formula form uses a day count.
+                    if (name.equalsIgnoreCase("DATE_SUB") && transformed.get(1).stripLeading()
+                            .matches("(?is)INTERVAL\\b.*")) {
+                        result.append(name).append('(').append(String.join(",", transformed)).append(')');
+                    } else {
+                        boolean days = name.equalsIgnoreCase("DATE_SUB");
+                        result.append("TIMESTAMPADD(").append(days ? "DAY,-(" : "MONTH,(")
+                                .append(transformed.get(1)).append("),").append(transformed.get(0)).append(')');
+                    }
                 }
                 default -> result.append(name).append('(').append(String.join(",", transformed)).append(')');
             }
