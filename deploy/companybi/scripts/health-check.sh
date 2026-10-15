@@ -26,7 +26,7 @@ docker info >/dev/null 2>&1 || die "docker daemon is not reachable"
 
 HOST="$BIND"; [ "$HOST" = "0.0.0.0" ] && HOST="127.0.0.1"
 BASE="http://$HOST:$PORT"
-FATAL_RE='APPLICATION FAILED TO START|Application run failed|OutOfMemoryError|FlywayException|Migration of schema .* failed|Unable to start web server|Failed to initialize company|CompanyBiSchemaInitializer.*(fail|error)'
+FATAL_RE='APPLICATION FAILED TO START|Application run failed|java\.lang\.OutOfMemoryError|FlywayException|Migration of schema .* failed|Unable to start web server|Failed to initialize company|CompanyBiSchemaInitializer.*(fail|error)'
 
 FAILS=0; OUT=""
 pass() { OUT+="  [PASS] $1"$'\n'; }
@@ -86,6 +86,10 @@ end=$(( $(date +%s) + WAIT ))
 while :; do
   run_checks && break
   [ "$(date +%s)" -ge "$end" ] && break
+  # a crash-looping app will not heal by waiting: stop early
+  if container_exists "$APP_C" && [ "$(docker inspect -f '{{.RestartCount}}' "$APP_C" 2>/dev/null || echo 0)" -ge 3 ]; then
+    OUT+="  [INFO] $APP_C is restart-looping; not waiting any longer"$'\n'; break
+  fi
   sleep 10
 done
 printf '%s' "$OUT"

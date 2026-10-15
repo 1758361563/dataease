@@ -42,9 +42,6 @@ fi
 
 CUR="$(state_get CURRENT_VERSION)"
 [ -n "$CUR" ] || die "no installed version recorded; nothing to roll back"
-[ -n "$TARGET" ] || TARGET="$(state_get PREVIOUS_GOOD_VERSION)"
-[ -n "$TARGET" ] || die "no --to given and no PREVIOUS_GOOD_VERSION recorded"
-
 # the version we are leaving = what the app container was last run with (falls back to the recorded one)
 FROM="$CUR"
 if container_exists "$APP_C"; then
@@ -52,7 +49,11 @@ if container_exists "$APP_C"; then
   lv="$(docker inspect -f '{{index .Config.Labels "com.companybi.version"}}' "$APP_C" 2>/dev/null || true)"
   [ -z "$lv" ] || FROM="$lv"
 fi
-[ "$TARGET" != "$FROM" ] || die "target $TARGET is the version that is already running"
+# --restore-db alone means "restore the data, keep running the same version"
+[ -n "$TARGET" ] || { [ -z "$RESTORE" ] || TARGET="$FROM"; }
+[ -n "$TARGET" ] || TARGET="$(state_get PREVIOUS_GOOD_VERSION)"
+[ -n "$TARGET" ] || die "no --to given and no PREVIOUS_GOOD_VERSION recorded"
+if [ "$TARGET" = "$FROM" ] && [ -z "$RESTORE" ]; then die "target $TARGET is the version that is already running"; fi
 case "$TARGET" in latest|'') die "refusing version '$TARGET'" ;; esac
 
 log "== Company BI rollback: project=$PROJECT  $FROM -> $TARGET =="
@@ -130,7 +131,7 @@ fi
 PHASE=switching
 switch_app "$TARGET"
 PHASE=verifying
-if "$LIB_DIR/health-check.sh" --wait 600 --expect-version "$TARGET"; then
+if "$LIB_DIR/health-check.sh" --wait "${COMPANY_BI_HEALTH_WAIT:-600}" --expect-version "$TARGET"; then
   PHASE=recording
   state_set CURRENT_VERSION "$TARGET" CURRENT_IMAGE_ID "$(image_id "$TARGET")" CURRENT_SINCE "$(date '+%F %T')" \
             CURRENT_SCHEMA_FP "$(kv "$REL_DIR/$TARGET/SCHEMA" schema.fingerprint 2>/dev/null || true)" \

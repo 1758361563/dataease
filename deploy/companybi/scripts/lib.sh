@@ -288,7 +288,8 @@ verify_image() {
 # assert_clean_release <version> <RELEASE file>: production only runs images built from a clean commit.
 assert_clean_release() {
   local v="$1" f="$2"
-  if [ "$(kv "$f" git_dirty)" = true ]; then
+  # build.sh records git_dirty as "clean" or "dirty"; anything that is not exactly "clean" is refused
+  if [ "$(kv "$f" git_dirty)" != clean ]; then
     [ "${COMPANY_BI_ALLOW_DIRTY_RELEASE:-0}" = 1 ] \
       || die "image $v was built from a DIRTY working tree (not traceable to a commit). Rebuild from a clean commit. (test-only override: COMPANY_BI_ALLOW_DIRTY_RELEASE=1 in the environment)"
     warn "accepting a DIRTY build because COMPANY_BI_ALLOW_DIRTY_RELEASE=1 (never do this in production)"

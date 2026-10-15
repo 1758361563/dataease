@@ -90,7 +90,7 @@ log "starting app ($APP_C) ..."
 compose up -d app
 
 log "waiting for the application to come up (first start runs Flyway + company schema, may take several minutes) ..."
-if ! "$LIB_DIR/health-check.sh" --wait 600; then
+if ! "$LIB_DIR/health-check.sh" --wait "${COMPANY_BI_HEALTH_WAIT:-600}"; then
   warn "health check failed. The stack is left running for inspection; data and logs are kept."
   warn "inspect:  docker logs --tail 100 $APP_C   |   scripts/status.sh"
   state_set LAST_OP install LAST_OP_RESULT FAILED LAST_OP_TIME "$(date '+%F %T')"

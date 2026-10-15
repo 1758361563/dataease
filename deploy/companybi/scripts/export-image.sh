@@ -39,7 +39,7 @@ docker image inspect "$IMG" >/dev/null 2>&1 || die "image $IMG not found; run sc
 PLAT="$(docker image inspect -f '{{.Os}}/{{.Architecture}}' "$IMG")"
 [ "$PLAT" = "linux/amd64" ] || die "image platform is $PLAT, expected linux/amd64"
 DIRTY="$(docker image inspect -f '{{index .Config.Labels "com.companybi.git-dirty"}}' "$IMG")"
-if [ "$DIRTY" = true ] && [ "$ALLOW_DIRTY" != yes ]; then die "image was built from a dirty tree; refusing to export (use --allow-dirty for a test export only)"; fi
+if [ "$DIRTY" != clean ] && [ "$ALLOW_DIRTY" != yes ]; then die "image was built from a dirty tree; refusing to export (use --allow-dirty for a test export only)"; fi
 LABEL_V="$(docker image inspect -f '{{index .Config.Labels "com.companybi.version"}}' "$IMG")"
 [ "$LABEL_V" = "$VERSION" ] || die "image label version '$LABEL_V' != '$VERSION'"
 

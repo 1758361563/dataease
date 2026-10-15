@@ -120,7 +120,7 @@ switch_app "$NEW"
 
 # ---- 5. health check ----------------------------------------------------------------------------
 PHASE=verifying
-if "$LIB_DIR/health-check.sh" --wait 600 --expect-version "$NEW"; then
+if "$LIB_DIR/health-check.sh" --wait "${COMPANY_BI_HEALTH_WAIT:-600}" --expect-version "$NEW"; then
   PHASE=recording
   state_set PREVIOUS_GOOD_VERSION "$OLD" PREVIOUS_GOOD_IMAGE_ID "$(image_id "$OLD")" \
             CURRENT_VERSION "$NEW" CURRENT_IMAGE_ID "$(image_id "$NEW")" CURRENT_SINCE "$(date '+%F %T')" CURRENT_SCHEMA_FP "$NEW_FP" \
@@ -146,7 +146,7 @@ if [ "$ROLLBACK_MODE" = auto ]; then
   log "schema is unchanged/declared compatible -> rolling the app image back to $OLD (once; no retry loop) ..."
   PHASE=rolling_back
   switch_app "$OLD"
-  if "$LIB_DIR/health-check.sh" --wait 400 --expect-version "$OLD"; then
+  if "$LIB_DIR/health-check.sh" --wait "${COMPANY_BI_HEALTH_WAIT:-600}" --expect-version "$OLD"; then
     state_set LAST_OP upgrade LAST_OP_RESULT FAILED_ROLLED_BACK LAST_OP_TIME "$(date '+%F %T')" LAST_BACKUP "$BACKUP" PENDING_MANUAL no
     history_add upgrade "$OLD" "$NEW" FAILED_ROLLED_BACK "$SCHEMA_CLASS" "$BACKUP" "auto image rollback ok"
     PHASE=done
