@@ -22,7 +22,7 @@
 失败版本的容器已被旧版本容器替换，所以 `docker logs` 看不到它；排查看 `${COMPANY_BI_HOME}/app/logs/`（文件日志）以及升级脚本输出里打印的最后 30 行。新版本镜像仍在本机，可用于复现。
 
 ### 2.2 升级失败，且 schema 兼容性未证明
-脚本停止新应用（MySQL 保持运行、未改动），`PENDING_MANUAL=yes`，阻止继续升级。二选一：
+脚本停止新应用（MySQL 保持运行、未改动），`state.env` 写 `LAST_OP_RESULT=FAILED_MANUAL_ROLLBACK_REQUIRED`、`PENDING_MANUAL=yes`，阻止继续升级。二选一：
 
 **a) 向前修复**：读 `app/logs/` 与 `docker logs companybi-app`，发新版本，再次 `upgrade.sh`（先 `rollback.sh --clear-pending` 确认你已核对过状态）。
 
@@ -38,7 +38,8 @@ scripts/rollback.sh --to <旧版本> --restore-db <LAST_BACKUP 文件>
 - 否则脚本会拒绝并说明原因；选择向前修复，或 `--restore-db`（同 2.2b，会丢掉升级后的新数据）。
 
 ### 2.4 回滚本身失败
-脚本只尝试一次：目标版本不健康 → 停应用，`PENDING_MANUAL=yes`，打印 `docker logs` / 备份位置。**不会**再切回新版本。人工排查后，用 `rollback.sh --clear-pending` 确认。
+适用于两种情况：`rollback.sh` 手动回滚，以及 2.1 的 `upgrade.sh` **自动**回滚（旧版本回滚后仍不健康，`LAST_OP_RESULT=FAILED_ROLLBACK_ALSO_FAILED`）。
+脚本只尝试一次：目标版本不健康 → 停应用，`PENDING_MANUAL=yes`，打印 `docker logs` / 备份位置。**不会**再切回新版本（避免来回切换）；MySQL 不动。人工排查后，用 `rollback.sh --clear-pending` 确认；若怀疑数据已损坏，走 2.2b / 2.6 的 `--restore-db`。
 
 ### 2.5 脚本在切换中途被中断（断网、Ctrl-C、进程被杀）
 `EXIT` 钩子会标 `PENDING_MANUAL=yes`、`LAST_OP_RESULT=INTERRUPTED`，并提示备份位置。先 `scripts/status.sh` 看实际运行的版本与容器状态（它会标出"记录版本 ≠ 运行版本"的漂移），再决定走 2.2a 还是 2.2b。
