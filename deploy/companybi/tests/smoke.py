@@ -28,10 +28,13 @@ def http(method, url, body=None, headers=None, timeout=20):
 
 
 def public_key(base):
-    status, text = http("GET", base + "/dekey")
+    status, text = http("GET", base + CTX + "/dekey")
     if status != 200:
         raise SystemExit(f"/dekey -> HTTP {status}")
-    text = text.strip().strip('"')
+    try:
+        text = json.loads(text)["data"]  # {"code":0,"data":"<aes(pub)>-sep-<aesKey>"}
+    except (ValueError, KeyError, TypeError):
+        text = text.strip().strip('"')
     cipher_b64, aes_key = text.split(SEP)
     from cryptography.hazmat.primitives import padding as sympad
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes

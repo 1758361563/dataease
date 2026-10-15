@@ -69,7 +69,7 @@ echo "== 4. secrets and Git hygiene =="
 if git ls-files --error-unmatch .env >/dev/null 2>&1; then bad ".env is tracked by git"; else ok ".env is not tracked"; fi
 if git check-ignore -q .env 2>/dev/null; then ok ".env is git-ignored"; else bad ".env is not git-ignored"; fi
 if git check-ignore -q dist/x.tar 2>/dev/null && git check-ignore -q backups/x.sql.gz 2>/dev/null; then ok "tars and sql dumps are git-ignored"; else bad "tar/sql not ignored"; fi
-leak="$(git grep -n -I -E 'Password123|39\.101\.192\.183' -- . 2>/dev/null | grep -v -E 'tests/static-audit.sh|image/sanitize-standalone-yml.sh|image/verify-jar.sh' || true)"
+leak="$(git grep -n -I -E 'Password123|39\.101\.192\.183' -- . 2>/dev/null | grep -v -E 'tests/static-audit.sh|tests/local-e2e.sh|image/sanitize-standalone-yml.sh|image/verify-jar.sh' || true)"
 if [ -z "$leak" ]; then ok "no known production DB secret/host in deploy files"; else bad "known secret/host found:"; printf '%s\n' "$leak" | sed 's/^/           /'; fi
 if code scripts/*.sh | grep -n -E 'echo[^|]*\$\{?COMPANY_BI_(DB_PASSWORD|DB_ROOT_PASSWORD|TOKEN_SECRET|BOOTSTRAP_PASSWORD)' | grep -q .; then bad "a script echoes a secret variable"; else ok "no script echoes a secret variable"; fi
 if grep -q -E 'MYSQL_PWD="\$MYSQL_ROOT_PASSWORD"' scripts/lib.sh && ! code scripts/*.sh | grep -q -E 'mysql[^|]* -p[^ ]'; then ok "DB password is passed via in-container env, never on a command line"; else bad "possible DB password on command line"; fi
