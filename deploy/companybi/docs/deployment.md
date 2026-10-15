@@ -45,6 +45,7 @@ bash deploy/companybi/scripts/build.sh
 - 构建上下文来自 `git archive HEAD`：**只含已提交内容**，本地未提交/被忽略的文件不会混入。工作区不干净则拒绝（`--allow-dirty` 仅限调试，镜像标记 `-dirty`，安装/升级脚本会拒绝它）。
 - 全部在 Docker 内完成：`npm ci && npm run build:base` → `mvn install`（sdk）→ `mvn -P standalone package` → 内容校验 → 运行镜像。构建机不需要装 Maven/Node。
 - 版本号 = `<dataease.version>-<提交日期UTC>-<commit前8位>`；镜像 `companybi:<v>`；**没有 `latest`**。
+- "可追溯"指：镜像里的 `RELEASE` 文件与标签记录了 commit、分支、dirty 标记、构建时间，且构建输入只来自该 commit。**不保证逐位可复现**：同一 commit 两次构建得到的 jar 字节不同（Maven 写入时间戳），所以以"镜像 ID + tar 的 SHA256"作为一次具体发布物的身份，而不是用 commit 去重。
 - 构建期强制检查（任一失败则构建失败）：jar 含前端 `index.html`/`panel.html` 及全部 dist 文件、公司定制类、全部 `db/company/*.sql` 与 Flyway 迁移；jar 内不含 `application-standalone.yml` 历史上硬编码的远程数据源地址与密码（对 jar 内所有类/资源做字面量扫描）；`application-standalone.yml` 中数据源已被替换为必填占位符。
 - 产物：镜像 + `deploy/companybi/dist/<v>/companybi_<v>.manifest`（版本、commit、分支、dirty、构建时间、镜像 ID、jar SHA256、schema 指纹、与上一版 schema 是否变化）。
 - `--previous-manifest <旧 manifest>`：对比上一版，写入 `schema_changed_vs_previous`。
@@ -100,6 +101,8 @@ scripts/upgrade.sh --version <v2> --image-tar companybi_<v2>_linux-amd64.tar    
 | 5 健康检查 | 容器 healthy、UI 200、依赖元数据库的公开 API `code:0`、管理员行存在、无失败的 Flyway 迁移、日志无致命错误、运行版本 = 目标版本 | 进入第 6 步失败分支 |
 | 6 记录 / 回滚 | 成功：写 `state.env`、`history.tsv`，**旧镜像保留**；失败：见 [rollback.md](rollback.md) | 只尝试一次；不来回切换 |
 
+**在 `tmux`/`screen` 里或用 `nohup` 运行升级与回滚。** SSH 断开会让脚本在"应用已停、新版本未验证"的中间态被打断；脚本的 EXIT 钩子会尽力把状态标成 `PENDING_MANUAL`，但被 `kill -9` 时无法执行。此时按 [rollback.md](rollback.md) 2.5 处理。（该场景未在本地测试中实际演练，见交付报告"未完成事项"。）
+
 升级**不会**自动删除旧镜像、备份或数据。清理旧镜像由人工、按精确 tag 执行（`docker rmi companybi:<旧版本>`），且至少保留当前 + 上一版。
 
 ### Schema 变更怎么处理
@@ -136,7 +139,16 @@ scripts/backup-db.sh                                  # 手动
 
 `docker compose down`、`docker system prune`、`docker volume prune`、`docker network prune`、任何不带项目名的批量 stop/rm、修改 `/etc/docker`、重启 dockerd、使用 DataEase 官方一键安装脚本、在塔内编译、`latest` 标签、用官方 DataEase 镜像冒充定制版。`tests/static-audit.sh` 会静态检查脚本与 compose 是否违反这些规则。
 
-## 11. 已知限制
+## 11. 本地验证（不连接任何真实环境）
+
+```bash
+bash deploy/companybi/tests/static-audit.sh                                   # 测试 F：脚本/compose 越界静态审计，不运行 docker
+bash deploy/companybi/tests/local-e2e.sh --v1 <旧版> --v2 <新版> --dirty-ver <脏构建版本>   # 测试 T/A–F，需要 WSL/Linux + docker
+```
+
+`local-e2e.sh` 使用独立项目名 `cbitest`、端口 `127.0.0.1:30105`、数据目录 `~/cbitest`，只按名字清理自己创建的对象，并对"其他容器/网络/卷/镜像"做前后快照比较。Schema 变化与启动失败场景用**派生镜像**模拟（在真实 v2 镜像上改 SCHEMA/COMPAT 清单或把入口改成立即失败），这些 schema 差异是**模拟**的，不是真实迁移。
+
+## 12. 已知限制
 
 - 镜像以 root 运行（继承基础镜像），目录权限靠宿主机目录 + `no-new-privileges`；后续可改为非 root 用户。
 - 运行时基础镜像 `registry.cn-qingdao.aliyuncs.com/dataease/alpine-openjdk21-jre` 来自 DataEase 官方，JRE 版本较旧，应纳入后续安全更新计划。

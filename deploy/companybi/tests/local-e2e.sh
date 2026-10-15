@@ -154,8 +154,15 @@ if want A; then
   ok_if A.5 "app published on 127.0.0.1:$PORT only" "$(docker port "$APP" 2>&1)" bash -c "docker port $APP | grep -q '127.0.0.1:$PORT' && ! docker port $APP | grep -q '0.0.0.0'"
   ok_if A.6 "MySQL publishes no host port" "$(docker port "$DB" 2>&1)" bash -c "[ -z \"\$(docker port $DB)\" ]"
   ok_if A.7 "only cbitest-app / cbitest-mysql / cbitest-net were created" "unexpected object" bash -c "[ \"\$(docker ps -a --format '{{.Names}}' | grep -c '^cbitest-')\" = 2 ] && docker network inspect $NET >/dev/null"
-  NT="$(sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='companybi_meta'")"; NF="$(sql "SELECT COUNT(*) FROM companybi_meta.de_standalone_version")"
-  [ "${NT:-0}" -gt 100 ] && res A.8 PASS "metadata DB initialised from empty (Flyway + company schema)" "tables=$NT flyway_rows=$NF" || res A.8 FAIL "metadata DB initialised" "tables=$NT"
+  NT="$(sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='companybi_meta'")"
+  NMIG="$(docker run --rm --network none --entrypoint /bin/cat "companybi:$V1" /opt/apps/release/SCHEMA | grep -c '^flyway\.file\.')"
+  NF="$(sql "SELECT COUNT(*) FROM companybi_meta.de_standalone_version WHERE success=1")"
+  NCO="$(sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='companybi_meta' AND table_name LIKE 'company\\_%'")"
+  NCO_WANT="$(cat "$HERE"/../../core/core-backend/src/main/resources/db/company/*.sql | grep -o -E 'CREATE TABLE IF NOT EXISTS company_[a-z_]+' | sort -u | wc -l)"
+  NCORE="$(sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='companybi_meta' AND table_name IN ('core_datasource','core_dataset_group','data_visualization_info','core_sys_setting')")"
+  if [ "${NF:-0}" -ge "${NMIG:-1}" ] && [ "${NCO:-0}" -ge "${NCO_WANT:-1}" ] && [ "${NCORE:-0}" = 4 ]; then
+    res A.8 PASS "metadata DB initialised from empty (Flyway + company schema)" "flyway success rows=$NF >= migrations=$NMIG; company tables=$NCO >= expected $NCO_WANT; core tables=4/4; total tables=$NT"
+  else res A.8 FAIL "metadata DB initialised" "flyway_ok=$NF/$NMIG company=$NCO/$NCO_WANT core=$NCORE/4"; fi
   [ "$(sql "SELECT COUNT(*) FROM companybi_meta.company_bi_user WHERE id=1")" = 1 ] && res A.9 PASS "bootstrap admin created (id=1)" || res A.9 FAIL "bootstrap admin created"
   ok_if A.10 "login with the bootstrap password works" "see smoke.py" login_ok "$BOOT_PW" "$WORK/token"
   ok_if A.11 "saved token opens a protected API" "see smoke.py" authed
@@ -176,8 +183,14 @@ if want B; then
   sql "CREATE TABLE IF NOT EXISTS companybi_meta.e2e_marker (k VARCHAR(40) PRIMARY KEY, v VARCHAR(100)); REPLACE INTO companybi_meta.e2e_marker VALUES ('m1','written-before-restart');" >/dev/null
   docker exec "$APP" sh -c 'echo persisted > /opt/dataease2.0/data/e2e_marker.txt'
   login_ok "$BOOT_PW" "$WORK/token"
+  # sample memory every 3 s for ~2 min while the app starts again: the START-UP peak matters for the host budget
+  ( for _ in $(seq 1 40); do docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' "$APP" "$DB" 2>/dev/null; sleep 3; done > "$LOGS/startup-mem.txt" ) &
+  SAMPLER=$!
   docker restart "$APP" "$DB" >/dev/null
   healthy 240 && res B.1 PASS "stack healthy after docker restart (both containers)" || res B.1 FAIL "healthy after restart"
+  wait "$SAMPLER" 2>/dev/null
+  PK="$(awk '{v=$2; u=v; gsub(/[0-9.]/,"",u); n=v; gsub(/[A-Za-z]/,"",n); m=(u=="GiB")?n*1024:n; if(m>mx[$1])mx[$1]=m} END{for(k in mx)printf "%s peak=%dMiB ",k,mx[k]}' "$LOGS/startup-mem.txt")"
+  res B.1b PASS "start-up memory peak sampled (informational, not a pass/fail criterion)" "$PK"
   [ "$(sql "SELECT v FROM companybi_meta.e2e_marker WHERE k='m1'")" = "written-before-restart" ] && res B.2 PASS "DB marker row survived restart" || res B.2 FAIL "DB marker row survived restart"
   authed && res B.3 PASS "token issued BEFORE the restart is still valid (token secret stable)" || res B.3 FAIL "old token valid after restart"
   # change the bootstrap password in .env: must have no effect because admin id=1 exists

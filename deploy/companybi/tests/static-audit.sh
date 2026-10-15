@@ -3,12 +3,13 @@
 # Pure text analysis: runs no docker command, needs no server.
 #
 #   tests/static-audit.sh        exit 0 = all rules satisfied
-set -uo pipefail
+set -u   # no pipefail on purpose: `grep -q` closes pipes early and would make pipelines look failed
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
-FAILS=0
+FAILS=0; SKIPS=0
 ok()   { printf '  [PASS] %s\n' "$1"; }
 bad()  { printf '  [FAIL] %s\n' "$1"; FAILS=$((FAILS+1)); }
+skip() { printf '  [SKIP] %s\n' "$1"; SKIPS=$((SKIPS+1)); }
 # strip comment-only lines so documentation of forbidden commands does not trip the audit
 code() { grep -v -E '^[[:space:]]*#' "$1"; }
 SCRIPTS=(scripts/*.sh image/*.sh)
@@ -66,14 +67,19 @@ chk "app image tag comes from the version file"       present 'image: companybi:
 chk "no hard-coded production datasource"             absent  '39\.101\.192\.183|Password123'
 
 echo "== 4. secrets and Git hygiene =="
-if git ls-files --error-unmatch .env >/dev/null 2>&1; then bad ".env is tracked by git"; else ok ".env is not tracked"; fi
-if git check-ignore -q .env 2>/dev/null; then ok ".env is git-ignored"; else bad ".env is not git-ignored"; fi
-if git check-ignore -q dist/x.tar 2>/dev/null && git check-ignore -q backups/x.sql.gz 2>/dev/null; then ok "tars and sql dumps are git-ignored"; else bad "tar/sql not ignored"; fi
-leak="$(git grep -n -I -E 'Password123|39\.101\.192\.183' -- . 2>/dev/null | grep -v -E 'tests/static-audit.sh|tests/local-e2e.sh|image/sanitize-standalone-yml.sh|image/verify-jar.sh' || true)"
-if [ -z "$leak" ]; then ok "no known production DB secret/host in deploy files"; else bad "known secret/host found:"; printf '%s\n' "$leak" | sed 's/^/           /'; fi
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git ls-files --error-unmatch .env >/dev/null 2>&1; then bad ".env is tracked by git"; else ok ".env is not tracked"; fi
+  if git check-ignore -q .env 2>/dev/null; then ok ".env is git-ignored"; else bad ".env is not git-ignored"; fi
+  if git check-ignore -q dist/x.tar 2>/dev/null && git check-ignore -q backups/x.sql.gz 2>/dev/null; then ok "tars and sql dumps are git-ignored"; else bad "tar/sql not ignored"; fi
+  leak="$(git grep -n -I -E 'Password123|39\.101\.192\.183' -- . 2>/dev/null | grep -v -E 'tests/static-audit.sh|tests/local-e2e.sh|image/sanitize-standalone-yml.sh|image/verify-jar.sh' || true)"
+  if [ -z "$leak" ]; then ok "no known production DB secret/host in tracked deploy files"; else bad "known secret/host found:"; printf '%s\n' "$leak" | sed 's/^/           /'; fi
+else
+  skip "git checks (.env ignored/untracked, dumps ignored, secret scan of tracked files): git cannot read this work tree from here; run the audit from Git Bash / the build machine"
+fi
 if code scripts/*.sh | grep -n -E 'echo[^|]*\$\{?COMPANY_BI_(DB_PASSWORD|DB_ROOT_PASSWORD|TOKEN_SECRET|BOOTSTRAP_PASSWORD)' | grep -q .; then bad "a script echoes a secret variable"; else ok "no script echoes a secret variable"; fi
 if grep -q -E 'MYSQL_PWD="\$MYSQL_ROOT_PASSWORD"' scripts/lib.sh && ! code scripts/*.sh | grep -q -E 'mysql[^|]* -p[^ ]'; then ok "DB password is passed via in-container env, never on a command line"; else bad "possible DB password on command line"; fi
 
 echo
+[ "$SKIPS" -eq 0 ] || echo "($SKIPS check group(s) skipped - see [SKIP] lines)"
 if [ "$FAILS" -eq 0 ]; then echo "STATIC AUDIT: PASS"; exit 0; fi
 echo "STATIC AUDIT: FAIL ($FAILS)"; exit 1

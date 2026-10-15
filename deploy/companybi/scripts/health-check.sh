@@ -59,8 +59,10 @@ run_checks() {
   code="$(http_code "$BASE/")"
   if [ "$code" = 200 ]; then pass "GET $BASE/ -> 200"; else fail "GET $BASE/ -> $code"; fi
   body="$(http_body "$BASE/de2api/sysParameter/ui")"
-  if printf '%s' "$body" | grep -q '"code":0'; then pass "GET /de2api/sysParameter/ui -> code 0 (backend + metadata DB reachable)"
-  else fail "GET /de2api/sysParameter/ui did not return code 0"; fi
+  case "$body" in
+    *'"code":0'*) pass "GET /de2api/sysParameter/ui -> code 0 (backend + metadata DB reachable)" ;;
+    *) fail "GET /de2api/sysParameter/ui did not return code 0" ;;
+  esac
 
   # 4 metadata DB facts
   if container_running "$DB_C"; then

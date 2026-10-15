@@ -184,7 +184,10 @@ schema_assess() {
         ;;
     esac
   done <<<"$SCHEMA_DELTA"
-  if [ -f "$compat" ] && grep -E '^[0-9a-f]{64}([[:space:]]|$)' "$compat" | awk '{print $1}' | grep -qx "$ofp"; then
+  # (no `grep -q` at the end of a pipeline: with pipefail an early exit can turn into SIGPIPE = false negative)
+  declared=""
+  [ -f "$compat" ] && declared="$(grep -E '^[0-9a-f]{64}([[:space:]]|$)' "$compat" | awk '{print $1}' | grep -x "$ofp" || true)"
+  if [ -n "$declared" ]; then
     SCHEMA_CLASS=DECLARED_COMPATIBLE
   else
     SCHEMA_CLASS=UNCONFIRMED
@@ -211,8 +214,10 @@ container_mem_mib() { # current usage of a running container in MiB (0 if not ru
     if (u=="GiB") printf "%d", n*1024; else if (u=="MiB") printf "%d", n; else if (u=="KiB") printf "%d", n/1024; else printf "0" }' || echo 0
 }
 port_in_use() { # TCP listener on this port (any address)
-  if command -v ss >/dev/null 2>&1; then ss -ltnH 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"
-  else grep -qiE ":$(printf '%04X' "$1") " /proc/net/tcp /proc/net/tcp6 2>/dev/null; fi
+  local hit
+  if command -v ss >/dev/null 2>&1; then hit="$(ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E "[:.]$1\$" || true)"
+  else hit="$(grep -iE ":$(printf '%04X' "$1") " /proc/net/tcp /proc/net/tcp6 2>/dev/null || true)"; fi
+  [ -n "$hit" ]
 }
 
 # ---------------------------------------------------------------------------
