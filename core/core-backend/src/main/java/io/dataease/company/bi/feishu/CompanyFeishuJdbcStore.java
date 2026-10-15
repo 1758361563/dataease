@@ -23,6 +23,17 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
 
     @PostConstruct
     void ensureIdentityStatusColumn() {
+        // Brand-new metadata database: the table does not exist yet. CompanyBiSchemaInitializer (an
+        // ApplicationRunner, i.e. it runs AFTER bean creation) creates it WITH identity_status, so there
+        // is nothing to add. Only a legacy table that predates the column needs the ALTER below.
+        Integer tableExists = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'company_feishu_recipient'
+                """, Integer.class);
+        if (tableExists == null || tableExists == 0) {
+            return;
+        }
         Integer present = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE()

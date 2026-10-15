@@ -1,0 +1,9 @@
+# Real secrets and release artifacts never go into Git.
+.env
+.env.*
+!.env.example
+dist/
+*.tar
+*.tar.gz
+*.sql
+*.sql.gz

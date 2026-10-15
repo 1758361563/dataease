@@ -1,0 +1,21 @@
+# Database schema compatibility declarations for Company BI releases.
+#
+# One schema fingerprint per line (the `schema.fingerprint=` value from a release's
+# SCHEMA file, shown by `scripts/status.sh` and in <version>.manifest).
+#
+# Meaning: "THIS build can run on the database schema of the listed release AND
+# the listed release's application can run on THIS build's schema." In other words
+# the schema delta is backward compatible in both directions.
+#
+# upgrade.sh / rollback.sh use this file (it is baked into the image as
+# /opt/apps/release/COMPAT) to decide whether an image-only rollback is safe after
+# a schema change. A schema change that is NOT declared here is treated as
+# "compatibility unknown": automatic rollback is refused and manual steps are printed.
+#
+# Only add a fingerprint after reading the migration diff and confirming that
+#   - only tables/columns/indexes are ADDED,
+#   - new columns are NULLable or have defaults,
+#   - nothing is dropped, renamed, retyped or backfilled in a way the old code misreads.
+#
+# Lines starting with '#' and blank lines are ignored. Format:
+#   <64-hex fingerprint>   [optional comment]

@@ -1,0 +1,104 @@
+# Company BI - single-node production stack (app + dedicated metadata MySQL).
+#
+# Drive it ONLY through deploy/companybi/scripts/*.sh (they pass the right env files,
+# fix the project name and refuse project-unscoped / destructive compose commands).
+#
+# Everything is namespaced by ${COMPANY_BI_PROJECT} (default "companybi"):
+#   containers  <project>-app, <project>-mysql
+#   network     <project>-net
+#   data        bind mounts under ${COMPANY_BI_HOME} (no Docker volumes, nothing for a prune to remove)
+# Nothing here uses or touches Guanyuan's containers, networks, volumes or ports.
+
+name: ${COMPANY_BI_PROJECT:-companybi}
+
+services:
+  mysql:
+    image: ${COMPANY_BI_MYSQL_IMAGE:-mysql:8.4.5}
+    container_name: ${COMPANY_BI_PROJECT:-companybi}-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${COMPANY_BI_DB_ROOT_PASSWORD:?set COMPANY_BI_DB_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${COMPANY_BI_DB_NAME:-companybi_meta}
+      MYSQL_USER: ${COMPANY_BI_DB_USER:-companybi}
+      MYSQL_PASSWORD: ${COMPANY_BI_DB_PASSWORD:?set COMPANY_BI_DB_PASSWORD in .env}
+    volumes:
+      - ${COMPANY_BI_HOME:?set COMPANY_BI_HOME in .env}/mysql/data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/companybi.cnf:ro
+    # No `ports:` on purpose: MySQL is reachable only from <project>-net.
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    mem_limit: ${COMPANY_BI_MYSQL_MEM_LIMIT:-768m}
+    memswap_limit: ${COMPANY_BI_MYSQL_MEM_LIMIT:-768m}
+    cpus: ${COMPANY_BI_MYSQL_CPUS:-1.0}
+    pids_limit: 512
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 60s
+    networks:
+      - net
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  app:
+    image: companybi:${COMPANY_BI_VERSION:?COMPANY_BI_VERSION is set by the scripts from releases/version.env}
+    container_name: ${COMPANY_BI_PROJECT:-companybi}-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Datasource: the jar has NO built-in database (see image/sanitize-standalone-yml.sh).
+      COMPANY_BI_DB_URL: "jdbc:mysql://mysql:3306/${COMPANY_BI_DB_NAME:-companybi_meta}?autoReconnect=false&useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true"
+      COMPANY_BI_DB_USER: ${COMPANY_BI_DB_USER:-companybi}
+      COMPANY_BI_DB_PASSWORD: ${COMPANY_BI_DB_PASSWORD:?set COMPANY_BI_DB_PASSWORD in .env}
+      # Token HMAC secret. Must be stable across releases, otherwise every login is invalidated.
+      COMPANY_BI_TOKEN_SECRET: ${COMPANY_BI_TOKEN_SECRET:?set COMPANY_BI_TOKEN_SECRET in .env}
+      # Only read when the bootstrap admin (company_bi_user.id=1) does not exist yet.
+      COMPANY_BI_BOOTSTRAP_PASSWORD: ${COMPANY_BI_BOOTSTRAP_PASSWORD:-}
+      # Feishu: this phase has no Feishu service and no credentials. Hard-coded on purpose
+      # (not read from .env) so a typo can never switch live delivery on; turning it off is a
+      # reviewed change to this file.
+      COMPANY_FEISHU_DRY_RUN: "true"
+      COMPANY_FEISHU_INTERNAL_TOKEN: ""
+      COMPANY_FEISHU_SHOT_BASE_URL: "http://127.0.0.1:9"
+      DATAEASE_ORIGIN_LIST: ${COMPANY_BI_ORIGIN_LIST:-http://localhost:30005,http://127.0.0.1:30005}
+      JAVA_OPTIONS: "-Dfile.encoding=utf-8 -Dloader.path=/opt/apps ${COMPANY_BI_JAVA_OPTS:--Xms512m -Xmx1g -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai}"
+    # Loopback only: reach it through an SSH tunnel. Do not widen without a reverse proxy + TLS.
+    ports:
+      - "${COMPANY_BI_BIND_ADDR:-127.0.0.1}:${COMPANY_BI_PORT:-30005}:8100"
+    volumes:
+      - ${COMPANY_BI_HOME}/app/data:/opt/dataease2.0/data
+      - ${COMPANY_BI_HOME}/app/conf:/opt/dataease2.0/conf
+      - ${COMPANY_BI_HOME}/app/cache:/opt/dataease2.0/cache
+      - ${COMPANY_BI_HOME}/app/logs:/opt/dataease2.0/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 4 -O /dev/null http://127.0.0.1:8100/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    mem_limit: ${COMPANY_BI_APP_MEM_LIMIT:-2g}
+    memswap_limit: ${COMPANY_BI_APP_MEM_LIMIT:-2g}
+    cpus: ${COMPANY_BI_APP_CPUS:-2.0}
+    pids_limit: 1024
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 40s
+    networks:
+      - net
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+networks:
+  net:
+    name: ${COMPANY_BI_PROJECT:-companybi}-net
