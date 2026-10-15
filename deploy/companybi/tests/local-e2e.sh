@@ -169,6 +169,9 @@ if want A; then
   ok_if A.12 "protected API rejects anonymous calls" "accepted?" python3 "$HERE/tests/smoke.py" anon "$BASE"
   login_ok "definitely-wrong-password" && res A.13 FAIL "wrong password rejected" || res A.13 PASS "wrong password rejected"
   ok_if A.14 "no datasource secret of the old remote DB reachable in container env/config" "found" bash -c "! docker exec $APP sh -c 'env; cat /proc/1/cmdline' | tr '\\0' ' ' | grep -q -E 'Password123|39\\.101\\.192\\.183'"
+  FE="$(docker exec "$APP" printenv COMPANY_FEISHU_DRY_RUN 2>/dev/null)|$(docker exec "$APP" printenv COMPANY_FEISHU_INTERNAL_TOKEN 2>/dev/null)|$(docker exec "$APP" printenv COMPANY_FEISHU_SHOT_BASE_URL 2>/dev/null)"
+  [ "$FE" = "true||http://127.0.0.1:9" ] && res A.14b PASS "Feishu is forced to dry-run in the running container; no token; screenshot service points at a dead port" "$FE" || res A.14b FAIL "Feishu safety env" "$FE"
+  [ "$(sql "SELECT COUNT(*) FROM companybi_meta.company_feishu_subscription")" = 0 ] && [ "$(sql "SELECT COUNT(*) FROM companybi_meta.company_feishu_app_config")" = 0 ] && res A.14c PASS "no Feishu app config and no subscriptions exist after a clean install (nothing can be delivered)" || res A.14c FAIL "Feishu tables empty"
   sleep 45
   echo "idle memory: $(docker stats --no-stream --format '{{.Name}} {{.MemUsage}} cpu={{.CPUPerc}}' "$APP" "$DB" | tr '\n' ';')" | tee "$LOGS/idle-memory.txt"
   res A.15 PASS "idle memory sampled (not a pass/fail criterion)" "$(tr '\n' ' ' < "$LOGS/idle-memory.txt")"
