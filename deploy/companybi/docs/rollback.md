@@ -53,6 +53,11 @@ scripts/rollback.sh --restore-db <备份文件>       # 不写 --to：数据恢�
 ```bash
 cd /opt/companybi
 docker compose --project-name companybi --env-file .env --env-file ${COMPANY_BI_HOME}/releases/version.env stop app    # 只停应用，不要 down
+# 先给"当前"库留一份安全转储（和 rollback.sh 一样：恢复会丢掉备份之后的数据，这份是唯一的找回途径）
+( umask 077; docker exec companybi-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -uroot --single-transaction --databases companybi_meta' | gzip > ${COMPANY_BI_HOME}/backups/pre-manual-restore.sql.gz )
+# 必须先删库：备份是 `mysqldump --databases`（无 add-drop-database），直接导入只会覆盖备份里有的表，
+# 备份之后新版本多建出来的表/数据会残留，和"恢复到备份时刻"不一致。库名默认 companybi_meta（.env 的 COMPANY_BI_DB_NAME）。
+docker exec companybi-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "DROP DATABASE IF EXISTS companybi_meta"'
 gunzip -c <备份文件> | docker exec -i companybi-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot'
 # 把 releases/version.env 改为想运行的版本，然后：
 docker compose --project-name companybi --env-file .env --env-file ${COMPANY_BI_HOME}/releases/version.env up -d --no-deps app

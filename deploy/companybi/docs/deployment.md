@@ -120,7 +120,9 @@ scripts/backup-db.sh                                  # 手动
 15 3 * * *  /opt/companybi/scripts/backup-db.sh --label scheduled --keep 14     # crontab 示例
 ```
 
-备份是 gzip 的逻辑导出，权限 600，目录权限 700，**不进 Git**。同盘备份不防磁盘损坏，请定期复制到机外。升级前/回滚前自动生成的备份（`pre-upgrade-*`、`pre-rollback-*`）不会被 `--keep` 清理。
+备份是 gzip 的逻辑导出，权限 600，目录权限 700，**不进 Git**。同盘备份不防磁盘损坏，请定期复制到机外。升级前/回滚前自动生成的备份（`pre-upgrade-*`、`pre-rollback-*`，以及无脚本手工恢复时留下的 `pre-manual-restore.sql.gz`）不会被 `--keep` 清理。
+
+**恢复**：`scripts/rollback.sh --restore-db <备份>`（脚本路径）或 [rollback.md](rollback.md) §2.7（无脚本路径，含"先删库"步骤）。两条路径都由 `tests/release-verify.sh` 的 R 阶段在隔离栈上实际执行并核对表校验和，不是纸面流程。恢复是**整库**恢复到备份时刻：备份之后写入的用户、权限、仪表板、以及新版本新建的表都会消失（恢复前的当前库保存在 `pre-rollback-*` / `pre-manual-restore` 里）。
 
 ## 8. 资源预算（初始值，待塔内实测校准）
 
