@@ -17,7 +17,7 @@ export async function handleCompanyAdminForbidden() {
   }
   const path = router.currentRoute.value?.path || ''
   if (!canVisitCompanyPath(path, companyStore.capabilities)) {
-    window.location.hash = '#/workbranch/index'
+    window.location.hash = '#/panel/index'
     window.location.reload()
     return
   }

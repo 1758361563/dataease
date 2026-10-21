@@ -82,22 +82,31 @@ const dvEdit = () => {
   initOpenHandler(newWindow)
 }
 
+const favoriteSaving = ref(false)
 const executeStore = () => {
+  if (favoriteSaving.value) return
+  favoriteSaving.value = true
   const param = {
     id: dvInfo.value.id,
     type: dvInfo.value.type === 'dashboard' ? 'panel' : 'screen'
   }
-  storeApi(param).then(() => {
-    storeQuery()
-  })
+  storeApi(param)
+    .then(() => {
+      useEmitt().emitter.emit('dashboard-favorite-change', { id: String(param.id) })
+    })
+    .finally(() => {
+      favoriteSaving.value = false
+    })
 }
 const storeQuery = () => {
   if (!dvInfo?.value?.id) return
-  storeStatusApi(dvInfo.value.id).then(res => {
-    favorited.value = res.data
+  const id = dvInfo.value.id
+  storeStatusApi(id).then(res => {
+    if (dvInfo.value.id === id) favorited.value = res.data
   })
 }
 storeQuery()
+useEmitt({ name: 'dashboard-favorite-change', callback: () => storeQuery() })
 watch(
   () => dvInfo.value.id,
   () => {

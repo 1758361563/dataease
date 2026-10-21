@@ -154,7 +154,12 @@ onMounted(load)
       </el-table-column>
     </GridTable>
 
-    <el-dialog v-model="editVisible" :title="form.id ? '编辑用户组' : '新建用户组'" width="480px">
+    <el-drawer
+      class="company-admin-drawer"
+      v-model="editVisible"
+      :title="form.id ? '编辑用户组' : '新建用户组'"
+      size="480px"
+    >
       <el-form label-width="80px">
         <el-form-item label="名称" required>
           <el-input v-model="form.name" />
@@ -167,9 +172,14 @@ onMounted(load)
         <el-button @click="editVisible = false">取消</el-button>
         <el-button type="primary" @click="submitGroup">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
 
-    <el-drawer v-model="memberVisible" :title="`成员 · ${currentGroup?.name || ''}`" size="480px">
+    <el-drawer
+      class="company-admin-drawer"
+      v-model="memberVisible"
+      :title="`成员 · ${currentGroup?.name || ''}`"
+      size="480px"
+    >
       <div class="member-add">
         <el-select v-model="addUserId" filterable placeholder="选择用户" style="flex: 1">
           <el-option
@@ -195,19 +205,8 @@ onMounted(load)
 </template>
 
 <style lang="less" scoped>
-.company-admin-page {
-  padding: 16px 24px;
-}
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 16px;
-}
 .member-add {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 </style>

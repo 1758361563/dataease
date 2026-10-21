@@ -79,93 +79,74 @@ onMounted(async () => {
 <template>
   <div class="company-admin-page" v-loading="loading">
     <div class="page-head">审计日志</div>
-    <div class="toolbar">
-      <el-select
-        v-model="filters.operatorUserId"
-        clearable
-        filterable
-        placeholder="操作者"
-        style="width: 200px"
-      >
-        <el-option
-          v-for="u in users"
-          :key="u.id"
-          :label="`${u.displayName} (${u.username})`"
-          :value="u.id"
+    <div class="admin-panel">
+      <div class="toolbar">
+        <el-select
+          v-model="filters.operatorUserId"
+          clearable
+          filterable
+          placeholder="操作者"
+          style="width: 200px"
+        >
+          <el-option
+            v-for="u in users"
+            :key="u.id"
+            :label="`${u.displayName} (${u.username})`"
+            :value="u.id"
+          />
+        </el-select>
+        <el-input
+          v-model="filters.actionType"
+          clearable
+          placeholder="操作类型"
+          style="width: 180px"
         />
-      </el-select>
-      <el-input v-model="filters.actionType" clearable placeholder="Action" style="width: 180px" />
-      <el-input
-        v-model="filters.targetType"
-        clearable
-        placeholder="Target Type"
-        style="width: 160px"
-      />
-      <el-date-picker
-        v-model="range"
-        type="datetimerange"
-        start-placeholder="开始"
-        end-placeholder="结束"
-      />
-      <el-button type="primary" @click="load">查询</el-button>
+        <el-input
+          v-model="filters.targetType"
+          clearable
+          placeholder="资源类型"
+          style="width: 160px"
+        />
+        <el-date-picker
+          v-model="range"
+          type="datetimerange"
+          start-placeholder="开始"
+          end-placeholder="结束"
+        />
+        <el-button type="primary" @click="load">查询</el-button>
+      </div>
+      <GridTable
+        :show-pagination="true"
+        :table-data="records"
+        :pagination="{ currentPage: page, pageSize, total }"
+        @current-change="(p: number) => { page = p; load() }"
+        @size-change="(s: number) => { pageSize = s; page = 1; load() }"
+      >
+        <el-table-column label="时间" min-width="170">
+          <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+        </el-table-column>
+        <el-table-column label="操作者" min-width="160">
+          <template #default="{ row }">{{ operatorLabel(row.operatorUserId) }}</template>
+        </el-table-column>
+        <el-table-column prop="actionType" label="操作类型" min-width="140" />
+        <el-table-column prop="targetType" label="资源类型" width="140" />
+        <el-table-column prop="targetId" label="资源 ID" min-width="180" />
+        <el-table-column label="详情" width="90">
+          <template #default="{ row }">
+            <el-button text @click="expanded = expanded === row.id ? '' : row.id">{{
+              expanded === row.id ? '收起' : '展开'
+            }}</el-button>
+          </template>
+        </el-table-column>
+      </GridTable>
     </div>
-    <GridTable
-      :show-pagination="true"
-      :table-data="records"
-      :pagination="{ currentPage: page, pageSize, total }"
-      @current-change="(p: number) => { page = p; load() }"
-      @size-change="(s: number) => { pageSize = s; page = 1; load() }"
-    >
-      <el-table-column label="时间" min-width="170">
-        <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
-      </el-table-column>
-      <el-table-column label="操作者" min-width="160">
-        <template #default="{ row }">{{ operatorLabel(row.operatorUserId) }}</template>
-      </el-table-column>
-      <el-table-column prop="actionType" label="Action" min-width="140" />
-      <el-table-column prop="targetType" label="Target Type" width="140" />
-      <el-table-column prop="targetId" label="Target ID" min-width="180" />
-      <el-table-column label="详情" width="90">
-        <template #default="{ row }">
-          <el-button text @click="expanded = expanded === row.id ? '' : row.id">展开</el-button>
-        </template>
-      </el-table-column>
-    </GridTable>
     <el-card v-if="expanded" shadow="never" class="json-card">
-      <div class="json-title">before</div>
+      <div class="json-title">变更前</div>
       <pre>{{ pretty(records.find(r => r.id === expanded)?.beforeJson) }}</pre>
-      <div class="json-title">after</div>
+      <div class="json-title">变更后</div>
       <pre>{{ pretty(records.find(r => r.id === expanded)?.afterJson) }}</pre>
     </el-card>
   </div>
 </template>
 
-<style lang="less" scoped>
-.company-admin-page {
-  padding: 16px 24px;
-}
-.page-head {
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 16px;
-}
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.json-card {
-  margin-top: 12px;
-  .json-title {
-    color: #646a73;
-    font-size: 12px;
-    margin-bottom: 4px;
-  }
-  pre {
-    white-space: pre-wrap;
-    word-break: break-all;
-    font-size: 12px;
-  }
-}
-</style>
+<style lang="less" scoped></style>

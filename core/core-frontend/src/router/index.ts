@@ -6,7 +6,7 @@ export const routes: AppRouteRecordRaw[] = [
   {
     path: '/',
     name: 'index',
-    redirect: '/workbranch/index',
+    redirect: '/panel/index',
     component: () => import('@/layout/index.vue'),
     hidden: true,
     meta: {},
@@ -15,7 +15,7 @@ export const routes: AppRouteRecordRaw[] = [
         path: 'workbranch',
         name: 'workbranch',
         hidden: true,
-        component: () => import('@/views/workbranch/index.vue'),
+        redirect: '/panel/index',
         meta: { hidden: true }
       }
     ]

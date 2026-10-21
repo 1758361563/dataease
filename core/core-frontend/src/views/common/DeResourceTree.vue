@@ -50,6 +50,8 @@ import { findParentIdByChildIdRecursive, onInitReady } from '@/utils/canvasUtils
 import { XpackComponent } from '@/components/plugin'
 import treeSort, { treeParentWeight } from '@/utils/treeSortUtils'
 import router from '@/router'
+import DashboardQuickAccess from '@/components/dashboard/DashboardQuickAccess.vue'
+import type { DashboardShortcut } from '@/utils/dashboardQuickAccess'
 import { cancelRequestBatch } from '@/config/axios/service'
 import { isFreeFolder } from '@/utils/utils'
 const { wsCache } = useCache()
@@ -143,6 +145,27 @@ const dvSvgType = computed(() =>
 )
 
 const isEmbedded = computed(() => appStore.getIsDataEaseBi || appStore.getIsIframe)
+const quickAccessEnabled = computed(
+  () =>
+    curCanvasType.value === 'dashboard' &&
+    showPosition.value === 'preview' &&
+    props.resourceTable === 'core' &&
+    !isEmbedded.value
+)
+const sidebarMode = ref<'all' | 'recent' | 'favorite'>('recent')
+let quickInitialHandled = false
+const selectShortcut = (row: DashboardShortcut) => {
+  resourceListTree.value?.setCurrentKey(row.node.id)
+  nodeClick(row.node, { disabled: false })
+  expandedArray.value = getDefaultExpandedKeys()
+}
+const shortcutsReady = (rows: DashboardShortcut[]) => {
+  if (quickInitialHandled || filterText.value?.trim()) return
+  quickInitialHandled = true
+  if (dvId || selectedNodeKey.value) return
+  if (rows.length) selectShortcut(rows[0])
+  else sidebarMode.value = 'all'
+}
 
 const resourceTypeList = computed(() => {
   const list = [
@@ -588,7 +611,7 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
 }, 300)
 
 watch(filterText, val => {
-  resourceListTree.value.filter(val)
+  resourceListTree.value?.filter(val)
 })
 
 const openHandler = ref(null)
@@ -633,7 +656,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="resource-tree">
+  <div class="resource-tree" :class="{ 'dashboard-quick-tree': quickAccessEnabled }">
     <div class="tree-header">
       <div class="icon-methods" v-show="showPosition === 'preview'">
         <span class="title"> {{ resourceLabel }} </span>
@@ -665,6 +688,7 @@ defineExpose({
         v-model="filterText"
         clearable
         class="search-bar"
+        :class="{ 'quick-search': quickAccessEnabled && sidebarMode !== 'all' }"
       >
         <template #prefix>
           <el-icon>
@@ -674,7 +698,11 @@ defineExpose({
           </el-icon>
         </template>
       </el-input>
-      <el-dropdown @command="handleSortTypeChange" trigger="click">
+      <el-dropdown
+        v-if="!quickAccessEnabled || sidebarMode === 'all'"
+        @command="handleSortTypeChange"
+        trigger="click"
+      >
         <el-icon class="filter-icon-span">
           <el-tooltip :offset="16" effect="dark" :content="sortTypeTip" placement="top">
             <Icon v-if="state.curSortType.includes('asc')" name="dv-sort-asc" class="opt-icon"
@@ -703,7 +731,46 @@ defineExpose({
         </template>
       </el-dropdown>
     </div>
-    <el-scrollbar class="custom-tree" v-loading="copyLoading">
+    <div
+      v-if="quickAccessEnabled"
+      class="dashboard-sidebar-modes"
+      role="group"
+      aria-label="仪表板范围"
+    >
+      <button
+        v-for="option in [
+          { value: 'all', label: '全部' },
+          { value: 'recent', label: '最近' },
+          { value: 'favorite', label: '收藏' }
+        ]"
+        :key="option.value"
+        type="button"
+        :class="{ active: sidebarMode === option.value }"
+        :aria-pressed="sidebarMode === option.value"
+        @click="sidebarMode = option.value as 'all' | 'recent' | 'favorite'"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+    <el-scrollbar
+      v-if="quickAccessEnabled && sidebarMode !== 'all'"
+      class="dashboard-shortcut-scroll"
+    >
+      <DashboardQuickAccess
+        :mode="sidebarMode"
+        :keyword="filterText"
+        :catalog="state.resourceTree"
+        :ready="mounted"
+        :selected-id="selectedNodeKey"
+        @select="selectShortcut"
+        @ready="shortcutsReady"
+      />
+    </el-scrollbar>
+    <el-scrollbar
+      v-show="!quickAccessEnabled || sidebarMode === 'all'"
+      class="custom-tree"
+      v-loading="copyLoading"
+    >
       <el-tree
         menu
         ref="resourceListTree"
@@ -806,6 +873,52 @@ defineExpose({
   <XpackComponent ref="openHandler" jsname="L2NvbXBvbmVudC9lbWJlZGRlZC1pZnJhbWUvT3BlbkhhbmRsZXI=" />
 </template>
 <style lang="less" scoped>
+.dashboard-quick-tree {
+  min-height: 0;
+  .tree-header .quick-search {
+    width: 100%;
+  }
+  .tree-header {
+    flex-shrink: 0;
+  }
+  .custom-tree,
+  .dashboard-shortcut-scroll {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+  .dashboard-sidebar-modes {
+    display: flex;
+    flex-shrink: 0;
+    gap: 3px;
+    margin: 0 14px 12px;
+    padding: 3px;
+    border-radius: 7px;
+    background: #f3f5f8;
+    button {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: #8794a8;
+      font-size: 12px;
+      line-height: 20px;
+      cursor: pointer;
+      &.active {
+        background: #fff;
+        color: #4966c7;
+        box-shadow: 0 1px 3px #24354b0c;
+      }
+      &:focus-visible {
+        outline: 2px solid #829bff;
+        outline-offset: -2px;
+      }
+    }
+  }
+}
+
 .filter-icon-span {
   border: 1px solid #d9dcdf;
   width: 32px;

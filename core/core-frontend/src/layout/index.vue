@@ -6,6 +6,8 @@ import Sidebar from './components/Sidebar.vue'
 import Menu from './components/Menu.vue'
 import Main from './components/Main.vue'
 import CollapseBar from './components/CollapseBar.vue'
+import '@/views/company/admin/admin.less'
+import DvSidebar from '@/components/visualization/DvSidebar.vue'
 import { ElContainer } from 'element-plus-secondary'
 import { useRoute } from 'vue-router_2'
 import { XpackComponent } from '@/components/plugin'
@@ -32,14 +34,25 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="common-layout">
+  <div class="common-layout" :class="{ 'company-admin-layout': companyAdminMenu }">
     <HeaderSystem
       v-if="settingMenu || toolboxMenu || msgFillMenu"
       :title="toolboxMenu ? t('toolbox.name') : msgFillMenu ? t('v_query.msg_center') : ''"
     />
     <Header v-else></Header>
     <el-container class="layout-container">
-      <template v-if="showSider">
+      <DvSidebar
+        v-if="companyAdminMenu"
+        class="company-admin-sidebar"
+        title="权限管理"
+        theme-info="light"
+        :width="280"
+        side-name="companyAdmin"
+        aside-position="left"
+      >
+        <Menu />
+      </DvSidebar>
+      <template v-else-if="showSider">
         <Sidebar v-if="!isCollapse" class="layout-sidebar">
           <div
             @click="setCollapse"
@@ -124,6 +137,24 @@ const { t } = useI18n()
     }
     .with-sider:has(.appearance-foot) {
       padding: 16px 24px 0px 24px !important;
+    }
+  }
+  &.company-admin-layout {
+    .layout-container {
+      min-height: 0;
+      flex: 1;
+    }
+    .company-admin-sidebar {
+      flex: 0 0 auto;
+      height: 100%;
+      overflow: hidden;
+      border-right: 1px solid var(--bi-border, #e7ecf2);
+      :deep(.ed-menu) {
+        width: 100%;
+      }
+    }
+    .layout-main {
+      min-width: 0;
     }
   }
 }

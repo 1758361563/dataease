@@ -116,6 +116,7 @@ const hasCurrentRouter = (locations, routers, index) => {
 
 export const getFirstAuthMenu = () => {
   const permissionStore = usePermissionStore(store)
+  if (pathValid('/panel/index')) return '/panel/index'
   const routers = permissionStore.getRouters
   const nodePathArray = []
   getPathway(routers, nodePathArray)
@@ -128,6 +129,7 @@ export const getFirstAuthMenu = () => {
 
 const getPathway = (tree, nodePathArray) => {
   for (let index = 0; index < tree.length; index++) {
+    if (/^\/?workbranch(?:\/|$)/.test(tree[index].path)) continue
     if (tree[index].children) {
       const endRecursiveLoop = getPathway(tree[index].children, nodePathArray)
       if (endRecursiveLoop) {

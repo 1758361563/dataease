@@ -205,3 +205,13 @@ export const exportLogTemplate = data =>
 export const exportLogPDF = data => request.post({ url: '/dataVisualization/exportLogPDF', data })
 
 export const exportLogImg = data => request.post({ url: '/dataVisualization/exportLogImg', data })
+
+// Keep the existing per-user history and favorite services, scoped to dashboards.
+export const findDashboardShortcutsApi = (
+  mode: 'recent' | 'favorite',
+  keyword = ''
+): Promise<IResponse> =>
+  request.post({
+    url: mode === 'recent' ? '/dataVisualization/findRecent' : '/store/query',
+    data: { type: 'panel', keyword, asc: false }
+  })

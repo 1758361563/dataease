@@ -100,8 +100,8 @@ router.beforeEach(async (to, from, next) => {
         companyPermissionStore.loaded = true
       }
     }
-    if (to.path === '/login') {
-      next({ path: '/workbranch/index' })
+    if (to.path === '/login' || /^\/workbranch(?:\/|$)/.test(to.path)) {
+      next({ path: '/panel/index' })
     } else {
       permissionStore.setCurrentPath(to.path)
       if (permissionStore.getIsAddRouters) {
@@ -129,7 +129,7 @@ router.beforeEach(async (to, from, next) => {
           return
         }
         if (!canVisitCompanyPath(to.path, companyPermissionStore.capabilities)) {
-          next({ path: getFirstAuthMenu() || '/workbranch/index' })
+          next({ path: getFirstAuthMenu() || '/panel/index' })
           return
         }
         next()
@@ -165,7 +165,7 @@ router.beforeEach(async (to, from, next) => {
         return
       }
       if (!canVisitCompanyPath(to.path, companyPermissionStore.capabilities)) {
-        next({ path: getFirstAuthMenu() || '/workbranch/index' })
+        next({ path: getFirstAuthMenu() || '/panel/index' })
         return
       }
       next(nextData)

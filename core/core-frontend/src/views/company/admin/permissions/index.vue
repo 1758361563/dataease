@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import AdminHelp from '../AdminHelp.vue'
 import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus-secondary'
 import { listCompanyUsers } from '@/api/company/user'
@@ -150,117 +151,75 @@ onMounted(async () => {
 <template>
   <div class="company-admin-page" v-loading="loading">
     <div class="page-head">
-      <span>资源授权</span>
+      <span class="admin-title"
+        >资源授权
+        <AdminHelp
+          content="资源关系决定可访问范围；实际编辑能力由账号角色决定。本页编辑的是直接授权，不是继承后的有效权限。"
+      /></span>
     </div>
-    <p class="help">
-      资源关系决定可访问范围；实际编辑能力由账号角色决定。本页编辑的是直接授权，不是继承后的有效权限。
-    </p>
-    <div class="toolbar">
-      <el-radio-group v-model="subjectType">
-        <el-radio-button label="USER">用户</el-radio-button>
-        <el-radio-button label="GROUP">用户组</el-radio-button>
-      </el-radio-group>
-      <el-select v-model="subjectId" filterable placeholder="选择授权对象" style="width: 280px">
-        <el-option
-          v-for="item in subjectOptions()"
-          :key="item.id"
-          :label="subjectType === 'USER' ? `${(item as CompanyUser).displayName} (${(item as CompanyUser).username})` : (item as CompanyGroup).name"
-          :value="item.id"
-        />
-      </el-select>
+
+    <div class="admin-panel">
+      <div class="toolbar">
+        <el-radio-group v-model="subjectType">
+          <el-radio-button label="USER">用户</el-radio-button>
+          <el-radio-button label="GROUP">用户组</el-radio-button>
+        </el-radio-group>
+        <el-select v-model="subjectId" filterable placeholder="选择授权对象" class="subject-select">
+          <el-option
+            v-for="item in subjectOptions()"
+            :key="item.id"
+            :label="subjectType === 'USER' ? `${(item as CompanyUser).displayName} (${(item as CompanyUser).username})` : (item as CompanyGroup).name"
+            :value="item.id"
+          />
+        </el-select>
+      </div>
+      <el-tabs v-model="tab" class="admin-tabs">
+        <el-tab-pane
+          v-for="resource in [
+            { name: 'dashboard', label: '仪表板', nodes: catalog.dashboards },
+            { name: 'dataset', label: '数据集', nodes: catalog.datasets }
+          ]"
+          :key="resource.name"
+          :label="resource.label"
+          :name="resource.name"
+        >
+          <el-table :data="resource.nodes" row-key="id" default-expand-all class="resource-table">
+            <el-table-column prop="name" label="资源名称" min-width="300" show-overflow-tooltip />
+            <el-table-column label="类型" width="120"
+              ><template #default="{ row }"
+                ><el-tag type="info" size="small">{{
+                  row.type.endsWith('_FOLDER')
+                    ? '文件夹'
+                    : row.type === 'DATASET'
+                    ? '数据集'
+                    : '仪表板'
+                }}</el-tag></template
+              ></el-table-column
+            >
+            <el-table-column label="直接授权" width="220"
+              ><template #default="{ row }">
+                <el-select
+                  v-if="['DASHBOARD', 'DASHBOARD_FOLDER', 'DATASET'].includes(row.type)"
+                  :model-value="currentRelation(row)"
+                  :disabled="!subjectId || savingKey === grantKey(row.type, row.id)"
+                  class="grant-select"
+                  @change="(val: string) => onChange(row, val)"
+                >
+                  <el-option
+                    v-for="opt in resource.name === 'dashboard'
+                      ? dashboardRelationOptions()
+                      : datasetRelationOptions()"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select> </template
+            ></el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
     </div>
-    <el-tabs v-model="tab">
-      <el-tab-pane label="Dashboard" name="dashboard">
-        <el-tree
-          :data="catalog.dashboards"
-          node-key="id"
-          default-expand-all
-          :expand-on-click-node="false"
-        >
-          <template #default="{ data }">
-            <div class="tree-row">
-              <span>{{ data.name }}</span>
-              <el-tag size="small" type="info">{{
-                data.type === 'DASHBOARD_FOLDER' ? '文件夹' : '仪表板'
-              }}</el-tag>
-              <el-select
-                v-if="data.type === 'DASHBOARD' || data.type === 'DASHBOARD_FOLDER'"
-                :model-value="currentRelation(data)"
-                :disabled="!subjectId || savingKey === grantKey(data.type, data.id)"
-                style="width: 140px"
-                @change="(val: string) => onChange(data, val)"
-              >
-                <el-option
-                  v-for="opt in dashboardRelationOptions()"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </div>
-          </template>
-        </el-tree>
-      </el-tab-pane>
-      <el-tab-pane label="Dataset" name="dataset">
-        <el-tree
-          :data="catalog.datasets"
-          node-key="id"
-          default-expand-all
-          :expand-on-click-node="false"
-        >
-          <template #default="{ data }">
-            <div class="tree-row">
-              <span>{{ data.name }}</span>
-              <el-tag size="small" type="info">{{
-                data.type === 'DATASET' ? '数据集' : '文件夹'
-              }}</el-tag>
-              <el-select
-                v-if="data.type === 'DATASET'"
-                :model-value="currentRelation(data)"
-                :disabled="!subjectId || savingKey === grantKey('DATASET', data.id)"
-                style="width: 140px"
-                @change="(val: string) => onChange(data, val)"
-              >
-                <el-option
-                  v-for="opt in datasetRelationOptions()"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </div>
-          </template>
-        </el-tree>
-      </el-tab-pane>
-    </el-tabs>
   </div>
 </template>
 
-<style lang="less" scoped>
-.company-admin-page {
-  padding: 16px 24px;
-}
-.page-head {
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-.help {
-  color: #646a73;
-  font-size: 13px;
-  margin: 0 0 16px;
-}
-.toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding-right: 12px;
-}
-</style>
+<style lang="less" scoped></style>

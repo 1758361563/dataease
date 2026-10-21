@@ -19,7 +19,7 @@ withDefaults(
   {}
 )
 const backToMain = () => {
-  push('/workbranch/index')
+  push('/panel/index')
 }
 const navigateBg = computed(() => appearanceStore.getNavigateBg)
 const navigate = computed(() => appearanceStore.getNavigate)
@@ -41,7 +41,7 @@ const navigate = computed(() => appearanceStore.getNavigate)
         <el-icon>
           <Icon name="icon_left_outlined"><icon_left_outlined class="svg-icon" /></Icon>
         </el-icon>
-        <span class="work">{{ t('work_branch.back_to_work_branch') }}</span>
+        <span class="work">返回仪表板</span>
       </span>
 
       <AccountOperator v-if="!desktop" />

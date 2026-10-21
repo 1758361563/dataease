@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import AdminHelp from '../AdminHelp.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router_2'
 import { ElMessage } from 'element-plus-secondary'
@@ -498,135 +499,151 @@ onMounted(async () => {
 <template>
   <div class="company-admin-page" v-loading="loading">
     <div class="page-head">
-      <span>飞书订阅</span>
+      <span class="admin-title"
+        >飞书订阅
+        <AdminHelp
+          content="按 Asia/Shanghai 调度，当前默认模拟发送。测试订阅不会真实发送。未关联 ETL 的正式订阅不校验数据是否更新；已关联任务须有覆盖业务日的成功记录，否则不发送旧图。"
+      /></span>
       <el-button @click="loadAll">刷新</el-button>
     </div>
-    <el-alert
-      type="warning"
-      :closable="false"
-      title="独立服务按 Asia/Shanghai 调度，当前默认模拟发送。测试订阅不会因为切换真实发送而真发。未关联 ETL 的正式订阅可按固定时间执行，页面显示「数据更新状态未经校验」，这不表示数据已更新。已关联任务必须有覆盖约定业务日的成功记录，否则不发送旧图。"
-      style="margin-bottom: 12px"
-    />
-    <el-tabs v-model="tab">
-      <el-tab-pane label="订阅" name="subscriptions">
-        <div class="toolbar">
-          <el-button type="primary" @click="openSubCreate()">新建订阅</el-button>
-          <span
-            v-if="route.query.dashboardId || route.query.chartId"
-            class="hint"
-            style="margin: 0 0 0 12px"
+
+    <div class="admin-panel">
+      <el-tabs v-model="tab" class="admin-tabs">
+        <el-tab-pane label="订阅" name="subscriptions">
+          <div class="toolbar">
+            <el-button type="primary" @click="openSubCreate()">新建订阅</el-button>
+            <AdminHelp
+              v-if="route.query.dashboardId || route.query.chartId"
+              :content="
+                '已按当前卡片筛选：仪表板 ' +
+                (route.query.dashboardId || '—') +
+                ' / 图表 ' +
+                (route.query.chartId || '—')
+              "
+            />
+          </div>
+          <GridTable
+            :show-pagination="false"
+            :table-data="filteredSubscriptions"
+            class="admin-grid"
           >
-            已按当前卡片筛选 dashboardId={{ route.query.dashboardId }} / chartId={{
-              route.query.chartId
-            }}
-          </span>
-        </div>
-        <GridTable :show-pagination="false" :table-data="filteredSubscriptions" class="admin-grid">
-          <el-table-column prop="name" label="名称" min-width="160" />
-          <el-table-column prop="chartName" label="卡片" min-width="140" />
-          <el-table-column prop="dashboardId" label="dashboardId" min-width="160" />
-          <el-table-column prop="chartId" label="chartId" min-width="160" />
-          <el-table-column label="状态" width="90">
-            <template #default="{ row }">{{ subscriptionStatusLabel(row.status) }}</template>
-          </el-table-column>
-          <el-table-column label="发送隔离" width="90">
-            <template #default="{ row }">{{ deliveryLaneLabel(row.deliveryLane) }}</template>
-          </el-table-column>
-          <el-table-column label="数据更新" min-width="220">
-            <template #default="{ row }">{{ dataUpdateStatusLabel(row.freshnessJson) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="340" fixed="right">
-            <template #default="{ row }">
-              <el-button text @click="openSubEdit(row)">编辑</el-button>
-              <el-button text @click="toggleSubscription(row)">
-                {{ row.status === 'ENABLED' ? '停用' : '启用' }}
-              </el-button>
-              <el-button text @click="dryRunSubscription(row)">试运行</el-button>
-              <el-button text @click="openRuns(row)">运行记录</el-button>
-            </template>
-          </el-table-column>
-        </GridTable>
-      </el-tab-pane>
-
-      <el-tab-pane label="收件人" name="recipients">
-        <div class="toolbar">
-          <el-button type="primary" @click="openEmployeeCreate">添加员工</el-button>
-          <el-button @click="openRecipientCreate">手动填写 User ID / 群聊</el-button>
-        </div>
-        <p class="hint">
-          添加员工会按姓名搜索通讯录并确认身份，自动保存可用于机器人私聊的 User
-          ID。搜索成功不等于消息已发送。群聊管理不变，仍用手动入口填写 chat_id。不会把飞书部门映射成
-          BI 用户组，也不要求对方有 BI 账号。
-        </p>
-        <GridTable :show-pagination="false" :table-data="recipients" class="admin-grid">
-          <el-table-column prop="displayName" label="名称" min-width="140" />
-          <el-table-column label="类型" width="90">
-            <template #default="{ row }">{{ recipientTypeLabel(row.recipientType) }}</template>
-          </el-table-column>
-          <el-table-column label="ID 类型" width="140">
-            <template #default="{ row }">{{ receiveIdTypeLabel(row.receiveIdType) }}</template>
-          </el-table-column>
-          <el-table-column prop="feishuId" label="飞书 ID" min-width="180" />
-          <el-table-column label="身份" width="110">
-            <template #default="{ row }">
-              <el-tag :type="isIdentityConfirmed(row.identityStatus) ? 'success' : 'info'">
-                {{ identityStatusLabel(row.identityStatus) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="发送验证" width="120">
-            <template #default="{ row }">
-              <el-tag :type="isRecipientVerified(row.verifyStatus) ? 'success' : 'info'">
-                {{ verifyStatusLabel(row.verifyStatus) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="90">
-            <template #default="{ row }">{{ row.status === 'ENABLED' ? '启用' : '停用' }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="180" fixed="right">
-            <template #default="{ row }">
-              <el-button text @click="openRecipientEdit(row)">编辑</el-button>
-              <el-button text @click="toggleRecipient(row)">
-                {{ row.status === 'ENABLED' ? '停用' : '启用' }}
-              </el-button>
-            </template>
-          </el-table-column>
-        </GridTable>
-      </el-tab-pane>
-
-      <el-tab-pane label="应用配置" name="integration">
-        <p class="hint">仅系统管理员 id=1 可修改。页面只读写环境变量名，不会回显 App Secret。</p>
-        <el-form label-width="140px" style="max-width: 560px">
-          <el-form-item label="状态">
-            {{ integration.configured ? integration.status : '未配置' }}
-            · Secret 引用 {{ integration.hasSecretRef ? '已设置' : '未设置' }}
-          </el-form-item>
-          <el-form-item label="App ID">
-            <el-input v-model="integrationForm.appId" :disabled="!canEditIntegration" />
-          </el-form-item>
-          <el-form-item label="App Secret 引用">
-            <el-input v-model="integrationForm.appSecretRef" :disabled="!canEditIntegration" />
-          </el-form-item>
-          <el-form-item label="上次检查">
-            {{ formatTime(integration.lastVerifiedAt) }}
-          </el-form-item>
-          <el-form-item>
-            <el-button v-if="canEditIntegration" type="primary" @click="saveIntegration"
-              >保存</el-button
+            <el-table-column prop="name" label="名称" min-width="160" />
+            <el-table-column label="关联卡片" min-width="240"
+              ><template #default="{ row }"
+                ><div class="card-name">{{ row.chartName || '—' }}</div>
+                <span class="admin-id" :title="'仪表板 ID：' + row.dashboardId"
+                  >Dashboard · {{ row.dashboardId }}</span
+                ><span class="admin-id" :title="'图表 ID：' + row.chartId"
+                  >Chart · {{ row.chartId }}</span
+                ></template
+              ></el-table-column
             >
-            <el-button v-if="canEditIntegration" @click="testIntegration">检查配置</el-button>
-            <span v-if="!canEditIntegration" class="hint">当前账号只能查看脱敏状态。</span>
-          </el-form-item>
-        </el-form>
-      </el-tab-pane>
-    </el-tabs>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">{{ subscriptionStatusLabel(row.status) }}</template>
+            </el-table-column>
+            <el-table-column label="发送隔离" width="90">
+              <template #default="{ row }">{{ deliveryLaneLabel(row.deliveryLane) }}</template>
+            </el-table-column>
+            <el-table-column label="数据更新" min-width="220">
+              <template #default="{ row }">{{ dataUpdateStatusLabel(row.freshnessJson) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="280" fixed="right">
+              <template #default="{ row }">
+                <el-button text @click="openSubEdit(row)">编辑</el-button>
+                <el-button text @click="toggleSubscription(row)">
+                  {{ row.status === 'ENABLED' ? '停用' : '启用' }}
+                </el-button>
+                <el-button text @click="dryRunSubscription(row)">试运行</el-button>
+                <el-button text @click="openRuns(row)">运行记录</el-button>
+              </template>
+            </el-table-column>
+          </GridTable>
+        </el-tab-pane>
 
-    <el-dialog v-model="employeeDialog" title="添加员工" width="640px">
-      <p class="hint">
-        输入姓名后查看匹配结果。同名员工会列出部门与 User ID
-        尾号，必须点选确认，不会自动取第一条。确认后只保存身份，不会发送消息。
-      </p>
+        <el-tab-pane label="收件人" name="recipients">
+          <div class="toolbar">
+            <el-button type="primary" @click="openEmployeeCreate">添加员工</el-button
+            ><AdminHelp
+              content="按姓名搜索通讯录并确认身份，保存用于机器人私聊的 User ID，不发送消息。群聊请使用手动入口。"
+            />
+            <el-button @click="openRecipientCreate">手动填写 User ID / 群聊</el-button>
+          </div>
+
+          <GridTable :show-pagination="false" :table-data="recipients" class="admin-grid">
+            <el-table-column prop="displayName" label="名称" min-width="140" />
+            <el-table-column label="类型" width="90">
+              <template #default="{ row }">{{ recipientTypeLabel(row.recipientType) }}</template>
+            </el-table-column>
+            <el-table-column label="ID 类型" width="140">
+              <template #default="{ row }">{{ receiveIdTypeLabel(row.receiveIdType) }}</template>
+            </el-table-column>
+            <el-table-column prop="feishuId" label="飞书 ID" min-width="180" />
+            <el-table-column label="身份" width="110">
+              <template #default="{ row }">
+                <el-tag :type="isIdentityConfirmed(row.identityStatus) ? 'success' : 'info'">
+                  {{ identityStatusLabel(row.identityStatus) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="发送验证" width="120">
+              <template #default="{ row }">
+                <el-tag :type="isRecipientVerified(row.verifyStatus) ? 'success' : 'info'">
+                  {{ verifyStatusLabel(row.verifyStatus) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">{{
+                row.status === 'ENABLED' ? '启用' : '停用'
+              }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" fixed="right">
+              <template #default="{ row }">
+                <el-button text @click="openRecipientEdit(row)">编辑</el-button>
+                <el-button text @click="toggleRecipient(row)">
+                  {{ row.status === 'ENABLED' ? '停用' : '启用' }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </GridTable>
+        </el-tab-pane>
+
+        <el-tab-pane label="应用配置" name="integration">
+          <div class="settings-help">
+            <AdminHelp content="仅系统初始管理员可修改。只读写环境变量名，不会回显 App Secret。" />
+          </div>
+          <el-form label-width="140px" class="integration-form">
+            <el-form-item label="状态">
+              {{ integration.configured ? integration.status : '未配置' }}
+              · Secret 引用 {{ integration.hasSecretRef ? '已设置' : '未设置' }}
+            </el-form-item>
+            <el-form-item label="App ID">
+              <el-input v-model="integrationForm.appId" :disabled="!canEditIntegration" />
+            </el-form-item>
+            <el-form-item label="App Secret 引用">
+              <el-input v-model="integrationForm.appSecretRef" :disabled="!canEditIntegration" />
+            </el-form-item>
+            <el-form-item label="上次检查">
+              {{ formatTime(integration.lastVerifiedAt) }}
+            </el-form-item>
+            <el-form-item>
+              <el-button v-if="canEditIntegration" type="primary" @click="saveIntegration"
+                >保存</el-button
+              >
+              <el-button v-if="canEditIntegration" @click="testIntegration">检查配置</el-button>
+              <AdminHelp v-if="!canEditIntegration" content="当前账号只能查看脱敏状态。" />
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
+
+    <el-drawer class="company-admin-drawer" v-model="employeeDialog" title="添加员工" size="640px">
+      <div class="settings-help">
+        <AdminHelp
+          content="搜索后须点选确认身份；同名员工会列出部门与 User ID 尾号，不会自动选取。确认只保存身份，不发送消息。"
+        />
+      </div>
       <el-form label-width="80px" @submit.prevent="searchEmployees">
         <el-form-item label="姓名" required>
           <div class="employee-search">
@@ -670,12 +687,13 @@ onMounted(async () => {
           确认身份
         </el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
 
-    <el-dialog
+    <el-drawer
+      class="company-admin-drawer"
       v-model="recipientDialog"
       :title="recipientForm.id ? '编辑收件人' : '手动填写 User ID / 群聊'"
-      width="520px"
+      size="520px"
     >
       <el-form label-width="120px">
         <el-form-item label="显示名" required>
@@ -701,9 +719,14 @@ onMounted(async () => {
         <el-button @click="recipientDialog = false">取消</el-button>
         <el-button type="primary" @click="submitRecipient">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
 
-    <el-drawer v-model="subDrawer" :title="subForm.id ? '编辑订阅' : '创建订阅'" size="560px">
+    <el-drawer
+      class="company-admin-drawer"
+      v-model="subDrawer"
+      :title="subForm.id ? '编辑订阅' : '创建订阅'"
+      size="560px"
+    >
       <el-form label-width="120px">
         <el-form-item label="订阅名称" required>
           <el-input v-model="subForm.name" />
@@ -763,10 +786,10 @@ onMounted(async () => {
         </el-form-item>
         <el-form-item v-if="subForm.scheduleKind !== 'manual'" label="自动触发">
           <el-switch v-model="subForm.autoRun" />
-          <span class="hint" style="margin-left: 8px">本机 dry-run，不会真实发送</span>
+          <AdminHelp content="本机模拟运行，不会真实发送。" />
         </el-form-item>
         <el-form-item>
-          <span class="hint">时区固定 Asia/Shanghai。同一计划时刻只会生成一条 SCHEDULED run。</span>
+          <AdminHelp content="时区固定 Asia/Shanghai。同一计划时刻只生成一条计划执行记录。" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -775,7 +798,7 @@ onMounted(async () => {
       </template>
     </el-drawer>
 
-    <el-drawer v-model="runDrawer" title="运行记录" size="640px">
+    <el-drawer class="company-admin-drawer" v-model="runDrawer" title="运行记录" size="640px">
       <p class="hint" v-if="polling">正在查询执行状态…</p>
       <GridTable :show-pagination="false" :table-data="runRows" class="admin-grid">
         <el-table-column prop="runId" label="runId" min-width="160">
@@ -813,31 +836,12 @@ onMounted(async () => {
 </template>
 
 <style lang="less" scoped>
-.company-admin-page {
-  padding: 16px 24px;
-}
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 16px;
-}
-.toolbar {
-  margin-bottom: 12px;
-}
-.hint {
-  color: #646a73;
-  font-size: 12px;
-  margin: 0 0 12px;
-}
 .employee-search {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
 }
 .run-detail {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 </style>

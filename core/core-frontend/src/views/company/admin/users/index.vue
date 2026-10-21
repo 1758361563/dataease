@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import AdminHelp from '../AdminHelp.vue'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import GridTable from '@/components/grid-table/src/GridTable.vue'
@@ -95,7 +96,7 @@ const afterSelfRoleLost = async (userId: string) => {
   }
   await companyStore.refreshCapabilities()
   if (!companyStore.hasCapability('USER_MANAGE')) {
-    window.location.hash = '#/workbranch/index'
+    window.location.hash = '#/panel/index'
     window.location.reload()
   }
 }
@@ -155,7 +156,9 @@ onMounted(load)
 <template>
   <div class="company-admin-page" v-loading="loading">
     <div class="page-head">
-      <span>用户管理</span>
+      <span class="admin-title"
+        >用户管理 <AdminHelp content="系统初始管理员不可禁用或降级。"
+      /></span>
       <el-button type="primary" @click="createVisible = true">新建用户</el-button>
     </div>
     <GridTable :show-pagination="false" :table-data="users" class="admin-grid">
@@ -216,15 +219,14 @@ onMounted(load)
         </template>
       </el-table-column>
     </GridTable>
-    <el-tooltip
-      v-if="users.some(isBootstrap)"
-      content="系统初始管理员不可禁用或降级。"
-      placement="top"
-    >
-      <span class="hint">uid=1 为系统初始管理员，禁用与降级按钮已锁定。</span>
-    </el-tooltip>
 
-    <el-dialog v-model="createVisible" title="新建用户" width="480px" @closed="resetCreate">
+    <el-drawer
+      class="company-admin-drawer"
+      v-model="createVisible"
+      title="新建用户"
+      size="480px"
+      @closed="resetCreate"
+    >
       <el-form label-width="100px">
         <el-form-item label="用户名" required>
           <el-input v-model="createForm.username" />
@@ -255,9 +257,9 @@ onMounted(load)
         <el-button @click="createVisible = false">取消</el-button>
         <el-button type="primary" @click="submitCreate">创建</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
 
-    <el-dialog v-model="editVisible" title="编辑用户" width="480px">
+    <el-drawer class="company-admin-drawer" v-model="editVisible" title="编辑用户" size="480px">
       <el-form label-width="100px">
         <el-form-item label="用户名">
           <el-input v-model="editForm.username" />
@@ -270,9 +272,9 @@ onMounted(load)
         <el-button @click="editVisible = false">取消</el-button>
         <el-button type="primary" @click="submitEdit">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
 
-    <el-dialog v-model="pwdVisible" title="重置密码" width="480px">
+    <el-drawer class="company-admin-drawer" v-model="pwdVisible" title="重置密码" size="480px">
       <el-form label-width="120px">
         <el-form-item label="新临时密码">
           <el-input
@@ -295,26 +297,8 @@ onMounted(load)
         <el-button @click="pwdVisible = false">取消</el-button>
         <el-button type="primary" @click="submitPwd">重置</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
   </div>
 </template>
 
-<style lang="less" scoped>
-.company-admin-page {
-  padding: 16px 24px;
-}
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 16px;
-}
-.hint {
-  display: inline-block;
-  margin-top: 12px;
-  color: #646a73;
-  font-size: 12px;
-}
-</style>
+<style lang="less" scoped></style>

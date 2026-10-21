@@ -60,7 +60,7 @@ const rules = reactive<FormRules>({
 const activeName = ref('simple')
 
 const getCurLocation = () => {
-  let queryRedirectPath = '/workbranch/index'
+  let queryRedirectPath = '/panel/index'
   if (router.currentRoute.value.query.redirect) {
     queryRedirectPath = router.currentRoute.value.query.redirect as string
   }

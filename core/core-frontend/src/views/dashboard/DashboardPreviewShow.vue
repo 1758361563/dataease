@@ -126,6 +126,7 @@ const loadCanvasData = (dvId, weight?) => {
       state.canvasViewInfoPreview = canvasViewInfoPreview
       state.dvInfo = dvInfo
       state.curPreviewGap = curPreviewGap
+      useEmitt().emitter.emit('dashboard-opened', { id: String(dvId) })
       dataInitState.value = true
       nextTick(() => {
         dashboardPreview.value.restore()

@@ -217,7 +217,7 @@ service.interceptors.response.use(
         })
         if (response.data.code === 80001) {
           clearCache()
-          let queryRedirectPath = '/workbranch/index'
+          let queryRedirectPath = '/panel/index'
           if (router.currentRoute.value.fullPath) {
             queryRedirectPath = router.currentRoute.value.fullPath as string
           }
@@ -291,7 +291,7 @@ service.interceptors.response.use(
         const flag = header.get('DE-GATEWAY-FLAG')
         localStorage.setItem('DE-GATEWAY-FLAG', flag.toString())
       }
-      let queryRedirectPath = '/workbranch/index'
+      let queryRedirectPath = '/panel/index'
       if (router.currentRoute.value.fullPath) {
         queryRedirectPath = router.currentRoute.value.fullPath as string
       }

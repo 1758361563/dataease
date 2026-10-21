@@ -2,7 +2,6 @@
 import logo from '@/assets/svg/logo.svg'
 import logo_sqlbot from '@/assets/svg/logo_sqlbot.svg'
 import msgNotice from '@/assets/svg/icon_notification_outlined.svg'
-import dvAi from '@/assets/svg/dv-ai.svg'
 import dvPreviewDownload from '@/assets/svg/icon_download_outlined.svg'
 import { computed, onMounted, ref } from 'vue'
 import { usePermissionStore } from '@/store/modules/permission'
@@ -14,14 +13,10 @@ import { Icon } from '@/components/icon-custom'
 import SystemCfg from './SystemCfg.vue'
 import ToolboxCfg from './ToolboxCfg.vue'
 import { useRouter, useRoute } from 'vue-router_2'
-import TopDoc from '@/layout/components/TopDoc.vue'
 import AccountOperator from '@/layout/components/AccountOperator.vue'
 import { isDesktop } from '@/utils/ModelUtil'
 import { XpackComponent } from '@/components/plugin'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
-import AiComponent from '@/layout/components/AiComponent.vue'
-import { findBaseParams } from '@/api/aiComponent'
-import AiTips from '@/layout/components/AiTips.vue'
 import DesktopSetting from './DesktopSetting.vue'
 import request from '@/config/axios'
 
@@ -32,15 +27,11 @@ import { useCache } from '@/hooks/web/useCache'
 import { useI18n } from '@/hooks/web/useI18n'
 import { msgCountApi } from '@/api/msg'
 const { wsCache } = useCache('localStorage')
-const aiBaseUrl = ref('https://maxkb.fit2cloud.com/ui/chat/2ddd8b594ce09dbb?mode=embed')
 const handleIconClick = () => {
-  if (route.path === '/workbranch/index') return
-  push('/workbranch/index')
+  if (route.path === '/panel/index') return
+  push('/panel/index')
 }
 
-const handleAiClick = () => {
-  useEmitt().emitter.emit('aiComponentChange')
-}
 const { t } = useI18n()
 
 const handleSQLBotClick = () => {
@@ -59,11 +50,12 @@ const permissionStore = usePermissionStore()
 const downloadClick = params => {
   useEmitt().emitter.emit('data-export-center', params)
 }
-const routers: any[] = formatRoute(permissionStore.getRoutersNotHidden as AppCustomRouteRecordRaw[])
+const routers: any[] = formatRoute(
+  permissionStore.getRoutersNotHidden as AppCustomRouteRecordRaw[]
+).filter(item => !/^\/(?:workbranch|screen)(?:\/|$)/.test(item.path))
 const showSystem = ref(false)
 const showMsg = ref(false)
 const showToolbox = ref(false)
-const showOverlay = ref(false)
 const handleSelect = (index: string) => {
   // 自定义事件
   if (isExternal(index)) {
@@ -85,28 +77,6 @@ const initShowToolbox = () => {
 const navigateBg = computed(() => appearanceStore.getNavigateBg)
 const navigate = computed(() => appearanceStore.getNavigate)
 
-const initAiBase = async () => {
-  // const aiTipsCheck = wsCache.get('DE-AI-TIPS-CHECK')
-  // if (aiTipsCheck === 'CHECKED') {
-  //   showOverlay.value = false
-  // } else {
-  //   showOverlay.value = true
-  // }
-  await findBaseParams().then(rsp => {
-    const params = rsp.data
-    if (params && params['ai.baseUrl']) {
-      aiBaseUrl.value = params['ai.baseUrl']
-    } else {
-      aiBaseUrl.value = null
-    }
-  })
-}
-
-const aiTipsConfirm = () => {
-  wsCache.set('DE-AI-TIPS-CHECK', 'CHECKED')
-  showOverlay.value = false
-}
-
 const msgNoticePush = () => {
   push('/msg/msg-fill')
 }
@@ -126,7 +96,6 @@ onMounted(() => {
   initShowSystem()
   initShowToolbox()
   initShowMsg()
-  initAiBase()
 
   msgCountApi().then(res => {
     badgeCount.value = (res?.data > 99 ? '99+' : res?.data) || '0'
@@ -156,15 +125,7 @@ onMounted(() => {
           <Icon name="copilot"><logo_sqlbot @click="handleSQLBotClick" class="svg-icon" /></Icon>
         </el-icon>
       </el-tooltip>
-      <el-tooltip offset="10" effect="dark" :content="t('commons.assistant')" placement="bottom">
-        <el-icon
-          style="margin: 0 10px"
-          class="ai-icon"
-          v-if="aiBaseUrl && !showOverlay && appearanceStore.getShowAi"
-        >
-          <Icon name="dv-ai"><dvAi @click="handleAiClick" class="svg-icon" /></Icon>
-        </el-icon>
-      </el-tooltip>
+
       <el-tooltip
         offset="10"
         effect="dark"
@@ -181,13 +142,7 @@ onMounted(() => {
         </el-icon>
       </el-tooltip>
 
-      <ai-tips
-        @confirm="aiTipsConfirm"
-        v-if="showOverlay && appearanceStore.getShowAi"
-        class="ai-icon-tips"
-      />
       <ToolboxCfg v-if="showToolbox" />
-      <TopDoc v-if="appearanceStore.getShowDoc" />
       <el-tooltip
         v-if="showMsg"
         effect="dark"
@@ -212,11 +167,6 @@ onMounted(() => {
 
       <SystemCfg v-if="showSystem" />
       <AccountOperator />
-      <ai-component
-        v-if="aiBaseUrl && appearanceStore.getShowAi"
-        :base-url="aiBaseUrl"
-      ></ai-component>
-      <div v-if="showOverlay && appearanceStore.getShowAi" class="overlay"></div>
     </div>
     <div v-else class="operate-setting">
       <desktop-setting />
