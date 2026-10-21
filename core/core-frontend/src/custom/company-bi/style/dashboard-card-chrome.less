@@ -47,7 +47,7 @@
       padding: 0;
       border: 0;
       border-radius: 0 0 4px 4px;
-      background: #edeef1;
+      background: var(--bi-bg-subtle);
       cursor: move;
       opacity: 0;
       pointer-events: none;
@@ -67,19 +67,19 @@
     }
 
     .bi-card-drag-handle:hover {
-      background: #e0e2e6;
+      background: var(--bi-bg-pressed);
     }
 
     .bi-card-drag-handle:hover .bi-drag-dot {
-      background: #667085;
+      background: var(--bi-text-secondary);
     }
 
     .bi-card-drag-handle.is-dragging {
-      background: #eff6ff;
+      background: var(--bi-bg-hover);
     }
 
     .bi-card-drag-handle.is-dragging .bi-drag-dot {
-      background: #2563eb;
+      background: var(--bi-primary);
     }
 
     .bi-drag-dot {
@@ -87,7 +87,7 @@
       height: 3px;
       flex: 0 0 auto;
       border-radius: 50%;
-      background: #98a2b3;
+      background: var(--bi-text-placeholder);
     }
 
     .bi-card-finish {
@@ -100,15 +100,15 @@
       padding: 0 10px;
       border: 0;
       border-radius: 8px;
-      color: #2563eb;
-      background: #eff6ff;
+      color: var(--bi-primary);
+      background: var(--bi-bg-hover);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
     }
 
     .bi-card-finish:hover {
-      background: #dbeafe;
+      background: var(--bi-bg-pressed);
     }
 
     .bi-card-finish__check {
@@ -189,7 +189,7 @@
 
     .bi-card-resize-handle path {
       fill: none;
-      stroke: #98a2b3;
+      stroke: var(--bi-text-placeholder);
       stroke-width: 1.5;
       stroke-linecap: round;
       pointer-events: none;
@@ -201,7 +201,7 @@
 
     .bi-card-resize-handle:hover path,
     .bi-card-resize-handle.is-resizing path {
-      stroke: #2563eb;
+      stroke: var(--bi-primary);
     }
 
     &.bi-card-chrome-on {

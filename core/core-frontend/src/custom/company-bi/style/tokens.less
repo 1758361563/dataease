@@ -16,25 +16,29 @@
   --bi-radius-sm: 6px;
   --bi-radius-md: 10px;
   --bi-radius-lg: 14px;
-  --bi-border: #e5e7eb;
-  --bi-border-strong: #d8dce3;
-  --bi-bg-page: #f5f6f8;
+  --bi-border: #e7ecf2;
+  --bi-border-strong: #d8e1ee;
+  --bi-bg-page: #f4f6f9;
   --bi-bg-surface: #ffffff;
-  --bi-text-primary: #1f2329;
-  --bi-text-secondary: #646a73;
-  --bi-shadow-card: 0 1px 3px rgba(31, 35, 41, 0.08);
-  --bi-shadow-overlay: 0 8px 24px rgba(31, 35, 41, 0.12);
+  --bi-bg-subtle: #f3f5f8;
+  --bi-bg-soft: #fafbfd;
+  --bi-bg-hover: #edf3fb;
+  --bi-bg-pressed: #e3ebf7;
+  --bi-text-primary: #37465f;
+  --bi-text-secondary: #64748b;
+  --bi-text-muted: #7b879b;
+  --bi-text-placeholder: #98a4b7;
+  --bi-shadow-card: 0 1px 3px rgba(55, 70, 95, 0.06);
+  --bi-shadow-overlay: 0 8px 24px rgba(55, 70, 95, 0.1);
   /* ---- Indicator card tokens ---- */
   --bi-card-bg: #ffffff;
   --bi-card-radius: 12px;
-  --bi-card-border: #e4e7ec;
-  --bi-card-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.04),
-    0 4px 12px rgba(16, 24, 40, 0.06);
-  --bi-card-title-color: #4a5160;
+  --bi-card-border: var(--bi-border);
+  --bi-card-shadow: 0 1px 2px rgba(55, 70, 95, 0.03), 0 4px 12px rgba(55, 70, 95, 0.05);
+  --bi-card-title-color: #475569;
   --bi-card-value-color: var(--ed-color-primary, #2563eb);
-  --bi-card-secondary-color: #5a6170;
-  --bi-card-divider: #e7e9ee;
+  --bi-card-secondary-color: var(--bi-text-secondary);
+  --bi-card-divider: #e9edf3;
   /* ---- Trend colors (reserved; not applied to compare arrows by default) ---- */
   --bi-up: #e5484d;
   --bi-down: #30a46c;
@@ -77,4 +81,20 @@
   --ed-color-primary-33: rgba(37, 99, 235, 0.2) !important;
   --ed-color-primary-99: rgba(37, 99, 235, 0.45) !important;
   --ed-color-primary_b50: #eff4ff !important;
+}
+
+/* Dashboard chrome shares the palette; dataV and the management pages keep
+   their existing component fill/text theme. Explicit component styles win. */
+.dashboard-editor,
+.dashboard-preview-layout,
+.dashboard-editor-layout {
+  --ed-fill-color: var(--bi-bg-subtle);
+  --ed-fill-color-light: var(--bi-bg-subtle);
+  --ed-fill-color-lighter: var(--bi-bg-soft);
+  --ed-fill-color-extra-light: var(--bi-bg-soft);
+  --ed-bg-color-page: var(--bi-bg-page);
+  --ed-text-color-primary: var(--bi-text-primary);
+  --ed-text-color-regular: var(--bi-text-primary);
+  --ed-text-color-secondary: var(--bi-text-secondary);
+  --ed-text-color-placeholder: var(--bi-text-placeholder);
 }

@@ -4,6 +4,7 @@ import {
   dashboardParameterRuntime
 } from '@/utils/dashboardParameterRuntime'
 import eventBus from '@/utils/eventBus'
+import { migrateQueryAppearance, readableQuerySize } from '@/utils/queryAppearance'
 import colorFunctions from 'less/lib/less/functions/color.js'
 import colorTree from 'less/lib/less/tree/color.js'
 import { isISOMobile, isMobile } from '@/utils/utils'
@@ -86,7 +87,7 @@ const canEdit = ref(false)
 const queryConfig = ref()
 const defaultStyle = {
   border: '',
-  placeholderSize: 16,
+  placeholderSize: 13,
   placeholderShow: true,
   background: '',
   text: '',
@@ -98,17 +99,17 @@ const defaultStyle = {
   textColorShow: false,
   labelShow: true,
   title: '',
-  labelColor: '#1f2329',
-  fontSize: '16',
+  labelColor: '#64748B',
+  fontSize: '12',
   fontWeight: '',
   fontStyle: '',
   fontSizeBtn: '14',
   fontWeightBtn: '',
   fontStyleBtn: '',
-  queryConditionWidth: 227,
-  nameboxSpacing: 8,
-  queryConditionSpacing: 16,
-  queryConditionHeight: 36,
+  queryConditionWidth: 180,
+  nameboxSpacing: 6,
+  queryConditionSpacing: 18,
+  queryConditionHeight: 32,
   btnColor: '#3370ff',
   labelColorBtn: '#ffffff'
 }
@@ -249,6 +250,7 @@ const curComponentView = computed(() => {
 const { datasetFieldList } = comInfo()
 
 const setCustomStyle = val => {
+  migrateQueryAppearance(val, element.value.propValue)
   const {
     borderColor,
     btnList,
@@ -281,17 +283,11 @@ const setCustomStyle = val => {
   customStyle.btnList = [...(btnList || [])]
   customStyle.layout = layout
   customStyle.placeholderShow = placeholderShow ?? true
-  customStyle.placeholderSize = placeholderSize ?? 16
-  nextTick(() => {
-    vQueryRef.value.style.setProperty(
-      '--ed-component-size',
-      `${customStyle.placeholderSize + 18}px`
-    )
-  })
+  customStyle.placeholderSize = placeholderSize ?? 13
   customStyle.titleShow = titleShow
   customStyle.titleColor = titleColor
   customStyle.labelColor = labelShow ? labelColor || '' : ''
-  customStyle.fontSize = labelShow ? fontSize || '14' : '14'
+  customStyle.fontSize = labelShow ? fontSize || '12' : '12'
   customStyle.fontWeight = labelShow ? fontWeight || '' : ''
   customStyle.fontStyle = labelShow ? fontStyle || '' : ''
   customStyle.title = title
@@ -300,10 +296,10 @@ const setCustomStyle = val => {
   customStyle.fontSizeBtn = fontSizeBtn || '14'
   customStyle.fontWeightBtn = fontWeightBtn
   customStyle.fontStyleBtn = fontStyleBtn
-  customStyle.queryConditionWidth = queryConditionWidth ?? 227
-  customStyle.nameboxSpacing = nameboxSpacing ?? 8
-  customStyle.queryConditionSpacing = queryConditionSpacing ?? 16
-  customStyle.queryConditionHeight = queryConditionHeight ?? 36
+  customStyle.queryConditionWidth = queryConditionWidth ?? 180
+  customStyle.nameboxSpacing = nameboxSpacing ?? 6
+  customStyle.queryConditionSpacing = queryConditionSpacing ?? 18
+  customStyle.queryConditionHeight = queryConditionHeight ?? 32
   customStyle.labelColorBtn = labelColorBtn || '#ffffff'
   customStyle.labelShow = labelShow ?? true
   customStyle.btnColor = btnColor || '#3370ff'
@@ -559,6 +555,7 @@ provide('release-unmount-select', releaseSelect)
 provide('query-data-for-id', queryDataForId)
 provide('query-data-for-id-tree', isConfirmSearchNoRequiredName)
 provide('com-width', getQueryConditionWidth)
+provide('readable-query-width', (width: number) => displaySize(width, 150))
 provide('cascade-list', getCascadeList)
 provide('placeholder', getPlaceholder)
 
@@ -899,13 +896,21 @@ watch(
   }
 )
 
-const boxWidth = computed(() => {
-  return `${customStyle.placeholderSize}px`
-})
+const keepControlsReadable = computed(() => isDashboard() && !mobileInPc.value && !isISOMobile())
+const displaySize = (value, baseline) =>
+  readableQuerySize(value, baseline, scale.value, keepControlsReadable.value)
+const boxWidth = computed(() => `${displaySize(customStyle.placeholderSize, 13)}px`)
 
 const boxHeight = computed(() => {
-  return `${customStyle.queryConditionHeight || 32}px`
+  return `${displaySize(customStyle.queryConditionHeight, 32)}px`
 })
+const controlTextColor = computed(() => customStyle.text || 'var(--ed-text-color-primary, #36465d)')
+const controlBorderColor = computed(
+  () => customStyle.border || 'var(--ed-border-color-lighter, #e2e8f0)'
+)
+const controlBackground = computed(
+  () => customStyle.background || 'var(--ed-fill-color-blank, #fff)'
+)
 
 const queryData = () => {
   let requiredName = ''
@@ -996,9 +1001,10 @@ const titleStyle = computed(() => {
 })
 
 const labelStyle = computed(() => {
+  const fontSize = displaySize(customStyle.fontSize, 12)
   const style = {
-    fontSize: customStyle.fontSize + 'px',
-    lineHeight: +customStyle.fontSize + 8 + 'px'
+    fontSize: fontSize + 'px',
+    lineHeight: fontSize + 8 + 'px'
   } as CSSProperties
   if (customStyle.fontWeight) {
     style.fontWeight = customStyle.fontWeight
@@ -1020,7 +1026,10 @@ const comLayout = computed(() => {
 
 const paddingTop = computed<CSSProperties>(() => {
   return {
-    paddingTop: comLayout.value !== 'horizontal' ? customStyle.nameboxSpacing + 22 + 'px' : '0'
+    paddingTop:
+      comLayout.value !== 'horizontal'
+        ? Number(customStyle.nameboxSpacing) + displaySize(customStyle.fontSize, 12) + 8 + 'px'
+        : '0'
   }
 })
 
@@ -1102,7 +1111,10 @@ const autoStyle = computed(() => {
             </div>
           </div>
         </div>
-        <div class="query-button" v-if="!!listVisible.length">
+        <div
+          class="query-button"
+          v-if="!!listVisible.length && (customStyle.btnList.length > 0 || componentWithSure)"
+        >
           <el-button
             @click.stop="clearData"
             :style="btnPlainStyle"
@@ -1144,11 +1156,31 @@ const autoStyle = computed(() => {
 
 <style lang="less" scoped>
 .v-query-container {
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
   overflow: auto;
   position: relative;
   --ed-font-size-base: v-bind(boxWidth);
+  --ed-component-size: v-bind(boxHeight);
+  --ed-border-radius-base: 6px;
+  --ed-input-text-color: v-bind(controlTextColor);
+  --ed-text-color-regular: v-bind(controlTextColor);
+  --ed-border-color: v-bind(controlBorderColor);
+  --ed-border-color-light: v-bind(controlBorderColor);
+
+  :deep(:is(.ed-input__wrapper, .ed-select__wrapper, .ed-date-editor)) {
+    border-radius: 6px;
+    background-color: v-bind(controlBackground);
+  }
+  :deep(:is(.ed-input__inner, .ed-range-input, .ed-range-separator)) {
+    font-size: v-bind(boxWidth);
+    font-variant-numeric: tabular-nums;
+  }
+  :deep(.flat-select .select-item) {
+    font-size: v-bind(boxWidth) !important;
+    height: v-bind(boxHeight);
+  }
 
   :deep(.ed-select-v2 .ed-select-v2__selection .ed-tag),
   :deep(.select-trigger .ed-select__tags .ed-tag) {
@@ -1228,6 +1260,7 @@ const autoStyle = computed(() => {
   }
 }
 .v-query {
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
   line-height: 1.5;
@@ -1236,21 +1269,26 @@ const autoStyle = computed(() => {
   position: relative;
   display: flex;
   margin: auto 0;
-  padding: 16px 4px 4px 4px;
+  padding: 8px 4px;
   .query-fields-container {
     display: flex;
     flex-wrap: wrap;
     width: 100%;
-    height: 100%;
+    height: auto;
+    align-content: flex-start;
+    row-gap: 10px;
   }
   .query-item {
     position: relative;
     line-height: 28px;
-    margin: 5px 16px 5px 0;
+    flex: 0 1 auto;
+    margin: 0 18px 0 0;
     max-width: 100%;
     min-width: 60px;
     .query-field {
       position: relative;
+      min-width: 0;
+      max-width: 100%;
       .label {
         display: flex;
         overflow: hidden;
@@ -1295,8 +1333,15 @@ const autoStyle = computed(() => {
       .query-select {
         display: flex;
         flex-wrap: wrap;
+        min-width: 0;
+        max-width: 100%;
+        flex-shrink: 1;
         line-height: 28px;
         position: relative;
+
+        :deep(:is(.ed-date-editor, .ed-select, .ed-select-v2, .ed-input)) {
+          max-width: 100%;
+        }
 
         :deep(.ed-date-editor) {
           .ed-input__wrapper {
@@ -1307,9 +1352,9 @@ const autoStyle = computed(() => {
     }
   }
   .query-button {
-    align-self: flex-end;
-    line-height: 40px;
-    margin: auto 0 5px auto;
+    align-self: center;
+    line-height: 1.5;
+    margin: 0 0 0 auto;
     z-index: 0;
   }
 
@@ -1324,7 +1369,7 @@ const autoStyle = computed(() => {
 
         .label {
           align-items: center;
-          height: 16px;
+          height: auto;
           left: 0;
           line-height: 16px;
           max-width: 100%;

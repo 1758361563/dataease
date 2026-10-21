@@ -183,15 +183,17 @@ const init = () => {
 }
 
 const queryConditionWidth = inject('com-width', Function, true)
-const getCustomWidth = () => {
+const getConfiguredWidth = () => {
   if (placeholder?.value?.placeholderShow) {
     if (props.config.queryConditionWidth === undefined) {
       return queryConditionWidth()
     }
     return props.config.queryConditionWidth
   }
-  return 227
+  return 180
 }
+const readableWidth = inject<(width: number) => number>('readable-query-width', width => width)
+const getCustomWidth = () => readableWidth(getConfiguredWidth())
 const isConfirmSearch = inject('is-confirm-search', Function, true)
 const selectStyle = computed(() => {
   return props.isConfig

@@ -180,6 +180,7 @@ import ChartCarouselTooltip from '@/views/chart/components/js/g2plot_tooltip_car
 import { debounce } from 'lodash-es'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { CommonBackground } from '@/components/visualization/component-background/Types'
+import { dashboardUiColor } from '@/custom/company-bi/utils/dashboardUiPalette'
 import { ShorthandMode } from '@/Types'
 import { checkFilterRemove } from '@/custom-component/v-query/QueryUtils'
 const dvMainStore = dvMainStoreWithOut()
@@ -608,7 +609,10 @@ const backgroundStyle = backgroundParams => {
     }
     let colorRGBA = ''
     if (backgroundColorSelect && backgroundColor) {
-      colorRGBA = backgroundColor
+      colorRGBA =
+        isDashboard() && !backgroundImageEnable
+          ? dashboardUiColor(backgroundColor, 'surface')
+          : backgroundColor
     }
     if (backgroundImageEnable) {
       if (backgroundType === 'outerImage' && typeof outerImage === 'string') {
@@ -672,9 +676,11 @@ const fontColor = computed(() => {
     element.value.style.headFontColor &&
     typeof element.value.style.headFontColor === 'string'
   ) {
-    return element.value.style.headFontColor
+    return isDashboard()
+      ? dashboardUiColor(element.value.style.headFontColor, 'muted')
+      : element.value.style.headFontColor
   } else {
-    return 'none'
+    return isDashboard() ? dashboardUiColor('', 'muted') : 'none'
   }
 })
 
@@ -685,9 +691,11 @@ const activeColor = computed(() => {
     element.value.style.headFontActiveColor &&
     typeof element.value.style.headFontActiveColor === 'string'
   ) {
-    return element.value.style.headFontActiveColor
+    return isDashboard()
+      ? dashboardUiColor(element.value.style.headFontActiveColor, 'text')
+      : element.value.style.headFontActiveColor
   } else {
-    return 'none'
+    return isDashboard() ? dashboardUiColor('', 'text') : 'none'
   }
 })
 

@@ -95,10 +95,6 @@ const apply = () => {
 const changed = () => {
   if (!buttons.value) apply()
 }
-const clear = () => {
-  runtime.draft = { ...runtime.defaults }
-  changed()
-}
 const open = () => {
   if (!info.value.id) {
     ElMessage.info('请先保存仪表板')
@@ -319,14 +315,19 @@ useEmitt({
 </script>
 
 <template>
-  <div v-if="hasParameters" class="dashboard-parameter-bar" @mousedown.stop>
+  <div
+    v-if="hasParameters"
+    class="dashboard-parameter-bar"
+    :class="{ 'is-collapsible': collapsible }"
+    @mousedown.stop
+  >
     <template v-if="!collapsible || !collapsed">
       <label
         v-for="parameter in runtime.config.parameters"
         :key="parameter.id"
         class="parameter-control"
       >
-        <span>{{ parameter.name }}</span>
+        <span class="parameter-name" :title="parameter.name">{{ parameter.name }}</span>
         <el-date-picker
           v-model="runtime.draft[parameter.id]"
           type="date"
@@ -336,7 +337,6 @@ useEmitt({
           @change="changed"
         />
       </label>
-      <el-button @click="clear">重置</el-button>
       <span v-if="buttons && dirty" class="pending">点击筛选器的查询按钮后生效</span>
     </template>
     <span v-else class="field-hint"
@@ -638,22 +638,48 @@ useEmitt({
 
 <style scoped lang="less">
 .dashboard-parameter-bar {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color);
+  gap: 10px 18px;
+  min-width: 0;
+  padding: 12px 20px;
+  background: var(--el-bg-color, #fff);
+  border-bottom: 1px solid var(--el-border-color-lighter, #e9edf3);
+  font-family: inherit;
+  font-size: 13px;
+  &.is-collapsible {
+    padding-right: 56px;
+  }
 }
 .parameter-control {
+  // Each name and its input wrap together, regardless of the parameter name.
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+.parameter-name {
+  min-width: 0;
+  max-width: 180px;
+  overflow-wrap: anywhere;
+  color: var(--el-text-color-regular, #64748b);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
 }
 .collapse-parameters {
-  margin-left: auto;
-  flex-shrink: 0;
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  color: var(--el-text-color-secondary, #8b97a9);
   :deep(svg) {
     width: 16px;
     height: 16px;
@@ -663,8 +689,41 @@ useEmitt({
   transform: rotate(180deg);
 }
 .parameter-control :deep(:is(.el-date-editor, .ed-date-editor)) {
-  width: 180px;
-  flex-shrink: 0;
+  width: 150px;
+  height: 32px;
+  flex: 0 0 150px;
+  font-size: 13px;
+}
+.parameter-control :deep(:is(.el-input__wrapper, .ed-input__wrapper)) {
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--el-fill-color-blank, #fff);
+  box-shadow: 0 0 0 1px var(--el-border-color-lighter, #e2e8f0) inset;
+  &:hover {
+    box-shadow: 0 0 0 1px var(--el-border-color, #bac7db) inset;
+  }
+  &.is-focus {
+    box-shadow: 0 0 0 1px var(--el-color-primary, #8297ef) inset;
+  }
+}
+.parameter-control :deep(:is(.el-input__inner, .ed-input__inner)) {
+  height: 30px;
+  line-height: 30px;
+  color: var(--el-text-color-primary, #36465d);
+  font-size: 13px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.parameter-control :deep(:is(.el-input__prefix, .ed-input__prefix)) {
+  color: var(--el-text-color-placeholder, #9aa7ba);
+}
+.dashboard-parameter-bar > .pending {
+  flex-basis: 100%;
+}
+.dashboard-parameter-bar > .field-hint {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
 }
 .dashboard-calculation-drawer {
   :deep(:is(.el-drawer__header, .ed-drawer__header)) {

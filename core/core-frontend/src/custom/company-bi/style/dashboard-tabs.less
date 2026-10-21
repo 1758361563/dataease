@@ -4,8 +4,7 @@
  * Official DeTabs renders an el-tabs (line type) with an underline active bar.
  * This layer restyles the chrome into a modern segmented control: tabs sit in
  * a rounded gray track, the active tab is a white pill with a soft shadow.
- * Colors are intentionally fixed to company tokens (design-system default
- * beats per-component font color config here).
+ * Default colors share dashboard tokens; explicit per-component colors win.
  *
  * The "+" add-tab button is pinned right after the last tab instead of the
  * element-plus default `float: right` at the far end of the header row, where
@@ -60,7 +59,7 @@
       gap: 2px;
       padding: 3px;
       border-radius: var(--bi-radius-md);
-      background: rgba(31, 35, 41, 0.05);
+      background: var(--bi-bg-subtle);
     }
 
     .ed-tabs__item {
@@ -71,17 +70,17 @@
       border: none;
       border-radius: var(--bi-radius-sm);
       background: transparent;
-      color: var(--bi-text-secondary);
+      color: var(--de-font-color, var(--bi-text-muted));
       transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.65);
-        color: var(--bi-text-primary);
+        background: var(--bi-bg-hover);
+        color: var(--de-active-color, var(--bi-text-primary));
       }
 
       &.is-active {
         background: var(--bi-bg-surface);
-        color: var(--bi-text-primary);
+        color: var(--de-active-color, var(--bi-text-primary));
         box-shadow: var(--bi-shadow-card);
       }
     }
@@ -108,7 +107,7 @@
     }
 
     &:hover {
-      background: rgba(31, 35, 41, 0.06);
+      background: var(--bi-bg-hover);
       color: var(--bi-text-primary);
     }
   }

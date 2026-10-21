@@ -11,6 +11,7 @@ import { imgUrlTrans } from '@/utils/imgUtils'
 import { COLOR_PANEL } from '@/views/chart/components/editor/util/chart'
 import CollapseSwitchItem from '@/components/collapse-switch-item/src/CollapseSwitchItem.vue'
 import { cloneDeep } from 'lodash-es'
+import { migrateQueryAppearance } from '@/utils/queryAppearance'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { storeToRefs } from 'pinia'
@@ -115,7 +116,7 @@ watch(
 const currentPlaceholder = ref()
 const currentSearch = ref({
   placeholder: '',
-  queryConditionWidth: 227
+  queryConditionWidth: 180
 })
 
 const onFreezeChange = () => {
@@ -170,7 +171,7 @@ const handleCurrentPlaceholder = val => {
   }
 
   if (obj.queryConditionWidth === undefined) {
-    obj.queryConditionWidth = 227
+    obj.queryConditionWidth = 180
   }
   currentSearch.value = obj
   snapshotStore.recordSnapshotCacheToMobile('propValue')
@@ -268,6 +269,7 @@ const initParams = () => {
     }
   }
 
+  migrateQueryAppearance(chart.value.customStyle.component, props.element.propValue)
   if (props.element.propValue.length) {
     currentPlaceholder.value = props.element.propValue[0].id
     handleCurrentPlaceholder(props.element.propValue[0].id)
