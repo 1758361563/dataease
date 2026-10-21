@@ -24,7 +24,10 @@ const open = async () => {
   form.datasetMapping = {}
   visible.value = true
   const nodes = await queryTreeApi({ busiFlag: 'dashboard', leaf: false, weight: 7 })
-  folders.value = [{ id: '0', name: '根目录' }, ...flattenMigrationNodes(nodes as any, true)]
+  folders.value = [
+    { id: '0', name: '根目录' },
+    ...flattenMigrationNodes(nodes as any, true).filter(folder => folder.id !== '0')
+  ]
 }
 
 const chooseFile = async upload => {

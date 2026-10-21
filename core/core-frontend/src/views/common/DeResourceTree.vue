@@ -102,7 +102,9 @@ const resourceGroupOpt = ref()
 const appImportDialog = ref()
 const handleCreateCommand = (command: string) => {
   if (command === 'template') appImportDialog.value.open()
-  else addOperation(command, null, command === 'newFolder' ? 'folder' : 'leaf', true)
+  else if (command === 'newLeaf' && !isEmbedded.value) {
+    router.push({ path: '/dashboard', query: { opt: 'create' } })
+  } else addOperation(command, null, command === 'newFolder' ? 'folder' : 'leaf', true)
 }
 const returnMounted = ref(false)
 const state = reactive({
