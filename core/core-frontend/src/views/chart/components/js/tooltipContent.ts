@@ -16,6 +16,7 @@ export const supportsTooltipShelf = (type: string) =>
     'area-stack',
     'pie',
     'pie-donut',
+    'treemap',
     'chart-mix',
     'chart-mix-group',
     'chart-mix-stack',

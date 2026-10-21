@@ -27,6 +27,7 @@ import { SUPPORT_Y_M } from '@/views/chart/components/editor/util/chart'
 import { fieldType } from '@/utils/attr'
 import { iconFieldMap } from '@/components/icon-group/field-list'
 import { useFieldNameTooltip } from './useFieldNameTooltip'
+import { createCompareCalc } from './components/compare'
 
 const {
   fieldNameTooltip,
@@ -95,6 +96,13 @@ const emit = defineEmits([
 ])
 
 const { item, chart } = toRefs(props)
+const compareType = computed(() => item.value.compareCalc?.type || 'none')
+const ensureCompareCalc = () => {
+  if (!item.value.compareCalc?.type) {
+    item.value.compareCalc = createCompareCalc(item.value.compareCalc)
+  }
+  return item.value.compareCalc
+}
 const percentDialog = ref(false)
 const percentChoice = ref('table')
 const percentScopeLabel = computed(() => {
@@ -167,7 +175,7 @@ watch(
     // 不支持累加计算的图表，自动设置快速计算为无
     if (
       state.notSupportAccumulateViews.indexOf(chart.value.type) > -1 &&
-      item.value.compareCalc.type === 'accumulate'
+      compareType.value === 'accumulate'
     ) {
       quickCalc({ type: 'none' })
     }
@@ -340,7 +348,7 @@ const quickCalc = param => {
     case 'none':
       // 选择占比外，设置自动
       resetValueFormatter(item.value)
-      item.value.compareCalc.type = 'none'
+      ensureCompareCalc().type = 'none'
       emit('onQuotaItemChange', item.value)
       break
     case 'setting':
@@ -360,11 +368,11 @@ const quickCalc = param => {
       item.value.formatterCfg.type = 'percent'
       item.value.formatterCfg.decimalCount = 2
 
-      item.value.compareCalc.type = 'percent'
+      ensureCompareCalc().type = 'percent'
       emit('onQuotaItemChange', item.value)
       break
     case 'accumulate':
-      item.value.compareCalc.type = 'accumulate'
+      ensureCompareCalc().type = 'accumulate'
       emit('onQuotaItemChange', item.value)
       break
     default:
@@ -379,6 +387,7 @@ const beforeQuickCalc = type => {
 }
 
 const editCompare = () => {
+  ensureCompareCalc()
   item.value.index = props.index
   item.value.calcType = props.type
   emit('editItemCompare', item.value)
@@ -523,16 +532,7 @@ onMounted(() => {
           class="summary-span"
         >
           {{ t('chart.' + item.summary) }}
-          <span
-            v-if="
-              item.compareCalc &&
-              item.compareCalc.type &&
-              item.compareCalc.type !== '' &&
-              item.compareCalc.type !== 'none'
-            "
-          >
-            -{{ t('chart.' + item.compareCalc.type) }}
-          </span>
+          <span v-if="compareType !== 'none'"> -{{ t('chart.' + compareType) }} </span>
         </span>
         <el-icon v-if="showHideIcon" style="margin-left: 4px">
           <Icon>
@@ -823,11 +823,7 @@ onMounted(() => {
                     <!--                    <Icon name="icon_describe_outlined" ><icon_describe_outlined class="svg-icon" /></Icon>-->
                   </el-icon>
                   <span>{{ t('chart.quick_calc') }}</span>
-                  <span class="summary-span-item">
-                    ({{
-                      !item.compareCalc ? t('chart.none') : t('chart.' + item.compareCalc.type)
-                    }})
-                  </span>
+                  <span class="summary-span-item"> ({{ t('chart.' + compareType) }}) </span>
                 </span>
                 <el-icon>
                   <Icon name="icon_right_outlined"><icon_right_outlined class="svg-icon" /></Icon>
@@ -842,11 +838,11 @@ onMounted(() => {
                   <el-dropdown-item class="menu-item-padding" :command="beforeQuickCalc('none')">
                     <span
                       class="sub-menu-content"
-                      :class="'none' === item.compareCalc.type ? 'content-active' : ''"
+                      :class="'none' === compareType ? 'content-active' : ''"
                     >
                       {{ t('chart.none') }}
                       <el-icon class="sub-menu-content--icon">
-                        <Icon name="icon_done_outlined" v-if="'none' === item.compareCalc.type"
+                        <Icon name="icon_done_outlined" v-if="'none' === compareType"
                           ><icon_done_outlined class="svg-icon"
                         /></Icon>
                       </el-icon>
@@ -859,14 +855,12 @@ onMounted(() => {
                   >
                     <div
                       class="sub-menu-content"
-                      :class="yoyLabel.includes(item.compareCalc.type) ? 'content-active' : ''"
+                      :class="yoyLabel.includes(compareType) ? 'content-active' : ''"
                       :disabled="state.disableEditCompare"
                     >
                       {{ t('chart.yoy_label') }}
                       <el-icon class="sub-menu-content--icon">
-                        <Icon
-                          name="icon_done_outlined"
-                          v-if="yoyLabel.includes(item.compareCalc.type)"
+                        <Icon name="icon_done_outlined" v-if="yoyLabel.includes(compareType)"
                           ><icon_done_outlined class="svg-icon"
                         /></Icon>
                       </el-icon>
@@ -879,7 +873,7 @@ onMounted(() => {
                   >
                     <div
                       class="sub-menu-content"
-                      :class="'percent' === item.compareCalc.type ? 'content-active' : ''"
+                      :class="'percent' === compareType ? 'content-active' : ''"
                       :disabled="state.quotaViews.indexOf(chart.type) > -1"
                     >
                       {{ t('chart.percent')
@@ -887,7 +881,7 @@ onMounted(() => {
                         chart.type === 'table-pivot' ? `（${percentScopeLabel}） · 设置范围` : ''
                       }}
                       <el-icon class="sub-menu-content--icon">
-                        <Icon name="icon_done_outlined" v-if="'percent' === item.compareCalc.type"
+                        <Icon name="icon_done_outlined" v-if="'percent' === compareType"
                           ><icon_done_outlined class="svg-icon"
                         /></Icon>
                       </el-icon>
@@ -900,14 +894,12 @@ onMounted(() => {
                   >
                     <div
                       class="sub-menu-content"
-                      :class="'accumulate' === item.compareCalc.type ? 'content-active' : ''"
+                      :class="'accumulate' === compareType ? 'content-active' : ''"
                       :disabled="state.notSupportAccumulateViews.indexOf(chart.type) > -1"
                     >
                       {{ t('chart.accumulate') }}
                       <el-icon class="sub-menu-content--icon">
-                        <Icon
-                          name="icon_done_outlined"
-                          v-if="'accumulate' === item.compareCalc.type"
+                        <Icon name="icon_done_outlined" v-if="'accumulate' === compareType"
                           ><icon_done_outlined class="svg-icon"
                         /></Icon>
                       </el-icon>

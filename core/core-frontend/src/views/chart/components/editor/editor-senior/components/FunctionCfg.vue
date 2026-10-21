@@ -206,7 +206,13 @@ onMounted(() => {
           @change="changeFunctionCfg"
         >
           <el-radio :effect="themes" :label="'breakLine'">
-            {{ isRichText ? t('visualization.set_as_tips') + '"-"' : t('chart.break_line') }}
+            {{
+              isRichText
+                ? t('visualization.set_as_tips') + '"-"'
+                : chart.type === 'line'
+                ? '跨空值连线'
+                : t('chart.break_line')
+            }}
           </el-radio>
           <el-radio v-if="isRichText" :effect="themes" :label="'custom'">
             {{ t('visualization.custom') }}

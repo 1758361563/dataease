@@ -25,6 +25,7 @@ import ChartError from '@/views/chart/components/views/components/ChartError.vue
 import { defaultsDeep, cloneDeep, debounce } from 'lodash-es'
 import { BASE_VIEW_CONFIG } from '../../editor/util/chart'
 import { customAttrTrans, customStyleTrans, recursionTransObj } from '@/utils/canvasStyle'
+import { migratePivotAppearance } from '../../js/panel/charts/table/pivotAppearance'
 import { deepCopy, isISOMobile, isMobile } from '@/utils/utils'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { isDashboard, trackBarStyleCheck } from '@/utils/canvasUtils'
@@ -181,6 +182,7 @@ const renderChartFromDialog = (viewInfo: Chart, chartDataInfo) => {
 }
 // 处理存量图表的默认值
 const handleDefaultVal = (chart: Chart) => {
+  migratePivotAppearance(chart)
   const customAttr = parseJson(chart.customAttr)
   // 明细表默认合并单元格，存量的不合并
   if (customAttr.tableCell.mergeCells === undefined) {

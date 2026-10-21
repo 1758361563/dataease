@@ -14,7 +14,8 @@ import {
   Aggregation,
   S2DataConfig,
   MergedCell,
-  LayoutResult
+  LayoutResult,
+  RowCell
 } from '@antv/s2'
 import { formatterItem, valueFormatter } from '../../../formatter'
 import { hexColorToRGBA, isAlphaColor, parseJson } from '../../../util'
@@ -46,6 +47,11 @@ import { isScopedPercent, pivotPercentValue } from './pivotPercent'
 import { fitPivotTotalColumns } from './pivotTotalWidth'
 import { expandMeasureFirstTotals } from './pivotMeasureTotals'
 import { configurePivotDisplayScope, fitSummaryOnlyHeader } from './pivotDisplayScope'
+import {
+  applyPivotAppearance,
+  migratePivotAppearance,
+  pivotTotalBackground
+} from './pivotAppearance'
 
 function mapTotalCfg(cfgList = [], yAxis: Axis[] = []) {
   const map = {}
@@ -75,6 +81,26 @@ function resolveStoredKey(fields: Axis[] = [], stored?: string) {
 type DataItem = Record<string, any>
 
 const { t } = useI18n()
+
+class PivotAppearanceDataCell extends CustomDataCell {
+  public getBackgroundColor() {
+    return pivotTotalBackground(
+      super.getBackgroundColor(),
+      this.meta,
+      !!this.spreadsheet.options.conditions?.background?.length
+    )
+  }
+}
+
+class PivotAppearanceRowCell extends RowCell {
+  public getBackgroundColor() {
+    return pivotTotalBackground(
+      super.getBackgroundColor(),
+      this.meta,
+      !!this.spreadsheet.options.conditions?.background?.length
+    )
+  }
+}
 
 class CustomPivotDataset extends PivotDataSet {
   percentContext?: { chart: Pick<Chart, 'xAxis' | 'xAxisExt' | 'yAxis'>; basis: any[] }
@@ -344,8 +370,10 @@ export class TablePivot extends S2ChartView<PivotSheet> {
         hoverFocus: false
       },
       dataCell: meta => {
-        return new CustomDataCell(meta, meta.spreadsheet)
+        return new PivotAppearanceDataCell(meta, meta.spreadsheet)
       },
+      rowCell: (node, spreadsheet, headerConfig) =>
+        new PivotAppearanceRowCell(node, spreadsheet, headerConfig),
       frozenRowHeader: !(tableHeader.rowHeaderFreeze === false)
     }
     if (summaryLayoutArrange) s2Options.layoutArrange = summaryLayoutArrange
@@ -826,7 +854,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
       }
       merge(theme, tmp)
     }
-    return theme
+    return applyPivotAppearance(theme, chart)
   }
   private configSortParams(chart: Chart, newData: []) {
     // 行列分开处理，先行后列，样式设置中汇总总计排序的优先级最高，剩下的按照字段的排序优先级设置进行排序
@@ -1135,6 +1163,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
   }
 
   setupDefaultOptions(chart: ChartObj): ChartObj {
+    migratePivotAppearance(chart)
     const { customAttr } = chart
     if (customAttr.basicStyle.tableColumnMode === 'field') {
       customAttr.basicStyle.tableColumnMode = 'custom'

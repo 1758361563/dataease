@@ -20,8 +20,23 @@ paletteModule._compile(
   }).outputText,
   palettePath
 )
+const compactPath = path.resolve(
+  __dirname,
+  '../src/views/chart/components/js/panel/common/compactTooltip.ts'
+)
+const compactModule = new Module(compactPath)
+compactModule._compile(
+  ts.transpileModule(fs.readFileSync(compactPath, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }
+  }).outputText,
+  compactPath
+)
 mod.require = request =>
-  request.endsWith('chartPalettes') ? paletteModule.exports : require(request)
+  request.endsWith('chartPalettes')
+    ? paletteModule.exports
+    : request.endsWith('compactTooltip')
+    ? compactModule.exports
+    : require(request)
 assert.equal(paletteModule.exports.CHART_PALETTES.length, 3)
 assert.ok(
   paletteModule.exports.CHART_PALETTES.every(

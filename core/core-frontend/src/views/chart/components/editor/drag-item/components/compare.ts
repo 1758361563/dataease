@@ -13,6 +13,17 @@ export const compareItem = {
   }
 }
 
+/** Each field needs its own nested defaults; shared/legacy fields may have no compare config. */
+export const createCompareCalc = (value?: any) => {
+  const defaults = JSON.parse(JSON.stringify(compareItem))
+  return {
+    ...defaults,
+    ...value,
+    type: value?.type || 'none',
+    custom: { ...defaults.custom, ...value?.custom }
+  }
+}
+
 export const compareYearList = [{ name: 'year_mom', value: 'year_mom' }]
 
 export const compareMonthList = [

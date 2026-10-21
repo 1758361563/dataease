@@ -17,3 +17,5 @@
 指标条需保留单个 DOM 根节点：占比范围弹窗放在根节点内部，并通过 append-to-body 展示。此前将弹窗与指标条并列导致 Vue 无法透传 Sortable 的 `data-draggable` 属性，指标不能抓取。已修复，新增 `quotaItemDrag.test.cjs` 防止多根节点回归，并在浏览器验证指标向下、向上拖动排序。
 
 指标和维度名称提示为被动提示：浮层 pointer-events 为 none、不可进入，悬停 350ms 显示，移出立即关闭。捕获 pointerdown/mousedown/dragstart 时同时取消待显示提示并立即隐藏已显示提示，拖动中经过其他字段不会重新启用；鼠标释放后重新悬停才恢复。`fieldNameTooltip.test.cjs` 覆盖这套交互和卸载监听清理。
+
+快速计算菜单兼容 `compareCalc=null`、缺省对象和空 type，读取时统一视为“无”；仅在用户选择计算方式时初始化所需配置，查看菜单不改写字段，打开占比范围后取消也不改写原配置。`quotaQuickCalc.test.cjs` 使用真实二级菜单模板进行 Vue 服务端渲染，并验证各计算方式的处理函数、默认配置隔离和既有占比保留。

@@ -15,6 +15,7 @@ import {
 import iconDelete from '@/assets/svg/icon_delete-trash_outlined.svg'
 import iconEdit from '@/assets/svg/icon_edit_outlined.svg'
 import iconSummary from '@/assets/svg/icon_functions_outlined.svg'
+import iconDown from '@/assets/svg/icon_down_outlined-1.svg'
 import { fieldType } from '@/utils/attr'
 import { iconFieldMap } from '@/components/icon-group/field-list'
 import ValueFormatterEdit from './drag-item/components/ValueFormatterEdit.vue'

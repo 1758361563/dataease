@@ -268,6 +268,13 @@ const init = () => {
     const customAttr = JSON.parse(JSON.stringify(chart.customAttr))
     if (customAttr.tooltip) {
       state.tooltipForm = defaultsDeep(customAttr.tooltip, cloneDeep(DEFAULT_TOOLTIP))
+      if (props.chart.type === 'treemap') {
+        state.tooltipForm.showProportion ??= true
+        state.tooltipForm.reserveDecimalCount ??=
+          customAttr.tooltip.contentMode === 'explicit'
+            ? 2
+            : customAttr.label?.reserveDecimalCount ?? 2
+      }
 
       initFormatCfgUnit(state.tooltipForm.tooltipFormatter)
 
@@ -487,6 +494,34 @@ onMounted(() => {
       </el-form-item>
     </el-space>
 
+    <template v-if="showProperty('showProportion')">
+      <el-form-item label="占比" class="form-item" :class="'form-item-' + themes">
+        <el-checkbox
+          v-model="state.tooltipForm.showProportion"
+          :effect="themes"
+          size="small"
+          @change="changeTooltipAttr('showProportion')"
+          >显示占比</el-checkbox
+        >
+      </el-form-item>
+      <el-form-item
+        v-if="state.tooltipForm.showProportion"
+        label="占比小数位"
+        class="form-item"
+        :class="'form-item-' + themes"
+      >
+        <el-input-number
+          v-model="state.tooltipForm.reserveDecimalCount"
+          :effect="themes"
+          :min="0"
+          :max="10"
+          :precision="0"
+          :value-on-clear="2"
+          size="small"
+          @change="changeTooltipAttr('reserveDecimalCount')"
+        />
+      </el-form-item>
+    </template>
     <div v-if="showProperty('showFields') && !batchOptStatus && !mobileInPc">
       <el-form-item :label="t('chart.tooltip')" class="form-item" :class="'form-item-' + themes">
         <el-select

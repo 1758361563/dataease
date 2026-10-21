@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { activeSortFields, displayLimitReason, displayCountPatch } from '../js/chartDisplayLimit'
+import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
 const props = defineProps<{ chart: ChartObj; themes: string }>()
 const emit = defineEmits(['change'])
 const { t } = useI18n()
@@ -55,18 +56,55 @@ function changeCount(value: string) {
 
 <template>
   <section class="sort-limit" :class="{ dark: themes === 'dark' }">
-    <div class="heading"><span>显示数量</span></div>
-    <template v-if="reason">
-      <p class="description">{{ reason }}</p>
-      <p v-if="count !== undefined" class="description">
-        当前仍保留旧的 {{ count }} 行限制，这不代表前 {{ count }} 个完整分类。
-        <el-button link size="small" @click="emit('change', { resultMode: 'all' })"
+    <div class="heading">
+      <span>显示数量</span>
+      <el-tooltip :effect="themes" placement="top" :enterable="false" :show-after="250">
+        <template #content>
+          <div class="limit-help">
+            <template v-if="reason">
+              <p>{{ reason }}</p>
+              <p v-if="count !== undefined">
+                当前保留旧的 {{ count }} 行限制，不代表前 {{ count }} 个完整分类。
+                可点击“取消行数限制”查询全部结果。
+              </p>
+            </template>
+            <template v-else>
+              <p>{{ description }}</p>
+              <p v-if="chart.type.startsWith('pie') && count !== undefined">
+                占比按保留的分类重新计算，不自动合并“其他”；负值不绘制扇区，实际数量可能少于上限。
+              </p>
+            </template>
+          </div>
+        </template>
+        <button type="button" class="help-icon" aria-label="显示数量说明">
+          <el-icon :size="14"><icon_info_outlined class="svg-icon" /></el-icon>
+        </button>
+      </el-tooltip>
+    </div>
+    <div class="control-row">
+      <template v-if="reason">
+        <el-select
+          aria-label="显示数量"
+          class="rank-control"
+          :model-value="count === undefined ? 'all' : 'legacy'"
+          :effect="themes"
+          size="small"
+          disabled
+        >
+          <el-option label="全部" value="all" />
+          <el-option :label="`${count} 行`" value="legacy" />
+        </el-select>
+        <el-button
+          v-if="count !== undefined"
+          link
+          type="primary"
+          size="small"
+          :effect="themes"
+          @click="emit('change', { resultMode: 'all' })"
           >取消行数限制</el-button
         >
-      </p>
-    </template>
-    <template v-else>
-      <div class="control-row">
+      </template>
+      <template v-else>
         <el-select
           aria-label="显示数量"
           class="rank-control"
@@ -80,28 +118,25 @@ function changeCount(value: string) {
             value="50"
           /><el-option label="自定义" value="custom" />
         </el-select>
-      </div>
-      <div v-if="preset === 'custom'" class="control-row">
-        <span>分类数量</span>
-        <el-input-number
-          class="rank-control"
-          aria-label="分类数量"
-          :model-value="count"
-          :min="1"
-          :max="1000000"
-          :precision="0"
-          :step-strictly="true"
-          :value-on-clear="20"
-          :controls="false"
-          size="small"
-          @change="value => emit('change', displayCountPatch(value))"
-        />
-      </div>
-      <p class="description">{{ description }}</p>
-      <p v-if="chart.type.startsWith('pie') && count !== undefined" class="description">
-        占比按保留的分类重新计算，不自动合并“其他”；负值不绘制扇区，实际数量可能少于上限。
-      </p>
-    </template>
+      </template>
+    </div>
+    <div v-if="!reason && preset === 'custom'" class="control-row">
+      <span>分类数量</span>
+      <el-input-number
+        class="rank-control"
+        aria-label="分类数量"
+        :model-value="count"
+        :min="1"
+        :max="1000000"
+        :precision="0"
+        :step-strictly="true"
+        :value-on-clear="20"
+        :controls="false"
+        :effect="themes"
+        size="small"
+        @change="value => emit('change', displayCountPatch(value))"
+      />
+    </div>
   </section>
 </template>
 
@@ -112,15 +147,23 @@ function changeCount(value: string) {
   .heading {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    font-size: 14px;
+    gap: 4px;
+    line-height: 20px;
+  }
+  .help-icon {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #646a73;
+    cursor: help;
   }
   .control-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 8px;
     > span {
       flex: 0 0 56px;
     }
@@ -130,13 +173,18 @@ function changeCount(value: string) {
       width: 100%;
     }
   }
-  .description {
-    color: #646a73;
-    line-height: 1.6;
-    margin: 10px 0 0;
-  }
-  &.dark .description {
+  &.dark .help-icon {
     color: #a6a6a6;
+  }
+}
+.limit-help {
+  max-width: 280px;
+  line-height: 1.6;
+  p {
+    margin: 0;
+    + p {
+      margin-top: 6px;
+    }
   }
 }
 </style>

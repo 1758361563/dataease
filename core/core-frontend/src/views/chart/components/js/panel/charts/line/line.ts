@@ -37,6 +37,7 @@ import { useI18n } from '@/hooks/web/useI18n'
 import { DEFAULT_LABEL, DEFAULT_LEGEND_STYLE } from '@/views/chart/components/editor/util/chart'
 import { clearExtremum, extremumEvt } from '@/views/chart/components/js/extremumUitl'
 import { Group } from '@antv/g-canvas'
+import { orderLineData } from './lineOrder'
 
 const { t } = useI18n()
 const DEFAULT_DATA = []
@@ -143,6 +144,13 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
     configPlotTooltipEvent(chart, newChart)
     listenYAxisNiceMinEvents(chart, newChart)
     return newChart
+  }
+
+  protected configEmptyDataStrategy(chart: Chart, options: LineOptions): LineOptions {
+    const result = super.configEmptyDataStrategy(chart, options)
+    // Bridge missing dates using the neighbouring real points. Keep nulls as
+    // nulls (not zero/synthetic tooltip values); setZero still runs in the base.
+    return { ...result, connectNulls: true }
   }
 
   protected configLabel(chart: Chart, options: LineOptions): LineOptions {
@@ -454,6 +462,7 @@ export class Line extends G2PlotChartView<LineOptions, G2Line> {
       this.configBasicStyle,
       this.configCustomColors,
       this.configLegend,
+      orderLineData,
       this.configXAxis,
       this.configYAxis,
       this.configSlider,

@@ -44,6 +44,7 @@ import FilterTree from './filter/FilterTree.vue'
 import ChartStyle from '@/views/chart/components/editor/editor-style/ChartStyle.vue'
 import TooltipFields from './TooltipFields.vue'
 import SortAndLimit from './SortAndLimit.vue'
+import { migratePivotAppearance } from '../js/panel/charts/table/pivotAppearance'
 import { hasDisplayLimitPanel } from '../js/chartDisplayLimit'
 import { pivotAllowsEmptyRowDimension } from '@/views/chart/components/js/panel/charts/table/pivotMeasureRows'
 import { supportsTooltipShelf, syncTooltipAxes } from '@/views/chart/components/js/tooltipContent'
@@ -284,8 +285,11 @@ const filedList = computed(() => {
 provide('filedList', () => filedList.value)
 provide('quota', () => state.quota)
 watch(
-  () => view.value.id,
-  () => syncTooltipAxes(view.value),
+  () => [view.value.id, view.value.type],
+  () => {
+    migratePivotAppearance(view.value)
+    syncTooltipAxes(view.value)
+  },
   { immediate: true }
 )
 watch(
@@ -3661,7 +3665,7 @@ const chartStyleScroll = (val: any) => {
                         </el-row>
                       </template>
                     </el-scrollbar>
-                    <el-footer :class="{ 'refresh-active-footer': view.refreshViewEnable }">
+                    <el-footer class="chart-data-footer">
                       <el-row class="refresh-area">
                         <el-form-item
                           class="form-item no-margin-bottom"
@@ -5006,13 +5010,20 @@ span {
 
     :deep(.ed-scrollbar) {
       &.has-footer {
-        height: calc(100% - 81px);
+        flex: 1;
+        height: auto;
+        min-height: 0;
       }
     }
 
-    :deep(.ed-footer) {
+    :deep(.chart-data-footer) {
       padding: 0;
-      height: 114px;
+      height: auto;
+      flex-shrink: 0;
+
+      > .refresh-area {
+        padding-top: 8px;
+      }
     }
   }
 
@@ -5226,8 +5237,6 @@ span {
   }
 
   .result-style {
-    position: absolute;
-    bottom: 0;
     width: 100%;
     border-top: 1px solid @side-outline-border-color;
   }
@@ -5704,10 +5713,6 @@ span {
   .ed-dialog__body {
     flex: 1;
   }
-}
-
-.refresh-active-footer {
-  height: 150px !important;
 }
 
 .refresh-area {

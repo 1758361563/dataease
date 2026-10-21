@@ -59,6 +59,8 @@ declare interface ChartAttr {
  * 基础样式设置
  */
 declare interface ChartBasicStyle {
+  /** Versioned pivot-only defaults; preserves subsequent manual style edits. */
+  pivotAppearanceVersion?: 1 | 2 | 3 | 4
   pieLayout?: 'legacy' | 'large' | 'ranking'
   pieLabelLimit?: number
   piePalette?: 'categorical' | 'theme'
@@ -1118,6 +1120,9 @@ declare interface ChartLabelAttr {
  * 提示设置
  */
 declare interface ChartTooltipAttr {
+  /** Treemap tooltip percentage is independent of in-chart labels. */
+  showProportion?: boolean
+  reserveDecimalCount?: number
   /** Absent on legacy charts: preserve automatic tooltip behavior. */
   contentMode?: 'explicit'
   autoAxisKeys?: string[]
