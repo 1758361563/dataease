@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# Use Docker's bundled BuildKit frontend (Docker >= 24); no external syntax image is needed.
 #
 # Company BI single-node image (DataEase standalone profile + company extensions).
 #
@@ -33,6 +33,7 @@ RUN npm run build:base \
 # Stage 2: Spring Boot jar (default `standalone` profile) with the frontend inside.
 # --------------------------------------------------------------------------
 FROM ${MAVEN_IMAGE} AS backend
+ARG MAVEN_CENTRAL_MIRROR=https://repo.maven.apache.org/maven2
 WORKDIR /build
 COPY pom.xml ./
 COPY sdk sdk
@@ -48,7 +49,7 @@ RUN sh /build/image-tools/sanitize-standalone-yml.sh \
 
 # sdk modules (+ root pom) into the local repo, like the official `mvn clean install`.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -ntp -f pom.xml install -DskipTests -Dmaven.test.skip=true
+    mvn -B -ntp -s /build/image-tools/maven-settings.xml -f pom.xml install -DskipTests -Dmaven.test.skip=true
 
 # core/pom.xml lists core-frontend as a module, so its pom must exist for the reactor to load
 # (it is NOT built here: `-pl core-backend`; the frontend was built in stage 1).
@@ -56,7 +57,7 @@ COPY core/core-frontend/pom.xml core/core-frontend/pom.xml
 # antrun copies ../core-frontend/dist into src/main/resources/static (standalone profile).
 COPY --from=frontend /build/core/core-frontend/dist core/core-frontend/dist
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -ntp -f core/pom.xml -pl core-backend -P standalone package \
+    mvn -B -ntp -s /build/image-tools/maven-settings.xml -f core/pom.xml -pl core-backend -P standalone package \
         -DskipTests -Dmaven.test.skip=true
 
 # Hard gate: fail the image build if the jar is missing frontend / company code /

@@ -8,6 +8,7 @@
 #   build.sh --allow-dirty        build the work tree incl. uncommitted changes; version gets "-dirty"
 #   build.sh --no-cache           ignore the BuildKit layer cache
 #   build.sh --npm-registry URL   override the registry from core-frontend/.npmrc
+#   build.sh --maven-central-mirror URL   use an HTTPS mirror for Maven Central only
 #   build.sh --previous-manifest FILE
 #                                 compare schema fingerprint with an earlier release manifest
 #
@@ -19,18 +20,26 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
 DIST_DIR="$ROOT/deploy/companybi/dist"
 
-ALLOW_DIRTY=0; NO_CACHE=""; NPM_REGISTRY=""; PREV_MANIFEST=""
+ALLOW_DIRTY=0; NO_CACHE=""; NPM_REGISTRY=""; MAVEN_CENTRAL_MIRROR=""; PREV_MANIFEST=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --allow-dirty) ALLOW_DIRTY=1 ;;
     --no-cache) NO_CACHE="--no-cache" ;;
     --npm-registry) NPM_REGISTRY="${2:?}"; shift ;;
+    --maven-central-mirror) MAVEN_CENTRAL_MIRROR="${2:?}"; shift ;;
     --previous-manifest) PREV_MANIFEST="${2:?}"; shift ;;
     -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
   shift
 done
+
+if [ -n "$MAVEN_CENTRAL_MIRROR" ]; then
+  case "$MAVEN_CENTRAL_MIRROR" in
+    https://?*) ;;
+    *) echo "build: ERROR: --maven-central-mirror must use HTTPS" >&2; exit 2 ;;
+  esac
+fi
 
 die() { echo "build: ERROR: $*" >&2; exit 1; }
 command -v docker >/dev/null || die "docker not found"
@@ -99,6 +108,7 @@ BUILD_ARGS=(
   --build-arg "DATAEASE_VERSION=$DE_VERSION"
 )
 [ -n "$NPM_REGISTRY" ] && BUILD_ARGS+=(--build-arg "NPM_REGISTRY=$NPM_REGISTRY")
+[ -n "$MAVEN_CENTRAL_MIRROR" ] && BUILD_ARGS+=(--build-arg "MAVEN_CENTRAL_MIRROR=$MAVEN_CENTRAL_MIRROR")
 [ -n "$NO_CACHE" ] && BUILD_ARGS+=("$NO_CACHE")
 
 ctx_tar | docker build "${BUILD_ARGS[@]}" -
@@ -143,6 +153,7 @@ MANIFEST="$OUT/companybi_${VERSION}.manifest"
   echo "git_branch=$GIT_BRANCH"
   echo "git_dirty=$DIRTY"
   echo "build_time=$BUILD_TIME"
+  echo "maven_central_mirror=${MAVEN_CENTRAL_MIRROR:-https://repo.maven.apache.org/maven2}"
   echo "dataease_version=$DE_VERSION"
   echo "jar_sha256=$JAR_SHA"
   echo "schema_fingerprint=$FP"

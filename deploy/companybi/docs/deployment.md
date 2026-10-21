@@ -41,7 +41,12 @@
 ```bash
 cd <仓库根>                                     # 一个干净的 commit
 bash deploy/companybi/scripts/build.sh
+# 构建容器无法连接 Maven Central 时，可只替换 central（保留 HTTPS 校验）：
+# bash deploy/companybi/scripts/build.sh --maven-central-mirror https://maven.aliyun.com/repository/public
 ```
+
+`--maven-central-mirror` 只用于构建阶段，默认为 Maven Central 原地址，不替换 fit2cloud 仓库。
+镜像地址写入发布 manifest；不进入应用运行配置，也不需要在服务器设置。
 
 - 构建上下文来自 `git archive HEAD`：**只含已提交内容**，本地未提交/被忽略的文件不会混入。工作区不干净则拒绝（`--allow-dirty` 仅限调试，镜像标记 `-dirty`，安装/升级脚本会拒绝它）。
 - 全部在 Docker 内完成：`npm ci && npm run build:base` → `mvn install`（sdk）→ `mvn -P standalone package` → 内容校验 → 运行镜像。构建机不需要装 Maven/Node。
