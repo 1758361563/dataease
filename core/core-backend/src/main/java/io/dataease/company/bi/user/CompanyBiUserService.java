@@ -52,6 +52,14 @@ public class CompanyBiUserService {
         mapper.updateById(user);
     }
 
+    public boolean updatePassword(Long userId, String expectedHash, String newHash) {
+        UpdateWrapper<CompanyBiUser> wrapper = new UpdateWrapper<>();
+        wrapper.eq("id", userId).eq("password_hash", expectedHash)
+                .set("password_hash", newHash).set("updated_at", System.currentTimeMillis())
+                .set("updated_by", userId);
+        return mapper.update(null, wrapper) == 1;
+    }
+
     public List<CompanyBiUser> listAll() {
         QueryWrapper<CompanyBiUser> wrapper = new QueryWrapper<>();
         wrapper.orderByAsc("id");

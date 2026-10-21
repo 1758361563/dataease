@@ -1180,6 +1180,8 @@ public class DataVisualizationServer implements DataVisualizationApi {
                 staticResource = request.getStaticResource();
                 name = request.getName();
                 dvType = request.getType();
+                version = request.getVersion();
+                appDataStr = request.getAppData() == null ? null : (String) JsonUtil.toJSONString(request.getAppData());
             } else if (DataVisualizationConstants.NEW_PANEL_FROM.NEW_MARKET_TEMPLATE.equals(newFrom)) {
                 TemplateManageFileDTO templateFileInfo = templateCenterManage.getTemplateFromMarketV2(request.getResourceName());
                 if (templateFileInfo == null) {
@@ -1345,9 +1347,9 @@ public class DataVisualizationServer implements DataVisualizationApi {
             datasourceTaskVOInfo = appTemplateMapper.findAppDatasourceTaskInfo(dsIds);
         }
 
-        if (CollectionUtils.isEmpty(datasourceVOInfo)) {
+        if (CollectionUtils.isEmpty(datasourceVOInfo) && !CollectionUtils.isEmpty(viewIds)) {
             DEException.throwException("当前不存在数据源无法导出");
-        } else if (datasourceVOInfo.stream().anyMatch(datasource -> datasource.getType().contains(DatasourceConfiguration.DatasourceType.API.name()))) {
+        } else if (datasourceVOInfo != null && datasourceVOInfo.stream().anyMatch(datasource -> datasource.getType().contains(DatasourceConfiguration.DatasourceType.API.name()))) {
             DEException.throwException(Translator.get("i18n_app_error_no_api"));
         }
 
@@ -1357,7 +1359,9 @@ public class DataVisualizationServer implements DataVisualizationApi {
         List<VisualizationLinkJumpInfoVO> linkJumpInfoVOInfo = appTemplateMapper.findAppLinkJumpInfoInfo(dvId);
         List<VisualizationLinkJumpTargetViewInfoVO> listJumpTargetViewInfoVO = appTemplateMapper.findAppLinkJumpTargetViewInfoInfo(dvId);
 
-        return new VisualizationExport2AppVO(chartViewVOInfo, datasetGroupVOInfo, datasetTableVOInfo, datasetTableFieldVOInfo, datasourceVOInfo, datasourceTaskVOInfo, linkJumpVOInfo, linkJumpInfoVOInfo, listJumpTargetViewInfoVO, linkageVOInfo, linkageFieldVOInfo);
+        // Migration packages contain configuration, never reusable connection credentials or tasks.
+        if (datasourceVOInfo != null) datasourceVOInfo.forEach(source -> source.setConfiguration(null));
+        return new VisualizationExport2AppVO(chartViewVOInfo, datasetGroupVOInfo, datasetTableVOInfo, datasetTableFieldVOInfo, datasourceVOInfo, List.of(), linkJumpVOInfo, linkJumpInfoVOInfo, listJumpTargetViewInfoVO, linkageVOInfo, linkageFieldVOInfo);
     }
 
     @DeLog(id = "#p0.id", ot = LogOT.APP_TEMPLATE_EXPORT, stExp = "#p0.type")

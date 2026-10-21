@@ -82,6 +82,17 @@ core/core-frontend/src/assets/fsSvg.html
 /core/backend/
 /classpath:substitule.json
 
+# Company BI self-service and migration sources / regression tests.
+!/core/core-backend/src/main/java/io/dataease/company/bi/auth/CompanyPasswordChangeService.java
+!/core/core-backend/src/main/java/io/dataease/company/bi/auth/CompanyDashboardMigrationServer.java
+!/core/core-backend/src/test/java/io/dataease/company/
+/core/core-backend/src/test/java/io/dataease/company/*
+!/core/core-backend/src/test/java/io/dataease/company/bi/
+/core/core-backend/src/test/java/io/dataease/company/bi/*
+!/core/core-backend/src/test/java/io/dataease/company/bi/auth/
+/core/core-backend/src/test/java/io/dataease/company/bi/auth/*
+!/core/core-backend/src/test/java/io/dataease/company/bi/auth/CompanySelfServiceTest.java
+!/core/core-backend/src/test/java/io/dataease/company/bi/auth/CompanyMigrationTest.java
 # Independent Feishu service runtime. Source under /feishu-integration is tracked.
 /feishu-integration/node_modules/
 /feishu-integration/tmp/

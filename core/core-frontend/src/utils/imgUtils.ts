@@ -64,7 +64,8 @@ export function download2AppTemplate(downloadType, canvasDom, name, attachParams
       html2canvas(canvasDom).then(async canvas => {
         const canvasViewDataTemplate = deepCopy(canvasViewInfo.value)
         Object.keys(canvasViewDataTemplate).forEach(viewId => {
-          canvasViewDataTemplate[viewId].data = canvasViewDataInfo.value[viewId]
+          if (downloadType === 'app') delete canvasViewDataTemplate[viewId].data
+          else canvasViewDataTemplate[viewId].data = canvasViewDataInfo.value[viewId]
           stripDashboardQueryState(canvasViewDataTemplate[viewId])
         })
         for (const chart of Object.values(canvasViewDataTemplate) as any[]) {
@@ -88,7 +89,7 @@ export function download2AppTemplate(downloadType, canvasDom, name, attachParams
               const templateInfo = {
                 name: templateName,
                 templateType: 'self',
-                snapshot: snapshot,
+                snapshot: downloadType === 'app' ? '' : snapshot,
                 dvType: dvInfo.value.type,
                 nodeType: downloadType,
                 version: 3,

@@ -1,6 +1,7 @@
 package io.dataease.company.bi.auth;
 
 import io.dataease.api.permissions.user.dto.LangSwitchRequest;
+import io.dataease.api.permissions.user.dto.ModifyPwdRequest;
 import io.dataease.api.permissions.user.vo.CurIpVO;
 import io.dataease.api.permissions.user.vo.CurUserVO;
 import io.dataease.api.permissions.user.vo.UserFormVO;
@@ -12,6 +13,7 @@ import io.dataease.i18n.Lang;
 import io.dataease.utils.AuthUtils;
 import io.dataease.utils.CacheUtils;
 import io.dataease.utils.IPUtils;
+import io.dataease.utils.RsaUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,10 +34,31 @@ public class CompanyUserServer {
 
     private final CompanyBiUserService userService;
     private final CompanyUserStatusGuard statusGuard;
+    private final CompanyPasswordChangeService passwordChangeService;
 
-    public CompanyUserServer(CompanyBiUserService userService, CompanyUserStatusGuard statusGuard) {
+    public CompanyUserServer(CompanyBiUserService userService, CompanyUserStatusGuard statusGuard,
+                             CompanyPasswordChangeService passwordChangeService) {
         this.userService = userService;
         this.statusGuard = statusGuard;
+        this.passwordChangeService = passwordChangeService;
+    }
+
+    @PostMapping("/modifyPwd")
+    public void modifyPwd(@RequestBody ModifyPwdRequest request) {
+        CompanyBiUser user = currentUser();
+        if (request == null || (request.getUid() != null && !user.getId().equals(request.getUid()))) {
+            DEException.throwException("只能修改当前用户的密码");
+        }
+        String oldPassword;
+        String newPassword;
+        try {
+            oldPassword = RsaUtils.decryptStr(request.getPwd());
+            newPassword = RsaUtils.decryptStr(request.getNewPwd());
+        } catch (Exception e) {
+            DEException.throwException("密码参数无效，请刷新页面重试");
+            return;
+        }
+        passwordChangeService.change(user, oldPassword, newPassword);
     }
 
     @GetMapping("/info")

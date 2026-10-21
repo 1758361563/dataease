@@ -106,7 +106,7 @@ function createNew() {
   resourceTreeRef.value?.createNewObject()
 }
 
-const loadCanvasData = (dvId, weight?) => {
+const loadCanvasData = (dvId, weight?, afterLoad?: () => void) => {
   // 复用不设置 dvMain 中的componentData 等画布信息
   const initMethod = showPosition.value === 'multiplexing' ? initCanvasDataPrepare : initCanvasData
   dataInitState.value = false
@@ -131,6 +131,7 @@ const loadCanvasData = (dvId, weight?) => {
       nextTick(() => {
         dashboardPreview.value.restore()
         onInitReady({ resourceId: dvId })
+        afterLoad?.()
       })
     }
   )
@@ -250,6 +251,10 @@ const downLoadApp = appAttachInfo => {
   fileDownload('app', appAttachInfo)
 }
 
+const exportMigration = data => {
+  loadCanvasData(data.id, data.weight, () => downloadAsAppTemplate('app'))
+}
+
 const freezeStyle = computed(() => [
   { '--top-show-offset': state.showOffset.top },
   { '--left-show-offset': state.showOffset.left }
@@ -289,6 +294,7 @@ defineExpose({
         :show-position="showPosition"
         :resource-table="resourceTable"
         @node-click="resourceNodeClick"
+        @export-app="exportMigration"
       />
     </el-aside>
     <el-container

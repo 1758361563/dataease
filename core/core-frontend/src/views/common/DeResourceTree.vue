@@ -14,6 +14,9 @@ import dvDashboardSpineDisabled from '@/assets/svg/dv-dashboard-spine-disabled.s
 import dvScreenSpine from '@/assets/svg/dv-screen-spine.svg'
 import dvNewFolder from '@/assets/svg/dv-new-folder.svg'
 import icon_fileAdd_outlined from '@/assets/svg/icon_file-add_outlined.svg'
+import icon_template from '@/assets/svg/icon_template.svg'
+import AppImportDialog from '@/components/de-app/AppImportDialog.vue'
+import { exportPermission } from '@/utils/utils'
 import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
 import dvSortAsc from '@/assets/svg/dv-sort-asc.svg'
 import dvSortDesc from '@/assets/svg/dv-sort-desc.svg'
@@ -96,6 +99,11 @@ const filterText = ref(null)
 const expandedArray = ref([])
 const resourceListTree = ref()
 const resourceGroupOpt = ref()
+const appImportDialog = ref()
+const handleCreateCommand = (command: string) => {
+  if (command === 'template') appImportDialog.value.open()
+  else addOperation(command, null, command === 'newFolder' ? 'folder' : 'leaf', true)
+}
 const returnMounted = ref(false)
 const state = reactive({
   pWeightMap: {},
@@ -189,9 +197,12 @@ const { handleDrop, allowDrop, handleDragStart } = treeDraggbleChart(
   curCanvasType.value
 )
 
-const menuListWeight = id => {
-  const pWeight = state.pWeightMap[id]
-  return pWeight < 7 ? menuList : menuListWithCopy
+const menuListWeight = data => {
+  const pWeight = state.pWeightMap[data.id]
+  const items = pWeight < 7 ? menuList : menuListWithCopy
+  return curCanvasType.value === 'dashboard' && exportPermission(data.weight, data.ext)[0]
+    ? [{ label: '导出迁移包（应用模板）', command: 'exportApp', svgName: icon_template }, ...items]
+    : items
 }
 const menuListWithCopy = [
   {
@@ -398,9 +409,13 @@ const afterTreeInit = (notOpen = false) => {
 
 const copyLoading = ref(false)
 const openType = wsCache.get('open-backend') === '1' ? '_self' : '_blank'
-const emit = defineEmits(['nodeClick'])
+const emit = defineEmits(['nodeClick', 'exportApp'])
 
 const operation = (cmd: string, data: BusiTreeNode, nodeType: string) => {
+  if (cmd === 'exportApp') {
+    emit('exportApp', data)
+    return
+  }
   if (cmd === 'delete') {
     const msg = data.leaf ? '' : t('visualization.delete_tips')
     const tips_label = data.leaf ? resourceLabel : t('visualization.folder')
@@ -676,7 +691,37 @@ defineExpose({
             </el-icon>
           </el-tooltip>
 
-          <el-tooltip offset="14" :content="newResourceLabel" placement="top" effect="dark">
+          <el-dropdown
+            v-if="curCanvasType === 'dashboard'"
+            trigger="click"
+            @command="handleCreateCommand"
+          >
+            <el-button text circle aria-label="新建或导入仪表板">
+              <el-icon
+                ><Icon name="icon_add_outlined"><icon_add_outlined class="svg-icon" /></Icon
+              ></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="newFolder"
+                  ><el-icon
+                    ><Icon name="dv-folder"><dvFolder /></Icon></el-icon
+                  >文件夹</el-dropdown-item
+                >
+                <el-dropdown-item command="newLeaf"
+                  ><el-icon
+                    ><Icon name="dv-dashboard-spine"><dvDashboardSpine /></Icon></el-icon
+                  >仪表板</el-dropdown-item
+                >
+                <el-dropdown-item command="template"
+                  ><el-icon
+                    ><Icon name="icon_template"><icon_template /></Icon></el-icon
+                  >应用模板</el-dropdown-item
+                >
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-tooltip v-else offset="14" :content="newResourceLabel" placement="top" effect="dark">
             <el-icon class="custom-icon btn" @click="addOperation('newLeaf', null, 'leaf', true)">
               <Icon name="icon_file-add_outlined"><icon_fileAdd_outlined class="svg-icon" /></Icon>
             </el-icon>
@@ -857,7 +902,7 @@ defineExpose({
                 :node="data"
                 :any-manage="anyManage"
                 :resource-type="curCanvasType"
-                :menu-list="data.leaf ? menuListWeight(data.id) : state.folderMenuList"
+                :menu-list="data.leaf ? menuListWeight(data) : state.folderMenuList"
               ></dv-handle-more>
             </div>
           </span>
@@ -870,6 +915,7 @@ defineExpose({
       />
     </el-scrollbar>
   </div>
+  <AppImportDialog v-if="curCanvasType === 'dashboard'" ref="appImportDialog" />
   <XpackComponent ref="openHandler" jsname="L2NvbXBvbmVudC9lbWJlZGRlZC1pZnJhbWUvT3BlbkhhbmRsZXI=" />
 </template>
 <style lang="less" scoped>

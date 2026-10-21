@@ -20,7 +20,7 @@ const pwdForm = reactive(cloneDeep(defaultForm))
 
 const validatePwd = (_: any, value: any, callback: any) => {
   if (value === pwdForm.pwd) {
-    callback(new Error(t('system.be_the_same')))
+    return callback(new Error(t('system.be_the_same')))
   }
   const pattern =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[~!@#$%^&*()_+\-\={}|":<>?`[\];',.\/])[a-zA-Z0-9~!@#$%^&*()_+\-\={}|":<>?`[\];',.\/]{8,128}$/
@@ -79,15 +79,21 @@ const rule = {
   ]
 }
 const updatePwdForm = ref()
+const saving = ref(false)
 
 const emits = defineEmits(['success'])
 
 const save = () => {
-  updatePwdForm.value.validate(val => {
+  if (saving.value) return
+  updatePwdForm.value.validate(async val => {
     if (val) {
-      const pwd = rsaEncryp(pwdForm.pwd)
-      const newPwd = rsaEncryp(pwdForm.newPwd)
-      request.post({ url: '/user/modifyPwd', data: { pwd, newPwd } }).then(() => {
+      saving.value = true
+      try {
+        const pwd = rsaEncryp(pwdForm.pwd)
+        const newPwd = rsaEncryp(pwdForm.newPwd)
+        const response = await request.post({ url: '/user/modifyPwd', data: { pwd, newPwd } })
+        // Some legacy HTTP error handlers resolve with undefined: require explicit API success.
+        if (response?.code !== 0) return
         if (isMobile()) {
           emits('success')
           return
@@ -95,7 +101,11 @@ const save = () => {
 
         ElMessage.success(t('system.log_in_again'))
         logoutHandler()
-      })
+      } catch {
+        // The request interceptor already displays the failure; keep the form open.
+      } finally {
+        saving.value = false
+      }
     }
   })
 }
@@ -135,7 +145,7 @@ const save = () => {
         :placeholder="t('system.the_confirmation_password')"
       />
     </el-form-item>
-    <el-button @click="save" type="primary">
+    <el-button @click="save" type="primary" :loading="saving">
       {{ t('common.save') }}
     </el-button>
   </el-form>

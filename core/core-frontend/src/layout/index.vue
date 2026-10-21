@@ -46,7 +46,7 @@ const { t } = useI18n()
         class="company-admin-sidebar"
         title="权限管理"
         theme-info="light"
-        :width="280"
+        :width="200"
         side-name="companyAdmin"
         aside-position="left"
       >
