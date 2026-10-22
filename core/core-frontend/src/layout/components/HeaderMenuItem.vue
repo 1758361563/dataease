@@ -1,11 +1,15 @@
 <script lang="ts">
 import { h } from 'vue'
-import icon_expandDown_filled from '@/assets/svg/icon_expand-down_filled.svg'
+import { resourceNavIcon } from './navIcons'
+import { NAV_MENU_TIMING } from './navMenu'
+import icon_expandDown_filled from '@/assets/svg/scent/chevron-down.svg'
 import { ElMenuItem, ElSubMenu } from 'element-plus-secondary'
 
 const title = props => {
   const { title } = props?.menu?.meta || {}
-  return [h('span', null, { default: () => title })]
+  const path = props?.menu?.path || ''
+  const icon = resourceNavIcon(path)
+  return [...(icon ? [h(icon)] : []), h('span', null, { default: () => title })]
 }
 
 const HeaderMenuItem = props => {
@@ -20,8 +24,8 @@ const HeaderMenuItem = props => {
       ElSubMenu,
       {
         index: path,
-        'popper-class': 'popper-class-menu',
-        showTimeout: 1,
+        'popper-class': 'scent-nav-popper',
+        ...NAV_MENU_TIMING,
         expandCloseIcon: icon_expandDown_filled,
         expandOpenIcon: icon_expandDown_filled
       },
@@ -42,33 +46,3 @@ const HeaderMenuItem = props => {
 }
 export default HeaderMenuItem
 </script>
-
-<style lang="less">
-.popper-class-menu {
-  --active-color: #1f2329;
-  &.is-light {
-    border: none !important;
-    margin-top: -2px;
-  }
-  .popper-class-menu {
-    min-width: 152px;
-    border-radius: 6px;
-    border: 1px solid #dee0e3 !important;
-
-    .ed-menu--popup {
-      min-width: 150px;
-      padding: 4px;
-      border-radius: 6px;
-
-      .ed-menu-item {
-        padding-left: 8px !important;
-        border-radius: 6px;
-      }
-    }
-
-    .ed-menu--popup .ed-menu-item.is-active.is-active:not(:hover) {
-      background-color: transparent;
-    }
-  }
-}
-</style>

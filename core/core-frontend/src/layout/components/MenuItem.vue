@@ -1,6 +1,7 @@
 <script lang="ts">
 import { h } from 'vue'
 import { ElMenuItem, ElSubMenu, ElIcon } from 'element-plus-secondary'
+import { resourceNavIcon } from './navIcons'
 import auth from '@/assets/svg/auth.svg'
 import association from '@/assets/svg/association.svg'
 import threshold from '@/assets/svg/threshold.svg'
@@ -51,8 +52,11 @@ const iconMap = {
 
 const titleWithIcon = props => {
   const { title, icon } = props.menu?.meta || {}
+  const resolvedIcon = iconMap[icon] || resourceNavIcon(props.menu?.path || '')
   return [
-    h(ElIcon, null, { default: () => h(iconMap[icon], { className: 'svg-icon logo' }) }),
+    ...(resolvedIcon
+      ? [h(ElIcon, null, { default: () => h(resolvedIcon, { class: 'svg-icon' }) })]
+      : []),
     h('span', null, { default: () => title })
   ]
 }
@@ -73,14 +77,18 @@ const MenuItem = props => {
     )
   }
   const { title, icon } = props.menu?.meta || {}
+  const resolvedIcon = iconMap[icon] || resourceNavIcon(path)
   return h(
     ElMenuItem,
     { index: path },
     {
       title: h('span', null, { default: () => title }),
-      default: h(iconMap[icon] ? ElIcon : null, null, {
-        default: () => h(iconMap[icon], { className: 'svg-icon logo' })
-      })
+      default: () =>
+        resolvedIcon
+          ? h(ElIcon, null, {
+              default: () => h(resolvedIcon, { class: 'svg-icon' })
+            })
+          : null
     }
   )
 }

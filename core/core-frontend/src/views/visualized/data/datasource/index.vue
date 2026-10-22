@@ -8,13 +8,11 @@ import icon_intoItem_outlined from '@/assets/svg/icon_into-item_outlined.svg'
 import { throttle } from 'lodash-es'
 import icon_rename_outlined from '@/assets/svg/icon_rename_outlined.svg'
 import icon_warning_colorful_red from '@/assets/svg/icon_warning_colorful_red.svg'
-import dvFolder from '@/assets/svg/dv-folder.svg'
-import dvNewFolder from '@/assets/svg/dv-new-folder.svg'
-import icon_fileAdd_outlined from '@/assets/svg/icon_file-add_outlined.svg'
-import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
-import dvSortAsc from '@/assets/svg/dv-sort-asc.svg'
-import dvSortDesc from '@/assets/svg/dv-sort-desc.svg'
-import icon_add_outlined from '@/assets/svg/icon_add_outlined.svg'
+import dvFolder from '@/assets/svg/scent/folder.svg'
+import sortIcon from '@/assets/svg/scent/arrow-down-wide-narrow.svg'
+import sourceIcon from '@/assets/svg/scent/database.svg'
+import icon_searchOutline_outlined from '@/assets/svg/scent/search.svg'
+import icon_add_outlined from '@/assets/svg/scent/plus.svg'
 import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
 import icon_dataset_outlined from '@/assets/svg/icon_dataset_outlined.svg'
 import icon_newItem_outlined from '@/assets/svg/icon_new-item_outlined.svg'
@@ -1136,37 +1134,29 @@ const getMenuList = (val: boolean) => {
         :style="{ left: (sideTreeStatus ? width - 12 : 0) + 'px' }"
         @change-side-tree-status="changeSideTreeStatus"
       ></ArrowSide>
-      <div class="resource-tree">
+      <div class="resource-tree scent-resource-tree">
         <div class="tree-header">
           <div class="icon-methods">
             <span class="title"> {{ t('datasource.datasource') }} </span>
             <div v-if="rootManage" class="flex-align-center">
-              <el-tooltip
-                offset="14"
-                effect="dark"
-                :content="t('deDataset.new_folder')"
-                placement="top"
+              <el-dropdown
+                trigger="click"
+                popper-class="scent-resource-menu"
+                @command="
+                  command =>
+                    command === 'folder' ? handleDatasourceTree('folder') : createDatasource()
+                "
               >
-                <el-icon
-                  class="custom-icon btn"
-                  :style="{ marginRight: '20px' }"
-                  @click="handleDatasourceTree('folder')"
+                <button type="button" class="scent-add-button" aria-label="新建文件夹或数据源">
+                  <icon_add_outlined />
+                </button>
+                <template #dropdown
+                  ><el-dropdown-menu>
+                    <el-dropdown-item command="folder"><dvFolder />文件夹</el-dropdown-item>
+                    <el-dropdown-item command="source"><sourceIcon />数据源</el-dropdown-item>
+                  </el-dropdown-menu></template
                 >
-                  <Icon name="dv-new-folder"><dvNewFolder class="svg-icon" /></Icon>
-                </el-icon>
-              </el-tooltip>
-              <el-tooltip
-                offset="14"
-                effect="dark"
-                :content="t('datasource.create')"
-                placement="top"
-              >
-                <el-icon class="custom-icon btn" @click="createDatasource">
-                  <Icon name="icon_file-add_outlined"
-                    ><icon_fileAdd_outlined class="svg-icon"
-                  /></Icon>
-                </el-icon>
-              </el-tooltip>
+              </el-dropdown>
             </div>
           </div>
 
@@ -1185,18 +1175,14 @@ const getMenuList = (val: boolean) => {
             </template>
           </el-input>
           <el-dropdown @command="handleSortTypeChange" trigger="click">
-            <el-icon class="filter-icon-span">
-              <el-tooltip :offset="16" effect="dark" :content="sortTypeTip" placement="top">
-                <Icon name="dv-sort-asc" class="opt-icon"
-                  ><dvSortAsc v-if="state.curSortType.includes('asc')" class="svg-icon opt-icon"
-                /></Icon>
-              </el-tooltip>
-              <el-tooltip :offset="16" effect="dark" :content="sortTypeTip" placement="top">
-                <Icon name="dv-sort-desc" class="opt-icon"
-                  ><dvSortDesc v-if="state.curSortType.includes('desc')" class="svg-icon opt-icon"
-                /></Icon>
-              </el-tooltip>
-            </el-icon>
+            <button
+              type="button"
+              class="filter-icon-span"
+              :aria-label="sortTypeTip"
+              :title="sortTypeTip"
+            >
+              <sortIcon />
+            </button>
             <template #dropdown>
               <el-dropdown-menu style="width: 246px">
                 <template :key="ele.value" v-for="ele in sortList">

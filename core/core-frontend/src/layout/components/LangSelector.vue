@@ -36,7 +36,10 @@ onMounted(async () => {
 </script>
 <template>
   <div class="language-container">
-    <div
+    <button
+      type="button"
+      role="menuitemradio"
+      :aria-checked="language === item.value"
       v-for="item in options"
       :key="item.value"
       class="language-item"
@@ -47,12 +50,18 @@ onMounted(async () => {
       <el-icon v-if="language === item.value">
         <Icon name="icon_done_outlined"><icon_done_outlined class="svg-icon" /></Icon>
       </el-icon>
-    </div>
+    </button>
   </div>
 </template>
 
 <style lang="less" scoped>
 .language-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   height: 32px;
   display: flex;
   align-items: center;
@@ -61,7 +70,7 @@ onMounted(async () => {
   border-radius: 6px;
   &:hover {
     cursor: pointer;
-    background-color: #1f23291a;
+    background-color: var(--bi-bg-hover, #f0f4f9);
   }
 }
 .active {

@@ -17,8 +17,8 @@
       font-size: 13px;
     }
     .ed-menu-item.is-active {
-      color: #4a64c5;
-      background: #edf2fc !important;
+      color: var(--bi-primary, #526fa8);
+      background: var(--bi-selected-bg, #ebf1f9) !important;
     }
     .ed-menu-item:not(.is-active):hover {
       background: #f3f6fb !important;
@@ -53,7 +53,7 @@
   .ed-button.is-text {
     min-height: 28px;
     padding: 5px 7px;
-    color: #5872cd;
+    color: var(--bi-primary, #526fa8);
     font-size: 12px;
   }
   .ed-button.is-text + .ed-button.is-text {
@@ -232,7 +232,7 @@
   .ed-radio-button.is-active .ed-radio-button__inner,
   .ed-radio-button__original-radio:checked + .ed-radio-button__inner {
     background: #fff !important;
-    color: #425d96 !important;
+    color: var(--bi-primary, #526fa8) !important;
   }
   .admin-tabs > .ed-tabs__header {
     margin: 0;

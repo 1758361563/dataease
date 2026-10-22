@@ -1,8 +1,14 @@
 <script lang="ts" setup>
-import userImg from '@/assets/svg/user-img.svg'
-import icon_expandDown_filled from '@/assets/svg/icon_expand-down_filled.svg'
-import { computed, ref, unref } from 'vue'
-import { Icon } from '@/components/icon-custom'
+import userImg from '@/assets/svg/scent/user-round.svg'
+import chevronDown from '@/assets/svg/scent/chevron-down.svg'
+import chevronRight from '@/assets/svg/scent/chevron-right.svg'
+import settingsIcon from '@/assets/svg/scent/settings-2.svg'
+import keyIcon from '@/assets/svg/scent/key-round.svg'
+import infoIcon from '@/assets/svg/scent/info.svg'
+import languagesIcon from '@/assets/svg/scent/languages.svg'
+import logoutIcon from '@/assets/svg/scent/log-out.svg'
+import { NAV_MENU_TIMING } from './navMenu'
+import { computed, ref, watch } from 'vue'
 import { useUserStoreWithOut } from '@/store/modules/user'
 import { logoutApi } from '@/api/login'
 import { logoutHandler } from '@/utils/logout'
@@ -15,7 +21,6 @@ import router from '@/router'
 import { useCache } from '@/hooks/web/useCache'
 import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 const appearanceStore = useAppearanceStoreWithOut()
-const navigateBg = computed(() => appearanceStore.getNavigateBg)
 const { wsCache } = useCache()
 const userStore = useUserStoreWithOut()
 const { t } = useI18n()
@@ -34,6 +39,7 @@ if (!appearanceStore.getShowAbout) {
 const inPlatformClient = computed(() => !!wsCache.get('de-platform-client'))
 
 const logout = async () => {
+  closeAccount()
   await logoutApi()
   logoutHandler()
 }
@@ -70,6 +76,7 @@ const toAbout = () => {
 }
 
 const executeMethod = (item: LinkItem) => {
+  closeAccount()
   if (item?.method) {
     toAbout()
   }
@@ -82,19 +89,14 @@ const executeMethod = (item: LinkItem) => {
 const name = computed(() => userStore.getName)
 const uid = computed(() => userStore.getUid)
 
-const buttonRef = ref()
-const popoverRef = ref()
-
-const divLanguageRef = ref()
-const popoverLanguageRef = ref()
-
-const openLanguage = () => {
-  unref(popoverLanguageRef).popperRef?.delayHide?.()
+const accountMenu = ref()
+const closeAccount = () => {
+  accountMenu.value?.close('account-language')
+  accountMenu.value?.close('account')
 }
-
-const openPopover = () => {
-  unref(popoverRef).popperRef?.delayHide?.()
-}
+watch(() => router.currentRoute.value.fullPath, closeAccount)
+const accountLinkIcon = (item: LinkItem) =>
+  item.method === 'toAbout' ? infoIcon : item.link?.includes('modify-pwd') ? keyIcon : settingsIcon
 
 if (uid.value === '1') {
   linkLoaded([{ id: 4, link: '/sys-setting/parameter', label: t('commons.system_setting') }])
@@ -106,184 +108,63 @@ if (uid.value === '1') {
 </script>
 
 <template>
-  <div
-    class="top-info-container"
-    :class="{ 'is-light-top-info': navigateBg && navigateBg === 'light' }"
-    ref="buttonRef"
-    v-click-outside="openPopover"
+  <el-menu
+    ref="accountMenu"
+    mode="horizontal"
+    :ellipsis="false"
+    menu-trigger="hover"
+    class="scent-account-menu"
+    close-on-click-outside
+    v-bind="NAV_MENU_TIMING"
+    @select="closeAccount"
   >
-    <el-icon class="main-color">
-      <Icon name="user-img"><userImg class="svg-icon" /></Icon>
-    </el-icon>
-    <span class="uname-span">{{ name }}</span>
-    <el-icon class="el-icon-animate">
-      <Icon name="icon_expand-down_filled"><icon_expandDown_filled class="svg-icon" /></Icon>
-    </el-icon>
-  </div>
-  <el-popover
-    ref="popoverRef"
-    :virtual-ref="buttonRef"
-    trigger="click"
-    title=""
-    virtual-triggering
-    placement="bottom-start"
-    popper-class="uinfo-popover"
-    width="224"
-  >
-    <div class="uinfo-container">
-      <div class="uinfo-header de-container">
-        <span class="uinfo-name">{{ name }}</span>
-        <span class="uinfo-id">{{ `ID: ${uid}` }}</span>
-      </div>
-      <el-divider />
-      <div class="uinfo-main">
-        <div
-          class="uinfo-main-item de-container"
-          v-for="link in linkList"
-          :key="link.id"
-          @click="executeMethod(link)"
+    <el-sub-menu
+      index="account"
+      popper-class="scent-nav-popper scent-account-popper"
+      v-bind="NAV_MENU_TIMING"
+      :expand-close-icon="chevronDown"
+      :expand-open-icon="chevronDown"
+    >
+      <template #title>
+        <div class="top-info-container" :aria-label="name">
+          <el-icon class="main-color"><userImg /></el-icon>
+          <span class="uname-span">{{ name }}</span>
+        </div>
+      </template>
+      <li class="scent-account-identity" role="presentation">
+        <span>{{ name }}</span
+        ><small>{{ 'ID: ' + uid }}</small>
+      </li>
+      <el-menu-item
+        v-for="link in linkList"
+        :key="link.id"
+        :index="'account-link-' + link.id"
+        @click="executeMethod(link)"
+      >
+        <component :is="accountLinkIcon(link)" /><span>{{ link.label }}</span>
+      </el-menu-item>
+      <el-sub-menu
+        index="account-language"
+        popper-class="scent-nav-popper scent-language-popper"
+        v-bind="NAV_MENU_TIMING"
+        :expand-close-icon="chevronRight"
+        :expand-open-icon="chevronRight"
+      >
+        <template #title
+          ><languagesIcon /><span>{{ t('commons.language') }}</span></template
         >
-          <span>{{ link.label }}</span>
-        </div>
-
-        <div class="uinfo-main-item de-container">
-          <div class="about-parent" ref="divLanguageRef" v-click-outside="openLanguage">
-            <span>{{ $t('commons.language') }}</span>
-            <el-icon class="el-icon-animate">
-              <ArrowRight />
-            </el-icon>
-          </div>
-          <el-popover
-            ref="popoverLanguageRef"
-            :virtual-ref="divLanguageRef"
-            trigger="hover"
-            title=""
-            virtual-triggering
-            placement="left"
-            width="224"
-            popper-class="language-popover"
-          >
-            <LangSelector />
-          </el-popover>
-        </div>
-      </div>
-      <el-divider />
-      <div class="uinfo-footer" v-if="!inPlatformClient">
-        <div class="uinfo-main-item de-container" @click="logout">
-          <span>{{ t('common.exit_system') }}</span>
-        </div>
-      </div>
-    </div>
-  </el-popover>
-
+        <li class="scent-language-options" role="presentation"><LangSelector /></li>
+      </el-sub-menu>
+      <el-menu-item
+        v-if="!inPlatformClient"
+        index="account-logout"
+        class="scent-account-logout"
+        @click="logout"
+      >
+        <logoutIcon /><span>{{ t('common.exit_system') }}</span>
+      </el-menu-item>
+    </el-sub-menu>
+  </el-menu>
   <AboutPage />
   <XpackComponent jsname="dWNlbnRlci1oYW5kbGVy" @loaded="xpackLinkLoaded" />
 </template>
-
-<style lang="less">
-.el-icon-animate {
-  width: 12px;
-  height: 12px;
-  font-size: 14px !important;
-}
-.is-light-top-info {
-  .uname-span {
-    font-family: var(--de-custom_font, 'PingFang');
-    color: var(--ed-color-black) !important;
-  }
-  &:hover {
-    background-color: var(--ed-color-primary-1a, rgba(51, 112, 255, 0.1)) !important;
-  }
-}
-.top-info-container {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  &:hover {
-    background-color: #1e2738;
-  }
-  .main-color {
-    background: var(--ed-color-primary);
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-  }
-  .uname-span {
-    font-family: var(--de-custom_font, 'PingFang');
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.8);
-  }
-  .ed-icon {
-    margin: 0 5px;
-  }
-}
-.uinfo-container {
-  width: 100%;
-  height: 100%;
-  .de-container {
-    padding: 0 8px 10px;
-  }
-  .ed-divider--horizontal {
-    margin: 0 0 !important;
-    color: #1f2329;
-    opacity: 0.35;
-  }
-  .uinfo-header {
-    span {
-      display: block;
-    }
-    .uinfo-name {
-      font-size: 14px;
-      font-weight: 500;
-      color: #1f2329;
-    }
-    .uinfo-id {
-      font-size: 14px;
-      font-weight: 400;
-      color: #646a73;
-      margin-top: 5px;
-    }
-  }
-  .uinfo-main,
-  .uinfo-footer {
-    width: 100%;
-    padding: 4px;
-    .uinfo-main-item {
-      width: 100%;
-      height: 40px;
-      line-height: 40px;
-      border-radius: 6px;
-      cursor: pointer;
-      &:hover {
-        background-color: #1f23291a;
-      }
-      .about-parent {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-    }
-  }
-}
-.uinfo-popover {
-  max-height: 372px;
-  .ed-popper__arrow {
-    display: none;
-  }
-  .ed-popover__title {
-    display: none;
-  }
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  padding-bottom: 0 !important;
-}
-.language-popover {
-  .ed-popper__arrow {
-    display: none;
-  }
-  padding: 4px !important;
-}
-</style>

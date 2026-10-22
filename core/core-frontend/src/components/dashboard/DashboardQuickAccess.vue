@@ -10,7 +10,7 @@ import {
 import type { BusiTreeNode } from '@/models/tree/TreeNode'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { Icon } from '@/components/icon-custom'
-import dashboardIcon from '@/assets/svg/dv-dashboard-spine.svg'
+import dashboardIcon from '@/assets/svg/scent/layout-dashboard.svg'
 import favoriteIcon from '@/assets/svg/visual-star.svg'
 import emptyFavoriteIcon from '@/assets/svg/icon_collection_outlined.svg'
 
@@ -178,9 +178,9 @@ const timeLabel = (time?: number) => {
     background: #f7f9fc;
   }
   &.selected {
-    background: #edf2fc;
+    background: #ebf1f9;
     .shortcut-name {
-      color: #4966c7;
+      color: #48659d;
       font-weight: 500;
     }
   }
@@ -200,11 +200,11 @@ const timeLabel = (time?: number) => {
 }
 .shortcut-icon {
   flex: 0 0 auto;
-  color: #91a4cc;
-  font-size: 16px;
+  color: #6d88af;
+  font-size: 18px;
 }
-.shortcut-icon :deep(.svg-primary-color) {
-  fill: currentColor;
+.shortcut-row.selected :deep(.scent-icon) {
+  color: var(--scent-icon-active, #526fa8);
 }
 .shortcut-star.favorited :deep(path) {
   fill: currentColor;

@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import dvBatch from '@/assets/svg/dv-batch.svg'
-import dvDashboard from '@/assets/svg/dv-dashboard.svg'
-import dvHidden from '@/assets/svg/dv-hidden.svg'
-import dvFilter from '@/assets/svg/dv-filter.svg'
-import dvMedia from '@/assets/svg/dv-media.svg'
-import dvMoreCom from '@/assets/svg/dv-more-com.svg'
-import dvTab from '@/assets/svg/dv-tab.svg'
-import dvText from '@/assets/svg/dv-text.svg'
-import dvView from '@/assets/svg/dv-view.svg'
-import icon_params_setting from '@/assets/svg/icon_params_setting.svg'
-import dashboardParamsIcon from '@/assets/svg/sys-param.svg'
-import icon_phone_outlined from '@/assets/svg/icon_phone_outlined.svg'
-import icon_copy_filled from '@/assets/svg/icon_copy_filled.svg'
-import icon_left_outlined from '@/assets/svg/icon_left_outlined.svg'
-import icon_undo_outlined from '@/assets/svg/icon_undo_outlined.svg'
-import icon_redo_outlined from '@/assets/svg/icon_redo_outlined.svg'
-import icon_pc_fullscreen from '@/assets/svg/icon_pc_fullscreen.svg'
-import dvPreviewOuter from '@/assets/svg/dv-preview-outer.svg'
-import dvRecoverOutlined from '@/assets/svg/dv-recover_outlined.svg'
-import dvCancelPublish from '@/assets/svg/icon_undo_outlined.svg'
+import dvBatch from '@/assets/svg/scent/list-checks.svg'
+import dvDashboard from '@/assets/svg/scent/palette.svg'
+import dvHidden from '@/assets/svg/scent/eye-off.svg'
+import dvFilter from '@/assets/svg/scent/funnel.svg'
+import dvMedia from '@/assets/svg/scent/image.svg'
+import dvMoreCom from '@/assets/svg/scent/layout-grid.svg'
+import dvTab from '@/assets/svg/scent/panels-top-left.svg'
+import dvText from '@/assets/svg/scent/type.svg'
+import dvView from '@/assets/svg/scent/chart-pie.svg'
+import icon_params_setting from '@/assets/svg/scent/settings-2.svg'
+import dashboardParamsIcon from '@/assets/svg/scent/sliders-horizontal.svg'
+import icon_phone_outlined from '@/assets/svg/scent/smartphone.svg'
+import icon_copy_filled from '@/assets/svg/scent/copy.svg'
+import icon_left_outlined from '@/assets/svg/scent/chevron-left.svg'
+import icon_undo_outlined from '@/assets/svg/scent/undo-2.svg'
+import icon_redo_outlined from '@/assets/svg/scent/redo-2.svg'
+import icon_pc_fullscreen from '@/assets/svg/scent/monitor.svg'
+import dvPreviewOuter from '@/assets/svg/scent/external-link.svg'
+import dvRecoverOutlined from '@/assets/svg/scent/rotate-ccw.svg'
+import dvCancelPublish from '@/assets/svg/scent/undo-2.svg'
 import { ElIcon, ElMessage, ElMessageBox } from 'element-plus-secondary'
 import eventBus from '@/utils/eventBus'
 import { useEmbedded } from '@/store/modules/embedded'
@@ -530,7 +530,7 @@ const initOpenHandler = newWindow => {
 </script>
 
 <template>
-  <div class="toolbar-main">
+  <div class="toolbar-main scent-editor-toolbar">
     <div class="toolbar">
       <template v-if="editMode === 'preview'">
         <div class="left-area">
@@ -749,6 +749,7 @@ const initOpenHandler = newWindow => {
         <template v-if="editMode === 'edit' || editMode === 'preview'">
           <el-button
             v-if="editMode === 'edit' || editMode === 'preview'"
+            class="scent-save-button"
             :disabled="styleChangeTimes < 1"
             @click="saveCanvasWithCheck()"
             style="float: right; margin-right: 12px"

@@ -1,19 +1,17 @@
 <script lang="tsx" setup>
 import icon_copy_filled from '@/assets/svg/icon_copy_filled.svg'
-import icon_dataset from '@/assets/svg/icon_dataset.svg'
+import icon_dataset from '@/assets/svg/scent/table-2.svg'
 import icon_deleteTrash_outlined from '@/assets/svg/icon_delete-trash_outlined.svg'
 import icon_intoItem_outlined from '@/assets/svg/icon_into-item_outlined.svg'
 import { throttle } from 'lodash-es'
 import icon_rename_outlined from '@/assets/svg/icon_rename_outlined.svg'
-import dvNewFolder from '@/assets/svg/dv-new-folder.svg'
-import icon_fileAdd_outlined from '@/assets/svg/icon_file-add_outlined.svg'
 import { moveDatasetTree } from '@/api/dataset'
-import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
-import dvSortAsc from '@/assets/svg/dv-sort-asc.svg'
-import dvSortDesc from '@/assets/svg/dv-sort-desc.svg'
-import dvFolder from '@/assets/svg/dv-folder.svg'
+import icon_searchOutline_outlined from '@/assets/svg/scent/search.svg'
+import dvFolder from '@/assets/svg/scent/folder.svg'
+import folderOpen from '@/assets/svg/scent/folder-open.svg'
+import sortIcon from '@/assets/svg/scent/arrow-down-wide-narrow.svg'
 import { treeDraggble } from '@/utils/treeDraggble'
-import icon_add_outlined from '@/assets/svg/icon_add_outlined.svg'
+import icon_add_outlined from '@/assets/svg/scent/plus.svg'
 import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
 import icon_dashboard_outlined from '@/assets/svg/icon_dashboard_outlined.svg'
 import icon_operationAnalysis_outlined from '@/assets/svg/icon_operation-analysis_outlined.svg'
@@ -849,39 +847,28 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
         :style="{ left: (sideTreeStatus ? width - 12 : 0) + 'px' }"
         @change-side-tree-status="changeSideTreeStatus"
       ></ArrowSide>
-      <div class="resource-tree">
+      <div class="resource-tree scent-resource-tree">
         <div class="tree-header">
           <div class="icon-methods">
             <span class="title"> {{ t('auth.dataset') }} </span>
             <div v-if="rootManage" class="flex-align-center">
-              <el-tooltip
-                class="box-item"
-                effect="dark"
-                offset="14"
-                :content="t('deDataset.new_folder')"
-                placement="top"
+              <el-dropdown
+                trigger="click"
+                popper-class="scent-resource-menu"
+                @command="
+                  command => (command === 'folder' ? handleDatasetTree('folder') : createDataset())
+                "
               >
-                <el-icon
-                  class="custom-icon btn"
-                  style="margin-right: 20px"
-                  @click="handleDatasetTree('folder')"
+                <button type="button" class="scent-add-button" aria-label="新建文件夹或数据集">
+                  <icon_add_outlined />
+                </button>
+                <template #dropdown
+                  ><el-dropdown-menu>
+                    <el-dropdown-item command="folder"><dvFolder />文件夹</el-dropdown-item>
+                    <el-dropdown-item command="dataset"><icon_dataset />数据集</el-dropdown-item>
+                  </el-dropdown-menu></template
                 >
-                  <Icon name="dv-new-folder"><dvNewFolder class="svg-icon" /></Icon>
-                </el-icon>
-              </el-tooltip>
-              <el-tooltip
-                class="box-item"
-                effect="dark"
-                offset="14"
-                :content="t('data_set.a_new_dataset')"
-                placement="top"
-              >
-                <el-icon class="custom-icon btn" @click="createDataset">
-                  <Icon name="icon_file-add_outlined"
-                    ><icon_fileAdd_outlined class="svg-icon"
-                  /></Icon>
-                </el-icon>
-              </el-tooltip>
+              </el-dropdown>
             </div>
           </div>
           <el-input
@@ -899,18 +886,14 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
             </template>
           </el-input>
           <el-dropdown @command="handleSortTypeChange" trigger="click">
-            <el-icon class="filter-icon-span">
-              <el-tooltip :offset="16" effect="dark" :content="sortTypeTip" placement="top">
-                <Icon name="dv-sort-asc" class="opt-icon"
-                  ><dvSortAsc v-if="state.curSortType.includes('asc')" class="svg-icon opt-icon"
-                /></Icon>
-              </el-tooltip>
-              <el-tooltip :offset="16" effect="dark" :content="sortTypeTip" placement="top">
-                <Icon name="dv-sort-desc" class="opt-icon"
-                  ><dvSortDesc v-if="state.curSortType.includes('desc')" class="svg-icon"
-                /></Icon>
-              </el-tooltip>
-            </el-icon>
+            <button
+              type="button"
+              class="filter-icon-span"
+              :aria-label="sortTypeTip"
+              :title="sortTypeTip"
+            >
+              <sortIcon />
+            </button>
             <template #dropdown>
               <el-dropdown-menu style="width: 246px">
                 <template :key="ele.value" v-for="ele in sortList">
@@ -950,7 +933,7 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
             <template #default="{ node, data }">
               <span class="custom-tree-node" :class="{ 'node-disabled-custom': data.weight === 0 }">
                 <el-icon v-if="!data.leaf" style="font-size: 18px">
-                  <Icon name="dv-folder"><dvFolder class="svg-icon" /></Icon>
+                  <Icon><component :is="node.expanded ? folderOpen : dvFolder" /></Icon>
                 </el-icon>
                 <el-icon v-if="data.leaf" style="font-size: 18px">
                   <Icon name="icon_dataset"><icon_dataset class="svg-icon" /></Icon>

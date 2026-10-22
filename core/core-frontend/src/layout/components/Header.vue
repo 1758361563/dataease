@@ -1,13 +1,14 @@
 <script lang="ts" setup>
-import logo from '@/assets/svg/logo.svg'
+import ScentBrand from './ScentBrand.vue'
 import logo_sqlbot from '@/assets/svg/logo_sqlbot.svg'
 import msgNotice from '@/assets/svg/icon_notification_outlined.svg'
-import dvPreviewDownload from '@/assets/svg/icon_download_outlined.svg'
+import dvPreviewDownload from '@/assets/svg/scent/download.svg'
 import { computed, onMounted, ref } from 'vue'
 import { usePermissionStore } from '@/store/modules/permission'
 import { isExternal } from '@/utils/validate'
 import { formatRoute } from '@/router/establish'
 import HeaderMenuItem from './HeaderMenuItem.vue'
+import { NAV_MENU_TIMING } from './navMenu'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { Icon } from '@/components/icon-custom'
 import SystemCfg from './SystemCfg.vue'
@@ -16,11 +17,9 @@ import { useRouter, useRoute } from 'vue-router_2'
 import AccountOperator from '@/layout/components/AccountOperator.vue'
 import { isDesktop } from '@/utils/ModelUtil'
 import { XpackComponent } from '@/components/plugin'
-import { useAppearanceStoreWithOut } from '@/store/modules/appearance'
 import DesktopSetting from './DesktopSetting.vue'
 import request from '@/config/axios'
 
-const appearanceStore = useAppearanceStoreWithOut()
 const { push } = useRouter()
 const route = useRoute()
 import { useCache } from '@/hooks/web/useCache'
@@ -74,8 +73,6 @@ const initShowMsg = () => {
 const initShowToolbox = () => {
   showToolbox.value = permissionStore.getRouters.some(route => route.path === '/toolbox')
 }
-const navigateBg = computed(() => appearanceStore.getNavigateBg)
-const navigate = computed(() => appearanceStore.getNavigate)
 
 const msgNoticePush = () => {
   push('/msg/msg-fill')
@@ -104,17 +101,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-header class="header-flex" :class="{ 'header-light': navigateBg === 'light' }">
-    <img class="logo" v-if="navigate" :src="navigate" alt="" />
-    <Icon v-else
-      ><logo @click="handleIconClick" class="svg-icon logo" style="cursor: pointer"
-    /></Icon>
+  <el-header class="header-flex scent-navbar">
+    <ScentBrand @click="handleIconClick" />
     <el-menu
       :default-active="activeIndex"
       mode="horizontal"
       :ellipsis="false"
+      menu-trigger="hover"
+      close-on-click-outside
+      v-bind="NAV_MENU_TIMING"
       @select="handleSelect"
-      :effect="navigateBg === 'light' ? 'light' : 'dark'"
+      effect="light"
     >
       <HeaderMenuItem v-for="menu in routers" :key="menu.path" :menu="menu"></HeaderMenuItem>
     </el-menu>
@@ -132,14 +129,14 @@ onMounted(() => {
         :content="t('data_export.export_center')"
         placement="bottom"
       >
-        <el-icon
-          class="preview-download_icon"
-          :class="navigateBg === 'light' && 'is-light-setting'"
+        <button
+          type="button"
+          class="scent-action-button"
+          :aria-label="t('data_export.export_center')"
+          @click="downloadClick"
         >
-          <Icon name="dv-preview-download"
-            ><dvPreviewDownload @click="downloadClick" class="svg-icon"
-          /></Icon>
-        </el-icon>
+          <dvPreviewDownload />
+        </button>
       </el-tooltip>
 
       <ToolboxCfg v-if="showToolbox" />
@@ -156,10 +153,7 @@ onMounted(() => {
           :value="badgeCount"
           class="ed-badge_custom"
         >
-          <el-icon
-            class="preview-download_icon"
-            :class="navigateBg === 'light' && 'is-light-setting'"
-          >
+          <el-icon class="preview-download_icon">
             <Icon><msgNotice @click="msgNoticePush" class="svg-icon" /></Icon>
           </el-icon>
         </el-badge>
@@ -173,108 +167,3 @@ onMounted(() => {
     </div>
   </el-header>
 </template>
-
-<style lang="less" scoped>
-:deep(.ed-badge_custom) {
-  --ed-badge-size: 14px;
-  height: 28px;
-  .ed-badge__content {
-    right: 0;
-    padding: 3px;
-    border: none;
-    font-size: 8px;
-    transform: translateX(20%) translateY(-30%);
-  }
-}
-.preview-download_icon {
-  height: 28px;
-  width: 28px;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  &:hover {
-    background-color: #1e2738;
-  }
-  &.is-light-setting {
-    &:hover {
-      background-color: #1f23291a !important;
-    }
-  }
-}
-
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5); /* 半透明黑色 */
-  z-index: 10000;
-}
-
-.header-flex {
-  margin-bottom: 0.5px;
-  display: flex;
-  align-items: center;
-  height: 56px;
-  background-color: #050e21;
-  padding: 0 24px;
-  .operate-setting {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    &:focus {
-      outline: none;
-    }
-  }
-
-  .ed-menu.ed-menu--horizontal {
-    border-bottom: none;
-    background: transparent;
-  }
-}
-
-.header-light {
-  background-color: #ffffff !important;
-  box-shadow: 0px 0.5px 0px 0px #1f232926 !important;
-  .logo {
-    color: #3371ff !important;
-  }
-}
-
-.logo {
-  width: 134px;
-  height: 34px;
-  margin-right: 48px;
-  color: #ffffff;
-}
-</style>
-
-<style lang="less">
-.header-flex {
-  .operate-setting {
-    .ed-icon {
-      cursor: pointer;
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 20px;
-    }
-  }
-}
-.header-light {
-  .operate-setting {
-    .ed-icon {
-      color: #646a73 !important;
-    }
-  }
-}
-
-.ai-icon {
-  font-size: 24px !important;
-}
-
-.ai-icon-tips,
-.copilot-icon-tips {
-  font-size: 24px !important;
-  z-index: 10001;
-}
-</style>

@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import dvDashboardSpineMobile from '@/assets/svg/dv-dashboard-spine-mobile.svg'
-import dvDashboardSpineMobileDisabled from '@/assets/svg/dv-dashboard-spine-mobile-disabled.svg'
-import icon_add_outlined from '@/assets/svg/icon_add_outlined.svg'
+import icon_add_outlined from '@/assets/svg/scent/plus.svg'
 import dvCopyDark from '@/assets/svg/dv-copy-dark.svg'
 import dvDelete from '@/assets/svg/dv-delete.svg'
 import dvMove from '@/assets/svg/dv-move.svg'
@@ -9,18 +7,16 @@ import dvCancelPublish from '@/assets/svg/icon_undo_outlined.svg'
 import { treeDraggbleChart } from '@/utils/treeDraggbleChart'
 import { throttle } from 'lodash-es'
 import dvRename from '@/assets/svg/dv-rename.svg'
-import dvDashboardSpine from '@/assets/svg/dv-dashboard-spine.svg'
-import dvDashboardSpineDisabled from '@/assets/svg/dv-dashboard-spine-disabled.svg'
+import dvDashboardSpine from '@/assets/svg/scent/layout-dashboard.svg'
 import dvScreenSpine from '@/assets/svg/dv-screen-spine.svg'
-import dvNewFolder from '@/assets/svg/dv-new-folder.svg'
 import icon_fileAdd_outlined from '@/assets/svg/icon_file-add_outlined.svg'
-import icon_template from '@/assets/svg/icon_template.svg'
+import icon_template from '@/assets/svg/scent/panels-top-left.svg'
 import AppImportDialog from '@/components/de-app/AppImportDialog.vue'
 import { exportPermission } from '@/utils/utils'
-import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
-import dvSortAsc from '@/assets/svg/dv-sort-asc.svg'
-import dvSortDesc from '@/assets/svg/dv-sort-desc.svg'
-import dvFolder from '@/assets/svg/dv-folder.svg'
+import icon_searchOutline_outlined from '@/assets/svg/scent/search.svg'
+import dvFolder from '@/assets/svg/scent/folder.svg'
+import folderOpen from '@/assets/svg/scent/folder-open.svg'
+import sortIcon from '@/assets/svg/scent/arrow-down-wide-narrow.svg'
 import icon_operationAnalysis_outlined from '@/assets/svg/icon_operation-analysis_outlined.svg'
 import icon_edit_outlined from '@/assets/svg/icon_edit_outlined.svg'
 import { onMounted, reactive, ref, toRefs, watch, nextTick, computed } from 'vue'
@@ -673,36 +669,25 @@ defineExpose({
 </script>
 
 <template>
-  <div class="resource-tree" :class="{ 'dashboard-quick-tree': quickAccessEnabled }">
+  <div
+    class="resource-tree scent-resource-tree"
+    :class="{ 'dashboard-quick-tree': quickAccessEnabled }"
+  >
     <div class="tree-header">
       <div class="icon-methods" v-show="showPosition === 'preview'">
         <span class="title"> {{ resourceLabel }} </span>
         <div v-if="rootManage" class="flex-align-center">
-          <el-tooltip
-            offset="14"
-            :content="t('work_branch.new_folder')"
-            placement="top"
-            effect="dark"
-          >
-            <el-icon
-              class="custom-icon btn"
-              style="margin-right: 20px"
-              @click="addOperation('newFolder', null, 'folder')"
-            >
-              <Icon name="dv-new-folder"><dvNewFolder class="svg-icon" /></Icon>
-            </el-icon>
-          </el-tooltip>
-
           <el-dropdown
             v-if="curCanvasType === 'dashboard'"
             trigger="click"
+            popper-class="scent-resource-menu"
             @command="handleCreateCommand"
           >
-            <el-button text circle aria-label="新建或导入仪表板">
+            <button type="button" class="scent-add-button" aria-label="新建或导入仪表板">
               <el-icon
                 ><Icon name="icon_add_outlined"><icon_add_outlined class="svg-icon" /></Icon
               ></el-icon>
-            </el-button>
+            </button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="newFolder"
@@ -750,18 +735,14 @@ defineExpose({
         @command="handleSortTypeChange"
         trigger="click"
       >
-        <el-icon class="filter-icon-span">
-          <el-tooltip :offset="16" effect="dark" :content="sortTypeTip" placement="top">
-            <Icon v-if="state.curSortType.includes('asc')" name="dv-sort-asc" class="opt-icon"
-              ><dvSortAsc class="svg-icon opt-icon"
-            /></Icon>
-          </el-tooltip>
-          <el-tooltip :offset="16" effect="dark" :content="sortTypeTip" placement="top">
-            <Icon v-if="state.curSortType.includes('desc')" name="dv-sort-desc" class="opt-icon"
-              ><dvSortDesc class="svg-icon opt-icon"
-            /></Icon>
-          </el-tooltip>
-        </el-icon>
+        <button
+          type="button"
+          class="filter-icon-span"
+          :aria-label="sortTypeTip"
+          :title="sortTypeTip"
+        >
+          <sortIcon />
+        </button>
         <template #dropdown>
           <el-dropdown-menu style="width: 246px">
             <template :key="ele.value" v-for="ele in sortList">
@@ -842,19 +823,10 @@ defineExpose({
             :class="{ 'node-disabled-custom': data.extraFlag1 === 0 || data.weight === 0 }"
           >
             <el-icon style="font-size: 18px" v-if="!data.leaf">
-              <Icon name="dv-folder"><dvFolder class="svg-icon" /></Icon>
+              <Icon><component :is="node.expanded ? folderOpen : dvFolder" /></Icon>
             </el-icon>
             <el-icon style="font-size: 18px" v-else-if="curCanvasType === 'dashboard'">
-              <Icon v-if="data.extraFlag1"
-                ><component
-                  :is="data.extraFlag ? dvDashboardSpineMobile : dvDashboardSpine"
-                ></component
-              ></Icon>
-              <Icon v-if="!data.extraFlag1"
-                ><component
-                  :is="data.extraFlag ? dvDashboardSpineMobileDisabled : dvDashboardSpineDisabled"
-                ></component
-              ></Icon>
+              <dvDashboardSpine />
             </el-icon>
             <el-icon
               class="icon-screen-new color-dataV"

@@ -1,0 +1,158 @@
+/* Component-library selectors repeat .is-active, and some backgrounds are
+   hardcoded. Cover those states explicitly, including teleported menus. */
+.scent-nav-popper .ed-menu--popup .ed-menu-item.is-active.is-active.is-active,
+.company-admin-layout .company-admin-sidebar .ed-menu-item.is-active.is-active.is-active {
+  background: var(--bi-selected-bg) !important;
+  color: var(--bi-primary) !important;
+  .scent-icon {
+    color: var(--bi-primary);
+  }
+}
+
+.scent-resource-tree.resource-tree .ed-tree-node.is-current > .ed-tree-node__content {
+  background: var(--bi-selected-bg) !important;
+  color: var(--bi-primary) !important;
+  .label-tooltip {
+    color: inherit;
+  }
+}
+
+.scent-resource-tree.resource-tree .dashboard-sidebar-modes button.active {
+  color: var(--bi-primary) !important;
+}
+.company-admin-layout .company-admin-sidebar .ed-menu-item .scent-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.ed-select__popper .ed-select-dropdown__item.selected:not(.is-disabled),
+.ed-select__popper .ed-select-dropdown__item.is-selected:not(.is-disabled),
+.scent-resource-menu .ed-dropdown-menu__item.selected:not(.is-disabled) {
+  background: var(--bi-selected-bg);
+  color: var(--bi-primary);
+}
+
+.company-admin-page .ed-tabs__item.is-active,
+.company-admin-page .ed-tabs__item:hover,
+.company-admin-drawer .ed-tabs__item.is-active {
+  color: var(--bi-primary);
+}
+.company-admin-page .ed-tabs__active-bar {
+  background: var(--bi-primary);
+}
+
+.scent-navbar.header-flex .scent-account-menu {
+  height: 34px;
+  > .ed-sub-menu > .ed-sub-menu__title {
+    height: 34px;
+    padding: 0 6px;
+    border-radius: 6px;
+    line-height: 34px;
+    &:hover {
+      background: #e8eef6 !important;
+    }
+    &::after {
+      display: none;
+    }
+  }
+  .top-info-container {
+    padding: 0;
+    &:hover {
+      background: transparent;
+    }
+  }
+  .ed-sub-menu__title .ed-sub-menu__icon-arrow {
+    margin-left: 8px;
+  }
+}
+
+.scent-nav-popper {
+  .ed-menu--popup {
+    border-color: var(--bi-border-strong);
+  }
+  .ed-menu-item,
+  .ed-sub-menu__title {
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .ed-menu-item:not(.is-disabled):hover,
+  .ed-sub-menu__title:hover {
+    background: #f0f4f9 !important;
+    color: var(--bi-primary);
+  }
+}
+
+.scent-account-popper {
+  .ed-menu--popup {
+    min-width: 210px;
+  }
+  .scent-account-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 0 5px 5px;
+    padding: 10px 6px 12px;
+    border-bottom: 1px solid var(--bi-border);
+    color: var(--bi-text-primary);
+    font-size: 13px;
+    small {
+      font-size: 11px;
+      color: var(--bi-text-placeholder);
+    }
+  }
+  .ed-sub-menu__title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 38px;
+    padding: 0 11px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: #53647b;
+  }
+  .ed-sub-menu__icon-arrow {
+    right: 11px;
+    font-size: 13px;
+  }
+  .scent-account-logout {
+    border-top: 1px solid var(--bi-border);
+    border-radius: 0 0 5px 5px;
+    margin-top: 5px;
+  }
+  .ed-menu--popup .ed-menu-item.is-active.is-active.is-active {
+    background: transparent !important;
+    color: #53647b !important;
+    &::after {
+      display: none;
+    }
+    &:hover {
+      background: #f0f4f9 !important;
+    }
+  }
+}
+
+.scent-language-popper {
+  .scent-language-options {
+    list-style: none;
+  }
+  .language-item {
+    height: 38px;
+    padding: 0 11px;
+    color: #53647b;
+    font-size: 13px;
+    &.active {
+      background: var(--bi-selected-bg);
+      color: var(--bi-primary) !important;
+    }
+    &:focus-visible {
+      outline: 2px solid #91a8ce;
+      outline-offset: -2px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scent-nav-popper .ed-menu-item,
+  .scent-nav-popper .ed-sub-menu__title {
+    transition: none;
+  }
+}

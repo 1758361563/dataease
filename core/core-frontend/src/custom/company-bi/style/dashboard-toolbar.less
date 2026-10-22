@@ -1,0 +1,202 @@
+/* Dashboard editor only. Keep the toolbar height and canvas geometry intact. */
+.scent-editor-toolbar.toolbar-main > .toolbar {
+  align-items: center;
+  height: 64px;
+  padding: 0 12px;
+  border-bottom: 1px solid #dfe6ef;
+  background: #eef2f7;
+  color: var(--bi-text-primary);
+  transition: background-color 120ms ease;
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+
+  .back-icon {
+    align-self: center;
+    width: 30px;
+    height: 32px;
+    margin: 0;
+    border-radius: 6px;
+    color: #788aa1;
+    &:hover {
+      background: #e8eef6;
+    }
+  }
+  .left-area {
+    flex: 1 1 160px;
+    min-width: 100px;
+    max-width: 240px;
+    margin: 0 12px 0 8px;
+    .name-area {
+      padding: 0 !important;
+      color: #37465f;
+      font-size: 14px;
+      font-weight: 500;
+      text-overflow: ellipsis;
+      input {
+        border: 1px solid #91a8ce;
+        background: #fff;
+        color: #37465f;
+        font: inherit;
+        &:focus {
+          box-shadow: 0 0 0 2px #526fa814;
+        }
+      }
+    }
+    .opt-area {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      height: 24px;
+      color: #788aa1;
+    }
+  }
+  .toolbar-hover-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 24px;
+    margin: 0;
+    border-radius: 5px;
+    color: #788aa1;
+    &:not(.toolbar-icon-disabled):hover {
+      background: #e8eef6;
+      color: var(--bi-primary);
+    }
+    &::after {
+      display: none;
+    }
+    &.toolbar-icon-disabled {
+      color: #b7c1ce !important;
+      cursor: not-allowed;
+    }
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+  svg.scent-icon {
+    color: inherit;
+  }
+  .middle-area {
+    flex: 1 0 auto;
+    justify-content: center;
+    gap: 0;
+    .group_inner {
+      min-width: 44px;
+      padding: 6px 8px;
+      border: 1px solid transparent;
+      color: #73859e;
+      span {
+        margin-top: 5px;
+        color: inherit !important;
+        font-size: 11px;
+        line-height: 14px;
+      }
+      &:hover {
+        background: #e8eef6;
+        color: var(--bi-primary);
+      }
+      &:active,
+      &.inner-active {
+        border-color: #d8e1ee;
+        background: #e3ebf7;
+        color: var(--bi-primary);
+      }
+    }
+  }
+  .group-right-border {
+    border-color: #d8e1ee;
+    height: 30px;
+    margin: 0 4px;
+  }
+  .right-area {
+    gap: 3px;
+    padding-right: 0;
+    padding-left: 12px;
+    .group_icon {
+      padding: 0 4px;
+    }
+    .group_inner {
+      width: 30px;
+      height: 32px;
+      color: #788aa1;
+      &::after {
+        display: none;
+      }
+      &:hover {
+        background: #e8eef6;
+        color: var(--bi-primary);
+      }
+      &.inner-active {
+        background: #e3ebf7;
+        color: var(--bi-primary);
+      }
+    }
+    .divider {
+      height: 20px;
+      margin: 0 7px;
+      background: #d8e1ee;
+    }
+    .ed-button {
+      min-width: 70px;
+      height: 32px;
+      margin-right: 8px !important;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+  }
+  .preview-button,
+  .scent-save-button,
+  .custom-normal-button:not(.ed-button--primary) {
+    border-color: #d8e1ee !important;
+    background: #fff;
+    color: #58719a !important;
+    &:hover,
+    &:focus-visible {
+      border-color: #b3c2d9 !important;
+      background: #f5f8fc !important;
+      color: var(--bi-primary) !important;
+    }
+    &:active {
+      background: #e3ebf7 !important;
+    }
+    &.is-disabled {
+      border-color: #dfe6ef !important;
+      background: #f4f6f9 !important;
+      color: #a8b5c7 !important;
+    }
+  }
+  .custom-normal-button.ed-button--primary {
+    border-color: var(--bi-primary) !important;
+    background: var(--bi-primary) !important;
+    color: #fff !important;
+    &:hover {
+      background: var(--bi-primary-hover) !important;
+    }
+    &:active {
+      background: var(--bi-primary-pressed) !important;
+    }
+  }
+  .adapt-count {
+    padding-top: 0;
+    color: #64748b;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .scent-editor-toolbar.toolbar-main > .toolbar {
+    .left-area {
+      flex-basis: 120px;
+      max-width: 170px;
+    }
+    .middle-area .group_inner {
+      min-width: 40px;
+      padding-right: 5px;
+      padding-left: 5px;
+    }
+    .right-area {
+      padding-left: 4px;
+    }
+  }
+}
