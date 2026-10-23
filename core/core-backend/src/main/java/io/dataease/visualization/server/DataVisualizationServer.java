@@ -412,6 +412,7 @@ public class DataVisualizationServer implements DataVisualizationApi {
          * 4.如果对已发布的仪表板编辑并存在已保存的镜像，此时仪表板状态为‘已保存未发布’
          */
         boolean isAppSave = false;
+        boolean datasetRebound = false;
         Long time = System.currentTimeMillis();
         // 如果是应用 则新进行应用校验 数据集名称和 数据源名称校验
         VisualizationExport2AppVO appData = request.getAppData();
@@ -433,14 +434,15 @@ public class DataVisualizationServer implements DataVisualizationApi {
         if (appData != null) {
             isAppSave = true;
             if ("dataset".equals(request.getDataType())) {
-                if (!det2AppDatasetRebindV1Manage.tryRebind(
+                datasetRebound = det2AppDatasetRebindV1Manage.tryRebind(
                         appData,
                         request,
                         dsGroupIdMap,
                         dsTableIdMap,
                         dsTableFieldsIdMap,
                         dsTableFieldsDatasetNameMap,
-                        datasourceIdMap)) {
+                        datasourceIdMap);
+                if (!datasetRebound) {
                     appDatasetMatch(appData, datasourceIdMap, dsGroupIdMap, dsTableIdMap, dsTableFieldsIdMap, dsTableFieldsDatasetNameMap);
                 }
             } else {
@@ -534,25 +536,24 @@ public class DataVisualizationServer implements DataVisualizationApi {
 
                     // dsTableFields 中存在计算字段在OriginName中 也需要替换
                     dsTableFieldsList.forEach(dsTableFields -> {
-                        dsTableFieldsIdMap.forEach((key, value) -> {
-                            dsTableFields.setOriginName(dsTableFields.getOriginName().replaceAll(key.toString(), value.toString()));
-                        });
+                        if (Objects.equals(dsTableFields.getExtField(), 3)) {
+                            Long sourceId = Long.valueOf(dsTableFields.getOriginName());
+                            if (!dsTableFieldsIdMap.containsKey(sourceId)) DEException.throwException("分组字段缺少来源：" + dsTableFields.getName());
+                            dsTableFields.setOriginName(dsTableFieldsIdMap.get(sourceId).toString());
+                        } else if (Objects.equals(dsTableFields.getExtField(), 2)) {
+                            dsTableFields.setOriginName(DashboardCalculationLifecycle.expression(dsTableFields.getOriginName(), dsTableFieldsIdMap));
+                        }
                         coreDatasetTableFieldMapper.insert(dsTableFields);
                     });
 
                     List<String> dsGroupNameSave = new ArrayList<>();
                     // 持久化数据集
                     newDsGroupInfo.forEach(dsGroup -> {
-                        dsTableIdMap.forEach((key, value) -> {
-                            dsGroup.setInfo(dsGroup.getInfo().replaceAll(key.toString(), value.toString()));
-                        });
-
-                        dsTableFieldsIdMap.forEach((key, value) -> {
-                            dsGroup.setInfo(dsGroup.getInfo().replaceAll(key.toString(), value.toString()));
-                        });
+                        Map<Long, Long> datasetReferences = new HashMap<>(dsGroupIdMap);
+                        datasetReferences.putAll(dsTableIdMap); datasetReferences.putAll(dsTableFieldsIdMap); datasetReferences.putAll(datasourceIdMap);
+                        dsGroup.setInfo(DashboardCalculationLifecycle.json(dsGroup.getInfo(), datasetReferences, dsTableFieldsDatasetNameMap, null));
 
                         datasourceIdMap.forEach((key, value) -> {
-                            dsGroup.setInfo(dsGroup.getInfo().replaceAll(key.toString(), value.toString()));
                             //表名映射更新
                             Map<String, String> appDsTableNamesMap = dsTableNamesMap.get(key);
                             Map<String, String> systemDsTableNamesMap = dsTableNamesMap.get(value);
@@ -599,33 +600,11 @@ public class DataVisualizationServer implements DataVisualizationApi {
             }
 
             // 更换主数据内容
-            AtomicReference<String> componentDataStr = new AtomicReference<>(request.getComponentData());
-            dsGroupIdMap.forEach((key, value) -> {
-                componentDataStr.set(componentDataStr.get().replaceAll(key.toString(), value.toString()));
-            });
-            dsTableIdMap.forEach((key, value) -> {
-                componentDataStr.set(componentDataStr.get().replaceAll(key.toString(), value.toString()));
-            });
-
-            dsTableFieldsIdMap.forEach((key, value) -> {
-                componentDataStr.set(componentDataStr.get().replaceAll(key.toString(), value.toString()));
-            });
-
-            datasourceIdMap.forEach((key, value) -> {
-                componentDataStr.set(componentDataStr.get().replaceAll(key.toString(), value.toString()));
-                //表名映射更新
-                Map<String, String> appDsTableNamesMap = dsTableNamesMap.get(key);
-                Map<String, String> systemDsTableNamesMap = dsTableNamesMap.get(value);
-                if (MapUtils.isNotEmpty(appDsTableNamesMap) && MapUtils.isNotEmpty(systemDsTableNamesMap)) {
-                    appDsTableNamesMap.forEach((keyName, valueName) -> {
-                        if (StringUtils.isNotEmpty(systemDsTableNamesMap.get(keyName))) {
-                            componentDataStr.set(componentDataStr.get().replaceAll(key.toString(), value.toString()));
-                        }
-                    });
-                }
-
-            });
-            request.setComponentData(componentDataStr.get());
+            if (!datasetRebound) {
+                Map<Long, Long> importedIds = new HashMap<>(datasourceIdMap);
+                importedIds.putAll(dsGroupIdMap); importedIds.putAll(dsTableIdMap); importedIds.putAll(dsTableFieldsIdMap);
+                request.setComponentData(DashboardCalculationLifecycle.json(request.getComponentData(), importedIds, dsTableFieldsDatasetNameMap, null));
+            }
         }
         if (request.getCalculationConfig() != null) {
             if (isAppSave) request.setCalculationConfig((String) JsonUtil.toJSONString(
@@ -663,8 +642,9 @@ public class DataVisualizationServer implements DataVisualizationApi {
             importedIds.putAll(dsTableIdMap);
             importedIds.putAll(dsTableFieldsIdMap);
             importedIds.putAll(dsGroupIdMap);
+            final boolean alreadyRebound = datasetRebound;
             canvasViewsStr.replaceAll((viewId, viewInfoStr) -> DashboardCalculationLifecycle.json(
-                    viewInfoStr, importedIds, dsTableFieldsDatasetNameMap, newDvId));
+                    viewInfoStr, alreadyRebound ? Map.of() : importedIds, alreadyRebound ? Map.of() : dsTableFieldsDatasetNameMap, newDvId));
             canvasViews = VisualizationUtils.viewTransToObj(canvasViewsStr);
             canvasViews.forEach((key, viewInfo) -> {
                 viewInfo.setDataFrom("dataset");

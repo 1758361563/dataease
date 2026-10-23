@@ -23,6 +23,10 @@ import io.dataease.extensions.view.dto.ChartViewDTO;
 import io.dataease.extensions.view.dto.ChartViewFieldDTO;
 import io.dataease.utils.BeanUtils;
 import io.dataease.utils.JsonUtil;
+import io.dataease.visualization.calculation.DashboardCalculationLifecycle;
+import io.dataease.api.permissions.auth.dto.BusiPerCheckDTO;
+import io.dataease.constant.AuthEnum;
+import io.dataease.system.manage.CorePermissionManage;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -38,7 +42,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * DET2APP 单表 Dataset Rebind V1：CSV 本地单表 Source → 用户选定的单表 MySQL Target，0 手拖字段。
+ * DET2APP dataset rebinding, including derived fields and dashboard-scoped references.
+ * The class name is retained for compatibility with existing injection/configuration.
  */
 @Service
 public class Det2AppDatasetRebindV1Manage {
@@ -51,9 +56,11 @@ public class Det2AppDatasetRebindV1Manage {
     private CoreDatasetTableMapper coreDatasetTableMapper;
     @Resource
     private CoreDatasetGroupMapper coreDatasetGroupMapper;
+    @Resource
+    private CorePermissionManage corePermissionManage;
 
     /**
-     * 满足单表 V1 条件时执行 Rebind 并填充官方 saveCanvas 所需的 id 映射表；否则返回 false，走官方 appDatasetMatch。
+     * Rebind selected datasets and fill the saveCanvas reference maps.
      */
     public boolean tryRebind(
             VisualizationExport2AppVO appData,
@@ -65,11 +72,6 @@ public class Det2AppDatasetRebindV1Manage {
             Map<Long, Long> datasourceIdMap) {
         if (appData == null || request == null) return false;
         var calculations = io.dataease.visualization.calculation.DashboardCalculationManage.parse(request.getCalculationConfig());
-        // The physical-field-only V1 path cannot rewrite dashboard/private calculated field graphs.
-        // Use the general application mapper; saveCanvas performs the scoped graph rebind afterwards.
-        if (!calculations.getParameters().isEmpty() || !calculations.getDatasetFields().isEmpty()
-                || (request.getCanvasViewInfo() != null && request.getCanvasViewInfo().values().stream()
-                .anyMatch(chart -> chart.getViewFields() != null && chart.getViewFields().stream().anyMatch(field -> field.getChartId() != null)))) return false;
         if (appData == null || !isV1Eligible(appData)) {
             return false;
         }
@@ -85,22 +87,34 @@ public class Det2AppDatasetRebindV1Manage {
                 .collect(Collectors.groupingBy(AppCoreDatasetTableVO::getDatasetGroupId));
 
         Set<Long> activeFieldIds = collectActiveFieldIds(request.getCanvasViewInfo(), request.getComponentData());
+        Set<Long> scopedIds = new HashSet<>();
+        calculations.getParameters().forEach(parameter -> scopedIds.add(parameter.getId()));
+        calculations.getDatasetFields().forEach(field -> {
+            scopedIds.add(field.getId());
+            activeFieldIds.addAll(DashboardCalculationLifecycle.references(field.getExpression()));
+        });
+        if (request.getCanvasViewInfo() != null) request.getCanvasViewInfo().values().forEach(chart -> {
+            if (chart.getViewFields() != null) chart.getViewFields().forEach(field -> {
+                if (field.getChartId() != null) {
+                    scopedIds.add(field.getId());
+                    activeFieldIds.addAll(DashboardCalculationLifecycle.references(field.getOriginName()));
+                }
+            });
+        });
+        activeFieldIds.removeAll(scopedIds);
+        TemplateDerivedFieldRebind.expand(activeFieldIds, appData.getDatasetTableFieldsInfo());
 
         for (AppCoreDatasetGroupVO sourceGroup : datasetGroups) {
             Long targetGroupId = sourceGroup.getSystemDatasetId();
+            BusiPerCheckDTO readCheck = new BusiPerCheckDTO(); readCheck.setId(targetGroupId); readCheck.setAuthEnum(AuthEnum.READ);
+            if (!corePermissionManage.checkAuth(readCheck)) DEException.throwException("无目标数据集访问权限：" + targetGroupId);
             List<AppCoreDatasetTableVO> sourceTables = sourceTablesByGroup.getOrDefault(sourceGroup.getId(), List.of());
-            if (sourceTables.size() != 1) {
-                return false;
-            }
-            CoreDatasetTable targetTable = getSingleTargetTable(targetGroupId);
-            if (targetTable == null) {
-                return false;
-            }
-            AppCoreDatasetTableVO sourceTable = sourceTables.get(0);
-
             dsGroupIdMap.put(sourceGroup.getId(), targetGroupId);
-            dsTableIdMap.put(sourceTable.getId(), targetTable.getId());
-            datasourceIdMap.put(sourceTable.getDatasourceId(), targetTable.getDatasourceId());
+            for (var sourceTable : sourceTables) {
+                CoreDatasetTable targetTable = matchTargetTable(sourceTable, sourceTables.size(), targetGroupId);
+                dsTableIdMap.put(sourceTable.getId(), targetTable.getId());
+                datasourceIdMap.put(sourceTable.getDatasourceId(), targetTable.getDatasourceId());
+            }
 
             buildPhysicalFieldMap(
                     appData.getDatasetTableFieldsInfo(),
@@ -109,19 +123,43 @@ public class Det2AppDatasetRebindV1Manage {
                     physicalFieldMap,
                     dsTableFieldsIdMap,
                     dsTableFieldsDatasetNameMap,
+                    dsTableIdMap,
                     activeFieldIds,
                     errors);
 
             targetSnapshots.put(sourceGroup.getId(), buildTargetSnapshotFields(targetGroupId));
         }
 
+        List<DatasetTableFieldDTO> createdFields = TemplateDerivedFieldRebind.plan(
+                appData.getDatasetTableFieldsInfo(), activeFieldIds, dsGroupIdMap, dsTableIdMap, datasourceIdMap,
+                targetSnapshots, physicalFieldMap, dsTableFieldsIdMap, dsTableFieldsDatasetNameMap);
         validateActiveFields(activeFieldIds, appData.getDatasetTableFieldsInfo(), physicalFieldMap, errors);
 
         if (!errors.isEmpty()) {
             throwPreflightErrors(errors);
         }
 
-        rebindChartViews(request.getCanvasViewInfo(), physicalFieldMap, dsGroupIdMap);
+        for (Long groupId : createdFields.stream().map(DatasetTableFieldDTO::getDatasetGroupId).collect(Collectors.toSet())) {
+            BusiPerCheckDTO check = new BusiPerCheckDTO(); check.setId(groupId); check.setAuthEnum(AuthEnum.MANAGE);
+            if (!corePermissionManage.checkAuth(check)) DEException.throwException("迁移需补建计算/分组字段，无目标数据集管理权限：" + groupId);
+        }
+        // saveCanvas is transactional: failed validation/persistence rolls back metadata together.
+        createdFields.forEach(datasetTableFieldManage::save);
+        for (var sourceGroup : datasetGroups) {
+            var snapshot = new ArrayList<>(targetSnapshots.get(sourceGroup.getId()));
+            createdFields.stream().filter(field -> Objects.equals(field.getDatasetGroupId(), sourceGroup.getSystemDatasetId())).forEach(snapshot::add);
+            targetSnapshots.put(sourceGroup.getId(), snapshot);
+        }
+
+        Map<Long, Long> allIds = new HashMap<>(datasourceIdMap);
+        allIds.putAll(dsTableIdMap); allIds.putAll(dsGroupIdMap); allIds.putAll(dsTableFieldsIdMap);
+        if (request.getCanvasViewInfo() != null) {
+            request.getCanvasViewInfo().replaceAll((id, view) -> JsonUtil.parseObject(
+                    DashboardCalculationLifecycle.json((String) JsonUtil.toJSONString(view), allIds, dsTableFieldsDatasetNameMap, null), ChartViewDTO.class));
+        }
+        Map<Long, DatasetTableFieldDTO> targetFieldsById = new HashMap<>();
+        physicalFieldMap.values().forEach(field -> targetFieldsById.put(field.getId(), field));
+        rebindChartViews(request.getCanvasViewInfo(), targetFieldsById, Map.of());
         clearChartDataCache(request.getCanvasViewInfo());
 
         for (AppCoreDatasetGroupVO sourceGroup : datasetGroups) {
@@ -129,12 +167,7 @@ public class Det2AppDatasetRebindV1Manage {
             replaceDatasetGroupInfoSnapshot(sourceGroup, targetGroupId, targetSnapshots.get(sourceGroup.getId()));
         }
 
-        String componentData = rebindComponentData(
-                request.getComponentData(),
-                physicalFieldMap,
-                dsTableFieldsIdMap,
-                datasetGroups,
-                targetSnapshots);
+        String componentData = DashboardCalculationLifecycle.json(request.getComponentData(), allIds, dsTableFieldsDatasetNameMap, null);
         request.setComponentData(componentData);
 
         return true;
@@ -158,20 +191,13 @@ public class Det2AppDatasetRebindV1Manage {
             if (group.getSystemDatasetId() == null) {
                 return false;
             }
-            if (!isSingleTableUnion(group.getInfo())) {
-                return false;
-            }
             List<AppCoreDatasetTableVO> tables = byGroup.getOrDefault(group.getId(), List.of());
-            if (tables.size() != 1) {
-                return false;
-            }
-            if (getSingleTargetTable(group.getSystemDatasetId()) == null) {
+            if (tables.isEmpty()) {
                 return false;
             }
             CoreDatasetGroup targetGroup = coreDatasetGroupMapper.selectById(group.getSystemDatasetId());
-            if (targetGroup == null || !isSingleTableUnion(targetGroup.getInfo())) {
-                return false;
-            }
+            if (targetGroup == null) DEException.throwException("目标数据集不存在：" + group.getSystemDatasetId());
+            for (var table : tables) matchTargetTable(table, tables.size(), group.getSystemDatasetId());
         }
         return true;
     }
@@ -201,6 +227,15 @@ public class Det2AppDatasetRebindV1Manage {
         return tables.get(0);
     }
 
+    private CoreDatasetTable matchTargetTable(AppCoreDatasetTableVO source, int sourceCount, Long targetGroupId) {
+        QueryWrapper<CoreDatasetTable> query = new QueryWrapper<>(); query.eq("dataset_group_id", targetGroupId);
+        List<CoreDatasetTable> targets = coreDatasetTableMapper.selectList(query);
+        if (sourceCount == 1 && targets.size() == 1) return targets.get(0);
+        var matches = targets.stream().filter(table -> Objects.equals(source.getTableName(), table.getTableName())).toList();
+        if (matches.size() != 1) throw new IllegalArgumentException("目标数据集的表需唯一匹配：" + source.getTableName());
+        return matches.get(0);
+    }
+
     private void buildPhysicalFieldMap(
             List<AppCoreDatasetTableFieldVO> allSourceFields,
             Long sourceGroupId,
@@ -208,10 +243,12 @@ public class Det2AppDatasetRebindV1Manage {
             Map<Long, DatasetTableFieldDTO> physicalFieldMap,
             Map<Long, Long> dsTableFieldsIdMap,
             Map<String, String> dsTableFieldsDatasetNameMap,
+            Map<Long, Long> tableIds,
             Set<Long> activeFieldIds,
             List<Det2AppRebindError> errors) {
         List<DatasetTableFieldDTO> targetFields = datasetTableFieldManage.selectByDatasetGroupId(targetGroupId);
         Map<String, List<DatasetTableFieldDTO>> targetByOrigin = targetFields.stream()
+                .filter(f -> Objects.equals(f.getExtField(), 0))
                 .filter(f -> StringUtils.isNotBlank(f.getOriginName()))
                 .collect(Collectors.groupingBy(DatasetTableFieldDTO::getOriginName));
 
@@ -224,7 +261,8 @@ public class Det2AppDatasetRebindV1Manage {
             }
             boolean active = src.getId() != null && activeFieldIds.contains(src.getId());
             String origin = src.getOriginName();
-            List<DatasetTableFieldDTO> matches = targetByOrigin.get(origin);
+            List<DatasetTableFieldDTO> matches = targetByOrigin.getOrDefault(origin, List.of()).stream()
+                    .filter(field -> src.getDatasetTableId() == null || Objects.equals(tableIds.get(src.getDatasetTableId()), field.getDatasetTableId())).toList();
             if (matches == null || matches.isEmpty()) {
                 if (active) {
                     errors.add(Det2AppRebindError.field(
@@ -450,10 +488,7 @@ public class Det2AppDatasetRebindV1Manage {
         }
         for (ChartViewDTO view : canvasViews.values()) {
             Long sourceGroupKey = view.getSourceTableId() != null ? view.getSourceTableId() : view.getTableId();
-            Long targetGroupId = sourceGroupKey != null ? dsGroupIdMap.get(sourceGroupKey) : null;
-            if (targetGroupId == null) {
-                targetGroupId = dsGroupIdMap.values().stream().findFirst().orElse(null);
-            }
+            Long targetGroupId = dsGroupIdMap.isEmpty() ? sourceGroupKey : dsGroupIdMap.get(sourceGroupKey);
             if (targetGroupId != null) {
                 view.setTableId(targetGroupId);
                 view.setSourceTableId(targetGroupId);
@@ -545,7 +580,7 @@ public class Det2AppDatasetRebindV1Manage {
             AppCoreDatasetGroupVO sourceGroup,
             Long targetGroupId,
             List<DatasetTableFieldDTO> targetSnapshotFields) {
-        if (StringUtils.isBlank(sourceGroup.getInfo())) {
+        if (StringUtils.isBlank(sourceGroup.getInfo()) || getSingleTargetTable(targetGroupId) == null) {
             return;
         }
         List<UnionDTO> unions = JsonUtil.parseList(sourceGroup.getInfo(), new TypeReference<List<UnionDTO>>() {});

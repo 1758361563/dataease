@@ -53,6 +53,20 @@ public class DashboardCalculationLifecycle {
         matcher.appendTail(result); return result.toString();
     }
 
+    public static Set<Long> references(String expression) {
+        Set<Long> result = new LinkedHashSet<>();
+        if (expression == null) return result;
+        if (!expression.contains("[")) {
+            try { expression = new String(Base64.getDecoder().decode(expression), StandardCharsets.UTF_8); }
+            catch (IllegalArgumentException ignored) { }
+        }
+        Matcher matcher = REF.matcher(expression);
+        while (matcher.find()) {
+            if (!DashboardCalculationValidator.insideLiteral(expression, matcher.start())) result.add(Long.valueOf(matcher.group(2)));
+        }
+        return result;
+    }
+
     public static String json(String value, Map<Long, Long> ids, Map<String, String> aliases, Long dashboardId) {
         if (value == null || value.isBlank()) return value;
         try { return JSON.writeValueAsString(rewrite(JSON.readTree(value), "", ids, aliases, dashboardId)); }
@@ -69,6 +83,11 @@ public class DashboardCalculationLifecycle {
             node.fields().forEachRemaining(entry -> {
                 String name = entry.getKey();
                 if (Set.of("dashboardParameterValues", "dashboardParameterReference", "calculationConfig").contains(name)) return;
+                // Grouping stores its source column as a bare ID, not a formula [ID].
+                if ("originName".equals(name) && node.path("extField").asInt() == 3) {
+                    result.set(name, rewrite(entry.getValue(), "fieldId", ids, aliases, dashboardId));
+                    return;
+                }
                 if ("checkedFieldsMap".equals(key)) {
                     try { name = ids.getOrDefault(Long.valueOf(name), Long.valueOf(name)).toString(); }
                     catch (NumberFormatException ignored) { }
