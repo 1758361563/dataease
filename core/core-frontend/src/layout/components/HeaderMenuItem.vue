@@ -8,7 +8,7 @@ import { ElMenuItem, ElSubMenu } from 'element-plus-secondary'
 const title = props => {
   const { title } = props?.menu?.meta || {}
   const path = props?.menu?.path || ''
-  const icon = resourceNavIcon(path)
+  const icon = props.index ? resourceNavIcon(path) : null
   return [...(icon ? [h(icon)] : []), h('span', null, { default: () => title })]
 }
 

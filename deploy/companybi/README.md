@@ -56,6 +56,6 @@ scripts/status.sh
 
 - 只操作名为 `<project>-app` / `<project>-mysql` / `<project>-net` 的对象；不使用 `docker compose down`、`prune`、全量清理；不改宿主机 Docker 全局配置；不触碰观远任何进程/容器/网络/卷。
 - 真实 `.env`、备份、镜像 tar、SQL 导出**不进 Git**；DB 密码不进镜像、不进日志。
-- 飞书推送在本阶段**强制 dry-run**（`compose.yaml` 写死），`.env` 里不放飞书凭据。
+- 飞书执行器随 BI 镜像交付并由后端托管；首次安装未配置应用连接且没有订阅，不会执行推送。初始管理员在“集成中心 → 应用连接”配置凭据及连接启停状态，`.env` 不放飞书应用凭据。见 [飞书运行与迁移说明](docs/feishu-integrated-runtime.md)。
 - 无法证明数据库 Schema 兼容时，**不做**自动镜像回滚、**不做**自动 DB 恢复，只给人工步骤。
 - 不在塔内编译 Java / Vue；塔内不需要 Git / Maven / Node。

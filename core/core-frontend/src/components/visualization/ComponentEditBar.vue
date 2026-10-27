@@ -424,13 +424,13 @@ const feishuCardQuery = () => ({
 })
 const openFeishuCreateSubscription = () => {
   feishuRouter.push({
-    path: '/company-admin/feishu',
+    path: '/integrations/feishu',
     query: { tab: 'subscriptions', create: '1', ...feishuCardQuery() }
   })
 }
 const openFeishuManageSubscriptions = () => {
   feishuRouter.push({
-    path: '/company-admin/feishu',
+    path: '/integrations/feishu',
     query: { tab: 'subscriptions', ...feishuCardQuery() }
   })
 }

@@ -38,6 +38,10 @@ public class CompanyFeishuService {
     private final CompanyFeishuDeliveryGateway deliveryGateway;
     private final CompanyFeishuDirectoryGateway directory;
     private final LongSupplier ids;
+    @Autowired(required = false)
+    private CompanyFeishuConnectionService managedConnections;
+    @Autowired(required = false)
+    private CompanyFeishuWorker managedWorker;
 
     @Autowired
     public CompanyFeishuService(CompanyFeishuRepository store,
@@ -96,6 +100,7 @@ public class CompanyFeishuService {
     }
 
     public Map<String, Object> updateIntegration(Map<String, Object> body, long operatorId) {
+        if (managedConnections != null) CompanyAdminErrors.invalid("请使用集成中心的应用连接页面配置飞书");
         rejectSecretFields(body);
         String appId = requiredText(body, "appId", 64);
         String appSecretRef = requiredSecretRef(body.get("appSecretRef"));
@@ -125,6 +130,7 @@ public class CompanyFeishuService {
     }
 
     public Map<String, Object> testIntegration() {
+        if (managedWorker != null) return managedWorker.call("test", Map.of());
         CompanyFeishuRepository.AppConfig row = store.findAppConfig();
         if (row == null || StringUtils.isBlank(row.appId) || StringUtils.isBlank(row.appSecretRef)) {
             CompanyAdminErrors.invalid("飞书应用配置不完整");
@@ -209,6 +215,7 @@ public class CompanyFeishuService {
     public Map<String, Object> createSubscription(Map<String, Object> body, long operatorId) {
         rejectSecretFields(body);
         CompanyFeishuRepository.Subscription row = newSubscription(body, operatorId, true);
+        if ("ENABLED".equals(row.status) && managedConnections != null) managedConnections.requireExecutionReady();
         requireDashboardView(row.dashboardId);
         List<Long> recipientIds = parseRecipientIds(body.get("recipientIds"));
         validateRecipients(recipientIds);
@@ -232,6 +239,7 @@ public class CompanyFeishuService {
         if (!body.containsKey("freshnessJson")) {
             row.freshnessJson = existing.freshnessJson;
         }
+        if ("ENABLED".equals(row.status) && managedConnections != null) managedConnections.requireExecutionReady();
         requireDashboardView(row.dashboardId);
         List<Long> recipientIds = body.containsKey("recipientIds")
                 ? parseRecipientIds(body.get("recipientIds"))
@@ -250,6 +258,7 @@ public class CompanyFeishuService {
         }
         CompanyFeishuRepository.Subscription row = requireSubscription(id);
         requireDashboardView(row.dashboardId);
+        if ("ENABLED".equals(status) && managedConnections != null) managedConnections.requireExecutionReady();
         row.status = status;
         row.updatedAt = System.currentTimeMillis();
         row.updatedBy = operatorId;
@@ -272,6 +281,11 @@ public class CompanyFeishuService {
         }
         if (store.findAppConfig() == null) {
             CompanyAdminErrors.invalid("飞书应用未配置");
+        }
+        if (managedConnections != null) {
+            if (truthy(requestDryRun)) CompanyAdminErrors.invalid("订阅执行不支持模拟发送");
+            managedConnections.requireExecutionReady();
+            return deliveryGateway.start(id, operatorId, false);
         }
         boolean dryRun = properties.isDryRun() || truthy(requestDryRun);
         return deliveryGateway.start(id, operatorId, dryRun);
@@ -514,7 +528,7 @@ public class CompanyFeishuService {
         vo.put("status", row.status);
         vo.put("scheduleJson", row.scheduleJson);
         vo.put("freshnessJson", row.freshnessJson);
-        vo.put("deliveryLane", StringUtils.defaultIfBlank(row.deliveryLane, "TEST"));
+        if (managedConnections == null) vo.put("deliveryLane", StringUtils.defaultIfBlank(row.deliveryLane, "TEST"));
         if (detail) {
             vo.put("titleTemplate", row.titleTemplate);
             vo.put("bodyTemplate", row.bodyTemplate);

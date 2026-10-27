@@ -16,6 +16,7 @@ async function readJson(res) {
 
 export async function getTenantAccessToken(appId, appSecret) {
   const res = await fetch(`${FEISHU_API}/auth/v3/tenant_access_token/internal`, {
+    signal: AbortSignal.timeout(20000),
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ app_id: appId, app_secret: appSecret })
@@ -37,6 +38,7 @@ export async function getTenantAccessToken(appId, appSecret) {
 export async function sendMessage({ token, receiveIdType, receiveId, msgType, content }) {
   const url = `${FEISHU_API}/im/v1/messages?receive_id_type=${encodeURIComponent(receiveIdType)}`
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(20000),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -67,6 +69,7 @@ export async function uploadImage({ token, filePath, filename }) {
   form.append('image_type', 'message')
   form.append('image', new Blob([buf], { type: 'image/png' }), filename || 'image.png')
   const res = await fetch(`${FEISHU_API}/im/v1/images`, {
+    signal: AbortSignal.timeout(30000),
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: form

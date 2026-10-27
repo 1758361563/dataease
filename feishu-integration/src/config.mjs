@@ -4,10 +4,11 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const ROOT_DIR = path.resolve(__dirname, '..')
-export const TMP_DIR = path.join(ROOT_DIR, 'tmp')
+export const TMP_DIR = process.env.FEISHU_TMP_DIR ? path.resolve(process.env.FEISHU_TMP_DIR) : path.join(ROOT_DIR, 'tmp')
 export const SHOT_DIR = path.join(TMP_DIR, 'screenshots')
 
 function loadDotEnv() {
+  if (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true') return
   const envPath = path.join(ROOT_DIR, '.env')
   if (!fs.existsSync(envPath)) return
   for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
@@ -31,7 +32,7 @@ export const LOG_DIR = process.env.FEISHU_LOG_DIR
   : path.join(ROOT_DIR, 'log')
 
 export const CONFIG = {
-  baseUrl: (process.env.DE_BASE_URL || 'http://localhost:8080').replace(/\/$/, ''),
+  baseUrl: (process.env.COMPANY_BI_FRONTEND_BASE_URL || process.env.DE_BASE_URL || 'http://localhost:8080').replace(/\/$/, ''),
   user: process.env.DE_SCREENSHOT_USER || process.env.DE_P0_USER || 'admin',
   password: process.env.DE_SCREENSHOT_PASSWORD || process.env.DE_P0_PWD || '',
   port: Number(process.env.FEISHU_SHOT_PORT || 8091),

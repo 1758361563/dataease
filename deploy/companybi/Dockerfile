@@ -11,7 +11,7 @@
 
 ARG NODE_IMAGE=node:22-bookworm
 ARG MAVEN_IMAGE=maven:3.9-eclipse-temurin-21
-ARG RUNTIME_BASE=registry.cn-qingdao.aliyuncs.com/dataease/alpine-openjdk21-jre
+ARG RUNTIME_BASE=eclipse-temurin:21-jre-noble
 
 # --------------------------------------------------------------------------
 # Stage 1: Vue frontend. Standalone build is `build:base`, NOT `build:distributed`
@@ -38,18 +38,17 @@ WORKDIR /build
 COPY pom.xml ./
 COPY sdk sdk
 COPY core/pom.xml core/pom.xml
-COPY core/core-backend core/core-backend
 COPY deploy/companybi/image /build/image-tools
-
-# The committed application-standalone.yml contains a real remote datasource
-# (host + root credentials). Replace it with required placeholders before
-# compiling; the script fails the build if the file shape ever changes.
-RUN sh /build/image-tools/sanitize-standalone-yml.sh \
-        core/core-backend/src/main/resources/application-standalone.yml
 
 # sdk modules (+ root pom) into the local repo, like the official `mvn clean install`.
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -ntp -s /build/image-tools/maven-settings.xml -f pom.xml install -DskipTests -Dmaven.test.skip=true
+
+# Backend edits do not invalidate the SDK installation layer.
+COPY core/core-backend core/core-backend
+# Replace the development datasource before compiling any backend resources.
+RUN sh /build/image-tools/sanitize-standalone-yml.sh \
+        core/core-backend/src/main/resources/application-standalone.yml
 
 # core/pom.xml lists core-frontend as a module, so its pom must exist for the reactor to load
 # (it is NOT built here: `-pl core-backend`; the frontend was built in stage 1).
@@ -68,9 +67,38 @@ RUN sh /build/image-tools/verify-jar.sh \
         /build/release-info
 
 # --------------------------------------------------------------------------
-# Stage 3: runtime
+# Stage 3: bundled internal executor. No .env, local tmp, or development scripts.
 # --------------------------------------------------------------------------
-FROM ${RUNTIME_BASE} AS runtime
+FROM ${NODE_IMAGE} AS integration
+WORKDIR /worker
+COPY feishu-integration/package.json feishu-integration/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+COPY feishu-integration/src/capture.mjs feishu-integration/src/config.mjs \
+     feishu-integration/src/contact.mjs feishu-integration/src/db.mjs \
+     feishu-integration/src/delivery-lane.mjs feishu-integration/src/etl-status.mjs \
+     feishu-integration/src/execution-mode.mjs feishu-integration/src/feishu.mjs \
+     feishu-integration/src/run-subscription.mjs feishu-integration/src/schedule.mjs \
+     feishu-integration/src/scheduler.mjs feishu-integration/src/service-log.mjs \
+     feishu-integration/src/session.mjs feishu-integration/src/store.mjs \
+     feishu-integration/src/managed-connection.mjs feishu-integration/src/embedded-worker.mjs ./src/
+
+# --------------------------------------------------------------------------
+# Stage 4: runtime (Java owns the internal executor lifecycle)
+# --------------------------------------------------------------------------
+FROM ${RUNTIME_BASE} AS local-runtime
+
+COPY --from=integration /usr/local/bin/node /usr/local/bin/node
+COPY --from=integration /worker/node_modules /opt/apps/integration-worker/node_modules
+COPY --from=integration /worker/package.json /opt/apps/integration-worker/package.json
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/apps/integration-browsers
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates fonts-noto-cjk \
+ && node /opt/apps/integration-worker/node_modules/playwright/cli.js install --with-deps chromium \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=integration /worker/src /opt/apps/integration-worker/src
+
+# The local development launcher mounts its separately compiled Java jar.
+# Production continues below and includes the frontend and backend in this same runtime.
+FROM local-runtime AS runtime
 
 ARG COMPANYBI_VERSION=unversioned
 ARG GIT_SHA=unknown

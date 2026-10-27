@@ -14,5 +14,12 @@ deploy-artifacts
 de-xpack
 docs
 installer
-feishu-integration
+feishu-integration/*
+!feishu-integration/package.json
+!feishu-integration/package-lock.json
+!feishu-integration/src
+feishu-integration/src/*.test.mjs
+feishu-integration/src/*-test.mjs
+feishu-integration/src/*-smoke.mjs
+feishu-integration/src/seed-dev-config.mjs
 deploy/companybi/dist

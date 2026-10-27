@@ -1,4 +1,4 @@
-import { exec, nextId, query } from './db.mjs'
+import { exec, nextId, query, getPool, metadataLockName } from './db.mjs'
 
 const now = () => Date.now()
 
@@ -410,6 +410,7 @@ export async function listPartialRetryRuns(maxRetries = 3, limit = 20) {
         AND (
           r.execution_mode IS NULL
           OR r.execution_mode <> 'LIVE'
+          OR ? = 1
           OR EXISTS (
             SELECT 1 FROM company_feishu_subscription s
              WHERE s.id = r.subscription_id AND s.delivery_lane = 'PROD'
@@ -432,7 +433,7 @@ export async function listPartialRetryRuns(maxRetries = 3, limit = 20) {
         )
       ORDER BY r.finished_at
       LIMIT ?`,
-    [maxRetries, limit]
+    [process.env.COMPANY_BI_EMBEDDED_WORKER === 'true' ? 1 : 0, maxRetries, limit]
   )
 }
 
@@ -456,6 +457,16 @@ export async function ensureDeliveryLaneSchema() {
 }
 
 export async function withSchedulerLock(fn) {
+  if (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true') {
+    const connection = await (await getPool()).getConnection()
+    try {
+      const lockName = metadataLockName('scheduler')
+      const [rows] = await connection.query('SELECT GET_LOCK(?, 10) AS locked', [lockName])
+      if (Number(rows[0]?.locked) !== 1) return { skipped: true, reason: 'lock-not-acquired' }
+      try { return { skipped: false, result: await fn() } }
+      finally { await connection.query('SELECT RELEASE_LOCK(?)', [lockName]) }
+    } finally { connection.release() }
+  }
   const got = await query(`SELECT GET_LOCK(?, 10) AS locked`, ['company_feishu_scheduler'])
   const locked = Number(got?.[0]?.locked)
   if (locked !== 1) return { skipped: true, reason: 'lock-not-acquired' }

@@ -99,10 +99,6 @@ export function dataUpdateStatusLabel(freshnessJson?: string | null): string {
   return `已关联 ${tasks.join('、')}；需覆盖 ${businessDate}，失败或未覆盖则不发送旧图`
 }
 
-export function deliveryLaneLabel(lane?: string | null): string {
-  return String(lane || '').toUpperCase() === 'PROD' ? '正式' : '测试'
-}
-
 export function subscriptionStatusLabel(status?: string): string {
   if (status === 'ENABLED') return '启用'
   if (status === 'DISABLED') return '停用'
@@ -168,13 +164,13 @@ export function inferTargetExecutionMode(
 
 export function runStatusLabel(status?: string, executionMode?: FeishuExecutionMode): string {
   if (status === 'SUCCEEDED') {
-    if (executionMode === 'DRY_RUN') return '模拟执行成功'
-    if (executionMode === 'LIVE') return '真实发送成功'
+    if (executionMode === 'DRY_RUN') return '未发送（历史记录）'
+    if (executionMode === 'LIVE') return '发送成功'
     return '执行成功（发送方式未记录）'
   }
   if (status === 'FAILED') {
-    if (executionMode === 'DRY_RUN') return '模拟执行失败'
-    if (executionMode === 'LIVE') return '真实发送失败'
+    if (executionMode === 'DRY_RUN') return '未发送（历史记录）'
+    if (executionMode === 'LIVE') return '发送失败'
     return '失败'
   }
   if (status === 'RUNNING') return '执行中'

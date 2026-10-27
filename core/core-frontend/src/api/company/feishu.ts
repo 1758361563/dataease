@@ -58,7 +58,6 @@ export interface FeishuSubscription {
   status: string
   scheduleJson?: string
   freshnessJson?: string | null
-  deliveryLane?: string | null
   titleTemplate?: string
   bodyTemplate?: string
   includeDetailLink?: boolean
@@ -246,12 +245,9 @@ export const disableFeishuSubscription = (id: string): Promise<FeishuSubscriptio
     .post({ url: `/company/bi/feishu/subscriptions/${id}/disable` })
     .then((res: any) => wrapSubscription(res.data))
 
-export const runFeishuSubscription = (
-  id: string,
-  data: { dryRun?: boolean } = { dryRun: true }
-): Promise<FeishuDeliveryRun> =>
+export const runFeishuSubscription = (id: string): Promise<FeishuDeliveryRun> =>
   request
-    .post({ url: `/company/bi/feishu/subscriptions/${id}/run`, data })
+    .post({ url: `/company/bi/feishu/subscriptions/${id}/run` })
     .then((res: any) => wrapRun(res.data))
 
 export const listFeishuRuns = (id: string): Promise<FeishuDeliveryRun[]> =>

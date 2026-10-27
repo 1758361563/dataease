@@ -104,3 +104,16 @@ core/core-frontend/src/assets/fsSvg.html
 /feishu-integration/*.log
 /feishu-integration/playwright-report/
 /feishu-integration/test-results/
+
+# BI-managed integration runtime and encrypted connection configuration.
+!/core/core-backend/src/main/java/io/dataease/company/bi/integration/*.java
+!/core/core-backend/src/main/java/io/dataease/company/bi/feishu/CompanyFeishuConnectionService.java
+!/core/core-backend/src/main/java/io/dataease/company/bi/feishu/CompanyFeishuConnectionController.java
+!/core/core-backend/src/main/java/io/dataease/company/bi/feishu/CompanyFeishuWorker.java
+!/core/core-backend/src/main/java/io/dataease/company/bi/feishu/CompanyFeishuEmbeddedGateway.java
+!/core/core-backend/src/main/resources/db/company/company_integration_connection.sql
+!/core/core-backend/src/test/java/io/dataease/company/bi/integration/
+!/core/core-backend/src/test/java/io/dataease/company/bi/integration/*.java
+!/core/core-backend/src/test/java/io/dataease/company/bi/feishu/
+/core/core-backend/src/test/java/io/dataease/company/bi/feishu/*
+!/core/core-backend/src/test/java/io/dataease/company/bi/feishu/CompanyFeishuConnectionServiceTest.java

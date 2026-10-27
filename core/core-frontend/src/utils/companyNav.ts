@@ -35,7 +35,7 @@ export function requiredCapabilityForPath(path: string): CompanyCapabilityName |
   if (normalized.startsWith('/company-admin/audit')) {
     return 'AUDIT_VIEW'
   }
-  if (normalized.startsWith('/company-admin/feishu')) {
+  if (normalized.startsWith('/company-admin/feishu') || normalized.startsWith('/integrations')) {
     return 'FEISHU_SUBSCRIPTION_MANAGE'
   }
   if (normalized.startsWith('/data/dataset') || normalized.startsWith('/dataset-form')) {
@@ -92,16 +92,6 @@ export function buildCompanyAdminRoutes(capabilities: CompanyCapabilityName[] | 
       meta: { title: '审计日志' }
     })
   }
-  if (hasCapability(capabilities, 'FEISHU_SUBSCRIPTION_MANAGE')) {
-    children.push({
-      path: 'feishu',
-      name: 'company-feishu',
-      hidden: false,
-      inLayout: true,
-      component: 'company/admin/feishu',
-      meta: { title: '飞书订阅' }
-    })
-  }
   if (!children.length) {
     return []
   }
@@ -115,6 +105,49 @@ export function buildCompanyAdminRoutes(capabilities: CompanyCapabilityName[] | 
       redirect: `/company-admin/${children[0].path}`,
       meta: { title: '权限管理' },
       children
+    }
+  ]
+}
+
+export function buildIntegrationRoutes(capabilities: CompanyCapabilityName[] | undefined): any[] {
+  if (!hasCapability(capabilities, 'FEISHU_SUBSCRIPTION_MANAGE')) return []
+  return [
+    {
+      path: '/integrations',
+      name: 'integrations',
+      hidden: false,
+      inLayout: true,
+      component: 'Layout',
+      redirect: '/integrations/feishu',
+      meta: { title: '集成中心' },
+      children: [
+        {
+          path: 'feishu',
+          name: 'company-feishu',
+          hidden: false,
+          inLayout: true,
+          component: 'company/admin/feishu',
+          meta: { title: '飞书订阅' }
+        },
+        {
+          path: 'connections',
+          name: 'integration-connections',
+          hidden: false,
+          inLayout: true,
+          component: 'company/integrations/connections',
+          meta: { title: '应用连接' }
+        }
+      ]
+    },
+    {
+      path: '/company-admin/feishu',
+      name: 'company-feishu-legacy',
+      hidden: true,
+      redirect: (to: any) => ({
+        path:
+          to.query?.tab === 'integration' ? '/integrations/connections' : '/integrations/feishu',
+        query: to.query
+      })
     }
   ]
 }
@@ -204,7 +237,8 @@ export function applyCompanyCapabilityToMenus(
 ): any[] {
   return [
     ...filterMenusByCapability(backendMenus || [], capabilities),
-    ...buildCompanyAdminRoutes(capabilities)
+    ...buildCompanyAdminRoutes(capabilities),
+    ...buildIntegrationRoutes(capabilities)
   ]
 }
 

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import AdminHelp from '../AdminHelp.vue'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router_2'
+import { useRoute, useRouter } from 'vue-router_2'
 import { ElMessage } from 'element-plus-secondary'
 import GridTable from '@/components/grid-table/src/GridTable.vue'
 import {
@@ -20,8 +20,6 @@ import {
   listFeishuSubscriptions,
   runFeishuSubscription,
   searchFeishuEmployees,
-  testFeishuIntegration,
-  updateFeishuIntegration,
   updateFeishuRecipient,
   updateFeishuSubscription,
   type FeishuDeliveryRun,
@@ -30,8 +28,7 @@ import {
   type FeishuRecipient,
   type FeishuSubscription
 } from '@/api/company/feishu'
-import { keepStringId, BOOTSTRAP_ADMIN_ID } from '@/utils/companyIds'
-import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
+import { keepStringId } from '@/utils/companyIds'
 import {
   acceptedRunNotice,
   isRecipientVerified,
@@ -46,7 +43,6 @@ import {
   runStatusLabel,
   targetStatusLabel,
   dataUpdateStatusLabel,
-  deliveryLaneLabel,
   subscriptionStatusLabel,
   verifyStatusLabel,
   isIdentityConfirmed,
@@ -54,14 +50,13 @@ import {
 } from '@/utils/companyFeishu'
 
 const route = useRoute()
-const companyStore = useCompanyPermissionStoreWithOut()
+const router = useRouter()
 
 const loading = ref(false)
 const tab = ref('subscriptions')
 const recipients = ref<FeishuRecipient[]>([])
 const subscriptions = ref<FeishuSubscription[]>([])
 const integration = ref<FeishuIntegration>({ configured: false })
-const canEditIntegration = computed(() => keepStringId(companyStore.userId) === BOOTSTRAP_ADMIN_ID)
 
 const recipientDialog = ref(false)
 const recipientForm = ref({
@@ -105,8 +100,6 @@ const runDetail = ref<FeishuDeliveryRun | null>(null)
 const activeRunId = ref('')
 const currentRunSubId = ref('')
 const polling = ref(false)
-
-const integrationForm = ref({ appId: '', appSecretRef: 'FEISHU_APP_SECRET', status: 'ENABLED' })
 
 const formatTime = (ms?: number | null) => (ms ? new Date(ms).toLocaleString('zh-CN') : '-')
 
@@ -170,11 +163,6 @@ const filteredSubscriptions = computed(() => {
 
 const loadIntegration = async () => {
   integration.value = await getFeishuIntegration()
-  integrationForm.value = {
-    appId: integration.value.appId || '',
-    appSecretRef: integration.value.appSecretRef || 'FEISHU_APP_SECRET',
-    status: integration.value.status || 'ENABLED'
-  }
 }
 
 const loadAll = async () => {
@@ -439,36 +427,24 @@ const pollRun = async (subscriptionId: string, runId: string) => {
   }
 }
 
-const dryRunSubscription = async (row: FeishuSubscription) => {
+const sendSubscription = async (row: FeishuSubscription) => {
   if (row.status !== 'ENABLED') {
     ElMessage.warning('只有启用中的订阅可以执行')
     return
   }
-  const accepted = await runFeishuSubscription(keepStringId(row.id), { dryRun: true })
+  const accepted = await runFeishuSubscription(keepStringId(row.id))
   ElMessage.info(acceptedRunNotice(accepted))
   await openRuns(row, keepStringId(accepted.runId || accepted.id))
   await pollRun(keepStringId(row.id), keepStringId(accepted.runId || accepted.id))
 }
 
-const saveIntegration = async () => {
-  if (!canEditIntegration.value) return
-  await updateFeishuIntegration({
-    appId: integrationForm.value.appId,
-    appSecretRef: integrationForm.value.appSecretRef,
-    status: integrationForm.value.status
-  })
-  ElMessage.success('应用配置已保存（仅写入环境变量名）')
-  await loadIntegration()
-}
-
-const testIntegration = async () => {
-  const result = await testFeishuIntegration()
-  ElMessage.success(result.checked || '配置检查完成')
-}
-
 const applyRouteQuery = async () => {
   const q = route.query
-  if (q.tab === 'recipients' || q.tab === 'integration' || q.tab === 'subscriptions') {
+  if (q.tab === 'integration') {
+    await router.replace('/integrations/connections')
+    return
+  }
+  if (q.tab === 'recipients' || q.tab === 'subscriptions') {
     tab.value = String(q.tab)
   }
   const dashboardId = q.dashboardId ? String(q.dashboardId) : ''
@@ -502,9 +478,12 @@ onMounted(async () => {
       <span class="admin-title"
         >飞书订阅
         <AdminHelp
-          content="按 Asia/Shanghai 调度，当前默认模拟发送。测试订阅不会真实发送。未关联 ETL 的正式订阅不校验数据是否更新；已关联任务须有覆盖业务日的成功记录，否则不发送旧图。"
+          content="启用订阅后按发送计划执行，也可立即发送。已关联数据更新条件的订阅须有覆盖业务日的成功记录，否则不发送旧数据。时区为 Asia/Shanghai。"
       /></span>
-      <el-button @click="loadAll">刷新</el-button>
+      <div>
+        <el-button @click="router.push('/integrations/connections')">应用连接</el-button>
+        <el-button @click="loadAll">刷新</el-button>
+      </div>
     </div>
 
     <div class="admin-panel">
@@ -541,9 +520,6 @@ onMounted(async () => {
             <el-table-column label="状态" width="90">
               <template #default="{ row }">{{ subscriptionStatusLabel(row.status) }}</template>
             </el-table-column>
-            <el-table-column label="发送隔离" width="90">
-              <template #default="{ row }">{{ deliveryLaneLabel(row.deliveryLane) }}</template>
-            </el-table-column>
             <el-table-column label="数据更新" min-width="220">
               <template #default="{ row }">{{ dataUpdateStatusLabel(row.freshnessJson) }}</template>
             </el-table-column>
@@ -553,7 +529,7 @@ onMounted(async () => {
                 <el-button text @click="toggleSubscription(row)">
                   {{ row.status === 'ENABLED' ? '停用' : '启用' }}
                 </el-button>
-                <el-button text @click="dryRunSubscription(row)">试运行</el-button>
+                <el-button text @click="sendSubscription(row)">立即发送</el-button>
                 <el-button text @click="openRuns(row)">运行记录</el-button>
               </template>
             </el-table-column>
@@ -606,34 +582,6 @@ onMounted(async () => {
               </template>
             </el-table-column>
           </GridTable>
-        </el-tab-pane>
-
-        <el-tab-pane label="应用配置" name="integration">
-          <div class="settings-help">
-            <AdminHelp content="仅系统初始管理员可修改。只读写环境变量名，不会回显 App Secret。" />
-          </div>
-          <el-form label-width="140px" class="integration-form">
-            <el-form-item label="状态">
-              {{ integration.configured ? integration.status : '未配置' }}
-              · Secret 引用 {{ integration.hasSecretRef ? '已设置' : '未设置' }}
-            </el-form-item>
-            <el-form-item label="App ID">
-              <el-input v-model="integrationForm.appId" :disabled="!canEditIntegration" />
-            </el-form-item>
-            <el-form-item label="App Secret 引用">
-              <el-input v-model="integrationForm.appSecretRef" :disabled="!canEditIntegration" />
-            </el-form-item>
-            <el-form-item label="上次检查">
-              {{ formatTime(integration.lastVerifiedAt) }}
-            </el-form-item>
-            <el-form-item>
-              <el-button v-if="canEditIntegration" type="primary" @click="saveIntegration"
-                >保存</el-button
-              >
-              <el-button v-if="canEditIntegration" @click="testIntegration">检查配置</el-button>
-              <AdminHelp v-if="!canEditIntegration" content="当前账号只能查看脱敏状态。" />
-            </el-form-item>
-          </el-form>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -786,7 +734,7 @@ onMounted(async () => {
         </el-form-item>
         <el-form-item v-if="subForm.scheduleKind !== 'manual'" label="自动触发">
           <el-switch v-model="subForm.autoRun" />
-          <AdminHelp content="本机模拟运行，不会真实发送。" />
+          <AdminHelp content="订阅启用后按设置的发送计划执行。关闭自动触发后仍可立即发送。" />
         </el-form-item>
         <el-form-item>
           <AdminHelp content="时区固定 Asia/Shanghai。同一计划时刻只生成一条计划执行记录。" />

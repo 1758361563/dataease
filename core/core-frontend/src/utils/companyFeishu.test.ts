@@ -4,7 +4,6 @@ import {
   acceptedRunNotice,
   DATA_UPDATE_UNCHECKED,
   dataUpdateStatusLabel,
-  deliveryLaneLabel,
   inferExecutionMode,
   inferTargetExecutionMode,
   isRecipientVerified,
@@ -19,7 +18,8 @@ import {
   canVisitCompanyPath,
   isCompanyAdminApi,
   requiredCapabilityForPath,
-  buildCompanyAdminRoutes
+  buildCompanyAdminRoutes,
+  buildIntegrationRoutes
 } from './companyNav.ts'
 
 describe('Phase 2F feishu UI helpers', () => {
@@ -92,14 +92,14 @@ describe('Phase 2F feishu UI helpers', () => {
       targets: [{ status: 'SUCCEEDED', messageId: null, errorSummary: 'dry-run: send skipped' }]
     })
     assert.equal(mode, 'DRY_RUN')
-    assert.equal(runStatusLabel('SUCCEEDED', mode), '模拟执行成功')
-    assert.doesNotMatch(runStatusLabel('SUCCEEDED', mode), /真实发送成功/)
+    assert.equal(runStatusLabel('SUCCEEDED', mode), '未发送（历史记录）')
+    assert.doesNotMatch(runStatusLabel('SUCCEEDED', mode), /发送成功/)
     assert.equal(
       runStatusLabel(
         'SUCCEEDED',
         inferTargetExecutionMode({ errorSummary: 'dry-run: send skipped' }, mode)
       ),
-      '模拟执行成功'
+      '未发送（历史记录）'
     )
   })
 
@@ -110,7 +110,7 @@ describe('Phase 2F feishu UI helpers', () => {
       targets: [{ status: 'SUCCEEDED', messageId: 'om_live_1' }]
     })
     assert.equal(byMessage, 'LIVE')
-    assert.equal(runStatusLabel('SUCCEEDED', byMessage), '真实发送成功')
+    assert.equal(runStatusLabel('SUCCEEDED', byMessage), '发送成功')
   })
 
   it('does not treat screenshot/upload success as live send', () => {
@@ -131,7 +131,7 @@ describe('Phase 2F feishu UI helpers', () => {
       targets: [{ status: 'SUCCEEDED', messageId: 'om_should_not_upgrade' }]
     })
     assert.equal(mode, 'DRY_RUN')
-    assert.equal(runStatusLabel('SUCCEEDED', mode), '模拟执行成功')
+    assert.equal(runStatusLabel('SUCCEEDED', mode), '未发送（历史记录）')
   })
 
   it('shows live mixed recipients separately', () => {
@@ -144,20 +144,20 @@ describe('Phase 2F feishu UI helpers', () => {
       ]
     })
     assert.equal(runMode, 'LIVE')
-    assert.equal(runStatusLabel('FAILED', runMode), '真实发送失败')
+    assert.equal(runStatusLabel('FAILED', runMode), '发送失败')
     assert.equal(
       runStatusLabel(
         'SUCCEEDED',
         inferTargetExecutionMode({ status: 'SUCCEEDED', messageId: 'om_ok' }, runMode)
       ),
-      '真实发送成功'
+      '发送成功'
     )
     assert.equal(
       runStatusLabel(
         'FAILED',
         inferTargetExecutionMode({ status: 'FAILED', errorSummary: 'unreachable' }, runMode)
       ),
-      '真实发送失败'
+      '发送失败'
     )
   })
 
@@ -170,8 +170,8 @@ describe('Phase 2F feishu UI helpers', () => {
     assert.equal(mode, 'UNKNOWN')
     const text = runStatusLabel('SUCCEEDED', mode)
     assert.equal(text, '执行成功（发送方式未记录）')
-    assert.doesNotMatch(text, /真实发送成功/)
-    assert.doesNotMatch(text, /模拟执行成功/)
+    assert.doesNotMatch(text, /发送成功/)
+    assert.doesNotMatch(text, /未发送（历史记录）/)
   })
 
   it('shows unchecked data status until an ETL task is linked', () => {
@@ -186,9 +186,6 @@ describe('Phase 2F feishu UI helpers', () => {
       dataUpdateStatusLabel('{"etlTasks":["销售订单数据"],"businessDate":"2026-09-21"}'),
       /不发送旧图/
     )
-    assert.equal(deliveryLaneLabel(null), '测试')
-    assert.equal(deliveryLaneLabel('TEST'), '测试')
-    assert.equal(deliveryLaneLabel('PROD'), '正式')
   })
 
   it('ADMIN feishu route is capability gated', () => {
@@ -198,12 +195,17 @@ describe('Phase 2F feishu UI helpers', () => {
       hidden[0].children.some((c: { path: string }) => c.path === 'feishu'),
       false
     )
-    const shown = buildCompanyAdminRoutes(['USER_MANAGE', 'FEISHU_SUBSCRIPTION_MANAGE'])
+    const shown = buildIntegrationRoutes(['USER_MANAGE', 'FEISHU_SUBSCRIPTION_MANAGE'])
     assert.ok(shown[0].children.some((c: { path: string }) => c.path === 'feishu'))
     assert.equal(isCompanyAdminApi('/company/bi/feishu/subscriptions'), true)
     assert.equal(isCompanyAdminApi('/company/bi/feishu/employees/search'), true)
     assert.equal(isCompanyAdminApi('/company/bi/admin/users'), true)
     assert.equal(canVisitCompanyPath('/company-admin/feishu', ['DASHBOARD_VIEW']), false)
     assert.equal(canVisitCompanyPath('/company-admin/feishu', ['FEISHU_SUBSCRIPTION_MANAGE']), true)
+    assert.equal(canVisitCompanyPath('/integrations/connections', ['DASHBOARD_VIEW']), false)
+    assert.equal(
+      canVisitCompanyPath('/integrations/connections', ['FEISHU_SUBSCRIPTION_MANAGE']),
+      true
+    )
   })
 })

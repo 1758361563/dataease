@@ -1,8 +1,17 @@
 # feishu-integration
 
+Company BI now packages the production execution modules inside the BI image and manages
+`src/embedded-worker.mjs` through private stdin/stdout RPC. Configure the application in
+**集成中心 → 应用连接**; do not start a separate HTTP service for a new BI installation.
+See [integrated runtime and migration](../deploy/companybi/docs/feishu-integrated-runtime.md).
+
+The standalone process/Compose commands below describe the retained legacy development
+workflow. Do not run its scheduler alongside the BI-managed executor on the same database.
+
 Independent Node service for DataEase card screenshots and Feishu delivery.
 
-It lives in this DataEase git repo as a **separate directory**: own `package.json`, own runtime, own deploy. It is not a Java module and is not mixed into `core-backend`.
+The execution sources remain a separate package for testing; their production runtime and
+lifecycle are delivered by the BI backend, not a second independently deployed system.
 
 The previous working copy at `test/feishu-integration/` was left in place as a backup until the in-repo path is confirmed. Continue 2B work here.
 

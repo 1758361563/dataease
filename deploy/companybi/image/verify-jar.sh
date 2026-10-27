@@ -45,6 +45,8 @@ for c in \
   io/dataease/company/bi/permission/CompanyCapabilityPathFilter \
   io/dataease/company/bi/admin/user/CompanyUserAdminController \
   io/dataease/company/bi/feishu/CompanyFeishuService \
+  io/dataease/company/bi/feishu/CompanyFeishuWorker \
+  io/dataease/company/bi/integration/IntegrationConnectionStore \
   io/dataease/chart/utils/SingleCategoryRank \
   io/dataease/chart/charts/impl/DefaultChartHandler \
   io/dataease/CoreApplication ; do

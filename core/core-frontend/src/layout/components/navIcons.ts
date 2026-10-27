@@ -14,7 +14,9 @@ const icons: Record<string, Component> = {
   groups,
   permissions,
   audit,
-  feishu
+  feishu,
+  integrations: feishu,
+  connections: datasource
 }
 
 export const resourceNavIcon = (path: string) => icons[path.split('/').filter(Boolean).pop() || '']

@@ -2,6 +2,11 @@ import { execFileSync, spawnSync } from 'child_process'
 import mysql from 'mysql2/promise'
 import mysqlCore from 'mysql2'
 import { CONFIG } from './config.mjs'
+import { createHash } from 'node:crypto'
+
+export function metadataLockName(kind) {
+  return `companybi:${kind}:${createHash('sha256').update(CONFIG.mysql.database).digest('hex').slice(0, 40)}`
+}
 
 let pool
 let transport = null
@@ -23,8 +28,7 @@ function resolveHost() {
 
 function mysqlPassword() {
   if (CONFIG.mysql.password) return CONFIG.mysql.password
-  // Same default as BI-docs/DataEase正式开发/scripts/_local_de_common.sh for local mysql-de.
-  return 'Password123@mysql'
+  throw new Error('DE_MYSQL_PASSWORD is required; refusing to use an implicit database credential')
 }
 
 function sanitizeMysqlText(text) {
@@ -131,6 +135,8 @@ export async function getPool() {
     waitForConnections: true,
     connectionLimit: 5,
     charset: 'utf8mb4',
+    supportBigNumbers: true,
+    bigNumberStrings: true,
     connectTimeout: 2000
   })
   try {
@@ -140,7 +146,7 @@ export async function getPool() {
     return pool
   } catch (err) {
     await candidate.end().catch(() => {})
-    transport = 'docker-exec'
+    if (process.env.COMPANY_BI_EMBEDDED_WORKER !== 'true') transport = 'docker-exec'
     throw err
   }
 }
@@ -155,6 +161,9 @@ async function ensureTransport() {
     await getPool()
     return transport
   } catch {
+    if (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true') {
+      throw new Error('BI metadata connection unavailable; embedded worker will not fall back to Docker or another database')
+    }
     transport = 'docker-exec'
     return transport
   }

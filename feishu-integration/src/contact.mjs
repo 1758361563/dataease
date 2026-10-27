@@ -42,6 +42,7 @@ export function publicEmployee(row) {
 
 async function feishuGet(token, path) {
   const res = await fetch(`${FEISHU_API}${path}`, {
+    signal: AbortSignal.timeout(20000),
     headers: { Authorization: `Bearer ${token}` }
   })
   const json = await res.json()

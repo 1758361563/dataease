@@ -182,6 +182,9 @@ function assertRunnable(sub, recipients, triggerType) {
   }
   if (!recipients.length) throw new Error('subscription has no recipients')
   for (const row of recipients) {
+    if (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true' && row.app_id !== CONFIG.feishuAppId) {
+      throw new Error('收件人不属于当前飞书应用，请重新选择当前应用的收件人')
+    }
     if (row.status === 'DISABLED') {
       throw new Error(`recipient ${row.display_name} is DISABLED`)
     }
@@ -342,6 +345,12 @@ export async function executeSubscription(opts) {
       : (await persistExecutionMode(run.id, desired)) || desired
   run.execution_mode = executionMode
   const dryRun = executionMode === 'DRY_RUN'
+  if (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true' && dryRun) {
+    await updateDeliveryRun(run.id, {
+      status: 'SKIPPED', errorSummary: '历史未投递记录不会转为新发送任务，请重新执行订阅', finishedAt: Date.now()
+    })
+    return { ...report, skipped: true, reason: 'historical-nondelivery-record', executionMode }
+  }
   report.executionMode = executionMode
   report.deliveryLane = lane
   if (storedMode === 'DRY_RUN' && desired === 'LIVE') {

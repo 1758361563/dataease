@@ -1,9 +1,7 @@
 <script lang="ts" setup>
-import DataEase from '@/assets/svg/DataEase.svg'
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { FormRules, FormInstance } from 'element-plus-secondary'
-import { Icon } from '@/components/icon-custom'
 import { loginApi, queryDekey } from '@/api/login'
 import { useCache } from '@/hooks/web/useCache'
 import { useAppStoreWithOut } from '@/store/modules/app'
@@ -15,7 +13,7 @@ import router from '@/router'
 import { ElMessage } from 'element-plus-secondary'
 import { XpackComponent } from '@/components/plugin'
 import { logoutHandler } from '@/utils/logout'
-import DeImage from '@/assets/login-desc-de.png'
+import DeImage from '@/assets/login-scent-library.png'
 import elementResizeDetectorMaker from 'element-resize-detector'
 import { cleanPlatformFlag } from '@/utils/utils'
 import xss from 'xss'
@@ -29,7 +27,9 @@ const loading = ref(false)
 const axiosFinished = ref(true)
 const showFoot = ref(false)
 const showSlogan = ref(true)
-const loginLogoUrl = ref(null)
+const loginLogoUrl = computed(
+  () => appearanceStore.getNavigate || `${import.meta.env.BASE_URL}branding/company-logo.png`
+)
 const msg = ref(null)
 const loginImageUrl = ref(null)
 const slogan = ref(null)
@@ -173,9 +173,6 @@ const loadArrearance = () => {
   if (appearanceStore.getBg) {
     loginImageUrl.value = appearanceStore.getBg
   }
-  if (appearanceStore.getLogin) {
-    loginLogoUrl.value = appearanceStore.getLogin
-  }
   if (appearanceStore.getShowSlogan) {
     showSlogan.value = appearanceStore.getShowSlogan === 'true'
   }
@@ -281,14 +278,8 @@ onMounted(async () => {
             :disabled="preheat"
           >
             <div class="login-logo">
-              <Icon
-                v-if="!loginLogoUrl && axiosFinished"
-                className="login-logo-icon"
-                name="DataEase"
-              >
-                <DataEase class="login-logo-icon" />
-              </Icon>
-              <img v-if="loginLogoUrl && axiosFinished" :src="loginLogoUrl" alt="" />
+              <img v-if="axiosFinished" :src="loginLogoUrl" alt="" />
+              <span>气味数据</span>
             </div>
             <div v-if="showSlogan" class="login-welcome">
               {{ slogan || t('system.available_to_everyone') }}
@@ -406,9 +397,17 @@ onMounted(async () => {
     }
   }
   .login-logo {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #1f2329;
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 52px;
     img {
       width: auto;
+      max-width: 64px;
       max-height: 52px;
       @media only screen and (max-width: 1280px) {
         width: auto;
@@ -556,10 +555,5 @@ onMounted(async () => {
   padding-top: 1px;
   zoom: 1;
   margin: 0;
-}
-
-.login-logo-icon {
-  width: auto;
-  height: 52px;
 }
 </style>

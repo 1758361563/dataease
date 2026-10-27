@@ -194,7 +194,8 @@ export function evaluateFreshness(binding, snapshot) {
 }
 
 function tableName() {
-  const raw = String(process.env.ETL_RUN_LOG_TABLE || 'qiwei_new_bi.etl_run_log').trim()
+  const raw = String(process.env.ETL_RUN_LOG_TABLE ||
+    (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true' ? 'etl_run_log' : 'qiwei_new_bi.etl_run_log')).trim()
   // 飞书默认连 dataease 库。正式记录在 qiwei_new_bi.etl_run_log，
   // 用库名.表名读取，避免只看到本库里另一张同名表。
   if (/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)?$/.test(raw)) return raw

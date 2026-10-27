@@ -1,6 +1,7 @@
 import { UNCHECKED_LABEL } from './etl-status.mjs'
 
 export function subscriptionLane(sub) {
+  if (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true') return 'PROD'
   const raw = String(sub?.delivery_lane || sub?.deliveryLane || 'TEST').trim().toUpperCase()
   return raw === 'PROD' ? 'PROD' : 'TEST'
 }

@@ -15,6 +15,8 @@ import { useI18n } from '@/hooks/web/useI18n'
 const route = useRoute()
 const systemMenu = computed(() => route.path.includes('system'))
 const companyAdminMenu = computed(() => route.path.includes('company-admin'))
+const integrationMenu = computed(() => route.path.startsWith('/integrations'))
+const companyWorkspace = computed(() => companyAdminMenu.value || integrationMenu.value)
 const settingMenu = computed(() => route.path.includes('sys-setting'))
 const toolboxMenu = computed(() => route.path.includes('toolbox'))
 const msgFillMenu = computed(() => route.path.includes('msg-fill'))
@@ -24,7 +26,7 @@ const showSider = computed(
     settingMenu.value ||
     toolboxMenu.value ||
     msgFillMenu.value ||
-    companyAdminMenu.value
+    companyWorkspace.value
 )
 const isCollapse = ref(false)
 const setCollapse = () => {
@@ -34,7 +36,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="common-layout" :class="{ 'company-admin-layout': companyAdminMenu }">
+  <div class="common-layout" :class="{ 'company-admin-layout': companyWorkspace }">
     <HeaderSystem
       v-if="settingMenu || toolboxMenu || msgFillMenu"
       :title="toolboxMenu ? t('toolbox.name') : msgFillMenu ? t('v_query.msg_center') : ''"
@@ -42,9 +44,9 @@ const { t } = useI18n()
     <Header v-else></Header>
     <el-container class="layout-container">
       <DvSidebar
-        v-if="companyAdminMenu"
+        v-if="companyWorkspace"
         class="company-admin-sidebar"
-        title="权限管理"
+        :title="integrationMenu ? '集成中心' : '权限管理'"
         theme-info="light"
         :width="200"
         side-name="companyAdmin"

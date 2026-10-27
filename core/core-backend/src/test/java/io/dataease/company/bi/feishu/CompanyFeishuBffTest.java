@@ -199,6 +199,22 @@ class CompanyFeishuBffTest {
     }
 
     @Test
+    void managedProductRunAlwaysSendsAndRejectsSimulationRequests() {
+        AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
+        Map<String, Object> person = service.createRecipient(recipient("PERSONAL", "user_id", "user_product"), USER_ADMIN);
+        Map<String, Object> created = service.createSubscription(subscription(String.valueOf(DASH_OK), List.of(person.get("id"))), USER_ADMIN);
+        CompanyFeishuConnectionService connections = org.mockito.Mockito.mock(CompanyFeishuConnectionService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "managedConnections", connections);
+        Long id = Long.parseLong((String) created.get("id"));
+        service.setSubscriptionStatus(id, "ENABLED", USER_ADMIN);
+        service.runSubscription(id, USER_ADMIN);
+        assertFalse(gateway.calls.get(0).dryRun());
+        assertFalse(service.getSubscription(id).containsKey("deliveryLane"));
+        assertThrows(DEException.class, () -> service.runSubscription(id, USER_ADMIN, true));
+        assertEquals(1, gateway.calls.size());
+    }
+
+    @Test
     void runDetailDistinguishesDryRunLiveAndUnknown() {
         AuthUtils.setUser(new TokenUserBO(USER_ADMIN, 1L));
         Map<String, Object> person = service.createRecipient(recipient("PERSONAL", "user_id", "user_mode"), USER_ADMIN);

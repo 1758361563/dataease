@@ -59,6 +59,8 @@ company:
     token-secret: ${COMPANY_BI_TOKEN_SECRET:}
     data-dir: ${dataease.path.data:/opt/dataease2.0/data}
   feishu:
+    node: ${COMPANY_BI_INTEGRATION_NODE:node}
+    worker-dir: ${COMPANY_BI_INTEGRATION_WORKER_DIR:/opt/apps/integration-worker}
     shot-base-url: ${COMPANY_FEISHU_SHOT_BASE_URL:http://127.0.0.1:8091}
     internal-token: ${COMPANY_FEISHU_INTERNAL_TOKEN:}
     dry-run: ${COMPANY_FEISHU_DRY_RUN:false}

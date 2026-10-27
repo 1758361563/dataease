@@ -3,7 +3,7 @@
 #  - makes the persistent data layout exist,
 #  - syncs image-owned static content into the (possibly bind-mounted) data dir,
 #  - fails fast with a readable message when required settings are missing,
-#  - then hands over to the base image's run-java.sh (exec, so java is PID 1).
+#  - then execs Java as PID 1; Java owns the private integration executor.
 set -eu
 
 DATA=/opt/dataease2.0/data
@@ -37,4 +37,6 @@ if [ -n "$missing" ]; then
 fi
 
 echo "companybi release: $(tr '\n' ' ' < /opt/apps/release/RELEASE)"
-exec /deployments/run-java.sh
+# JAVA_OPTIONS is the deployment-owned JVM option list, not user input from BI.
+# shellcheck disable=SC2086
+exec java ${JAVA_OPTIONS:-} -jar "${JAVA_APP_JAR:-/opt/apps/app.jar}" --server.port="${RUNNING_PORT:-8100}"

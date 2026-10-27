@@ -34,6 +34,7 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             "db/company/company_bi_audit_log.sql",
             "db/company/company_bi_compat_seed.sql",
             "db/company/company_feishu_app_config.sql",
+            "db/company/company_integration_connection.sql",
             "db/company/company_feishu_recipient.sql",
             "db/company/company_feishu_identity_map.sql",
             "db/company/company_feishu_subscription.sql",

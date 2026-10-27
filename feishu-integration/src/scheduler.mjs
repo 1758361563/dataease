@@ -2,8 +2,6 @@ import { CONFIG } from './config.mjs'
 import { planScheduledSend, resolveSchedulerDryRun, subscriptionLane } from './delivery-lane.mjs'
 import { etlHoldSummary, freshnessDecision, isEtlHoldSummary } from './etl-status.mjs'
 import { currentDueSlot, parseSchedule } from './schedule.mjs'
-import { listEnabledSheetSources } from './sheet-source.mjs'
-import { syncConfiguredSource } from './sheet-sync.mjs'
 import { recordServiceEvent } from './service-log.mjs'
 import {
   claimDeliveryRun,
@@ -153,13 +151,18 @@ export async function schedulerTick(opts = {}) {
     const dryRun = resolveSchedulerDryRun(opts, CONFIG.dryRun)
     const recovered = await recoverIncompleteRuns({ ...opts, dryRun })
     const retried = await retryPartialFailures({ ...opts, dryRun })
-    const sheets = await fireDueSheetSources({ now: opts.now })
-    const fired = await fireDueSubscriptions({ ...opts, dryRun, readRuns: opts.readRuns })
+    const sheets = opts.includeSheetSources === false ? [] : await fireDueSheetSources({ now: opts.now })
+    const fired = opts.fireScheduled === false ? [] : await fireDueSubscriptions({ ...opts, dryRun, readRuns: opts.readRuns })
     return { dryRun, recovered, retried, fired, sheets }
   })
 }
 
 export async function fireDueSheetSources({ now = Date.now() } = {}) {
+  // Legacy stand-alone sheet jobs are deliberately not activated by a BI upgrade.
+  // Future managed import/export jobs use their own source, destination and schedule.
+  if (process.env.COMPANY_BI_EMBEDDED_WORKER === 'true') return []
+  const { listEnabledSheetSources } = await import('./sheet-source.mjs')
+  const { syncConfiguredSource } = await import('./sheet-sync.mjs')
   const sources = await listEnabledSheetSources()
   const fired = []
   for (const source of sources) {

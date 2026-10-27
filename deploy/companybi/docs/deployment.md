@@ -143,7 +143,9 @@ scripts/backup-db.sh                                  # 手动
 
 ## 9. 飞书
 
-本阶段 `COMPANY_FEISHU_DRY_RUN=true` 写死在 `compose.yaml`（不读 `.env`），无飞书凭据，不部署 Node/Playwright 截图服务，不创建正式定时任务。开启真实推送是一次需要评审的 `compose.yaml` 变更，不是配置项。
+飞书能力由 BI 后端托管的内部执行器提供，Node 和 Chromium 已包含在同一 BI 镜像中；不再部署独立容器、不开放 8091 端口。首次安装不启动飞书任务，旧版本升级也不会自动开启真实发送。
+
+初始管理员进入“集成中心 → 应用连接”，填写 App ID、App Secret 和截图用 BI 账号；凭据加密保存在元数据库，表单不回显。依次保存、启用连接、验证连接，确认通讯录权限后按需启用各条订阅并设置发送计划。连接验证不发送消息；浏览器已安装不代表截图账号已验收。完整迁移、验收及回滚边界见 [飞书运行与迁移说明](feishu-integrated-runtime.md)。
 
 ## 10. 禁止事项清单
 
@@ -164,4 +166,4 @@ bash deploy/companybi/tests/local-e2e.sh --v1 <旧版> --v2 <新版> --dirty-ver
 - 运行时基础镜像 `registry.cn-qingdao.aliyuncs.com/dataease/alpine-openjdk21-jre` 来自 DataEase 官方，JRE 版本较旧，应纳入后续安全更新计划。
 - 单机单实例：升级期间有数分钟中断；不含蓝绿/多副本/CI-CD。
 - 镜像没有 registry digest；镜像身份以 image ID（`docker image inspect`）+ tar 的 SHA256 为准。
-- 飞书服务、业务数据源、反向代理/TLS 不在本次范围。
+- 飞书不再需要独立部署；业务数据源、反向代理/TLS 仍按各自部署方案管理。
