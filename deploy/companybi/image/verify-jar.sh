@@ -47,6 +47,9 @@ for c in \
   io/dataease/company/bi/feishu/CompanyFeishuService \
   io/dataease/company/bi/feishu/CompanyFeishuWorker \
   io/dataease/company/bi/integration/IntegrationConnectionStore \
+  io/dataease/company/bi/etl/EtlController \
+  io/dataease/company/bi/etl/EtlChainRunner \
+  io/dataease/company/bi/etl/EtlQuartzJob \
   io/dataease/chart/utils/SingleCategoryRank \
   io/dataease/chart/charts/impl/DefaultChartHandler \
   io/dataease/CoreApplication ; do

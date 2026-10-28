@@ -1,7 +1,7 @@
 # DataEase 每日数据刷新与秉坤 SQL Server 接入方案
 
 版本：v2（2026-10-28），取代 2026-10-27 阶段 0 对话中的口头方案。
-状态：**方案待 Leo 确认，尚未开始阶段 1 编码**。
+状态：**阶段 1 已在分支 `feature/etl-refresh` 实现，尚未部署临时 ECS。** 2026-10-28 完整编译 524 个后端源文件通过；29 项测试（含 MySQL 5.7.44、GTID）通过。本地页面验收和 ECS 更新仍等 Leo 安排。实现说明见 [etl-refresh-local-testing.md](etl-refresh-local-testing.md)。
 范围：在 DataEase（Company BI，分支 `company/bi`）内替代 39.103.208.62 上的 `qiwei-etl-daily`，并评估、实现秉坤 SQL Server 接入。
 
 信息来源标注：

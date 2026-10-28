@@ -66,6 +66,9 @@ services:
       # The backend owns the bundled executor. App credentials and opt-in delivery/scheduling
       # switches live in encrypted BI connections; a clean installation has none enabled.
       COMPANY_BI_INTEGRATION_WORKER_DIR: "/opt/apps/integration-worker"
+      TZ: Asia/Shanghai
+      COMPANY_BI_ETL_HARD_DISABLE: ${COMPANY_BI_ETL_HARD_DISABLE:-false}
+      COMPANY_BI_INSTANCE_ID: ${COMPANY_BI_INSTANCE_ID:-}
       DATAEASE_ORIGIN_LIST: ${COMPANY_BI_ORIGIN_LIST:-http://localhost:30005,http://127.0.0.1:30005}
       JAVA_OPTIONS: "-Dfile.encoding=utf-8 -Dloader.path=/opt/apps ${COMPANY_BI_JAVA_OPTS:--Xms512m -Xmx1g -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError -Duser.timezone=Asia/Shanghai}"
     # Loopback only: reach it through an SSH tunnel. Do not widen without a reverse proxy + TLS.

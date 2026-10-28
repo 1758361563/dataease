@@ -64,13 +64,30 @@ check_docker() {
 # ---------------------------------------------------------------------------
 # docker compose, project-scoped and verb-restricted
 # ---------------------------------------------------------------------------
+resolve_etl_instance_id() {
+  # Never reuse an ID from a copied .env. Resolve this host on every app start.
+  local token="" instance=""
+  if command -v curl >/dev/null 2>&1; then
+    token="$(curl --noproxy '*' -fsS --connect-timeout 1 --max-time 2 -X PUT \
+      -H 'X-aliyun-ecs-metadata-token-ttl-seconds: 60' \
+      http://100.100.100.200/latest/api/token 2>/dev/null || true)"
+    if [ -n "$token" ]; then
+      instance="$(curl --noproxy '*' -fsS --connect-timeout 1 --max-time 2 \
+        -H "X-aliyun-ecs-metadata-token: $token" \
+        http://100.100.100.200/latest/meta-data/instance-id 2>/dev/null || true)"
+    fi
+  fi
+  case "$instance" in i-*) ;; *) instance="" ;; esac
+  export COMPANY_BI_INSTANCE_ID="$instance"
+}
+
 compose() {
   local verb="${1:-}" a
   case "$verb" in config|ps|logs|up|stop|start|restart) ;; *) die "compose verb '$verb' is not allowed by the Company BI scripts" ;; esac
   for a in "$@"; do
     case "$a" in -v|--volumes|--remove-orphans|--rmi|down|rm|kill) die "compose argument '$a' is not allowed by the Company BI scripts" ;; esac
   done
-  case "$verb" in up|start|restart) ensure_mysql_conf ;; esac
+  case "$verb" in up|start|restart) ensure_mysql_conf; resolve_etl_instance_id ;; esac
   local envs=()
   [ -f "$VERSION_ENV" ] && envs=(--env-file "$VERSION_ENV")
   docker compose --project-name "$PROJECT" --project-directory "$DEPLOY_DIR" -f "$DEPLOY_DIR/compose.yaml" \

@@ -17,6 +17,12 @@
 
 ## 2. 场景与操作
 
+### ETL 数据刷新版本的回滚准备
+
+回滚到不含数据刷新功能的镜像前，在「集成中心 → 数据刷新」关闭全局开关，等待当前批次结束，并确认 `COMPANY_ETL` 分组的 Job 和 Trigger 已删除。关闭开关会删除持久化调度；这一步避免旧镜像加载不存在的 ETL Job 类。新增 ETL 元数据表和 `etl_run_log` 历史记录保留。
+
+恢复旧 Python 刷新职责时，也先关闭 DataEase 全局开关，再由 etl_migration 启用旧程序。
+
 ### 2.1 升级后健康检查失败（schema 安全）
 `upgrade.sh` 已自动回滚到旧镜像并复检。日志末尾会写 `ROLLED BACK to <旧版本>`，`state.env` 的 `LAST_OP_RESULT=FAILED_ROLLED_BACK`。
 失败版本的容器已被旧版本容器替换，所以 `docker logs` 看不到它；排查看 `${COMPANY_BI_HOME}/app/logs/`（文件日志）以及升级脚本输出里打印的最后 30 行。新版本镜像仍在本机，可用于复现。
