@@ -219,7 +219,7 @@ export async function readEtlRunLog(taskNames, queryFn) {
               DATE_FORMAT(window_start, '%Y-%m-%d') AS window_start,
               DATE_FORMAT(window_end, '%Y-%m-%d') AS window_end
          FROM ${tableName()}
-        WHERE etl_name IN (${placeholders})
+        WHERE etl_name IN (${placeholders}) AND kind = 'refresh'
         ORDER BY id DESC`,
       names
     )
