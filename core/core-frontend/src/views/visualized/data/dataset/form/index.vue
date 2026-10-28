@@ -1,25 +1,18 @@
 <script lang="tsx" setup>
-import dvFolder from '@/assets/svg/dv-folder.svg'
+import dvFolder from '@/assets/svg/scent/folder.svg'
 import icon_left_outlined from '@/assets/svg/icon_left_outlined.svg'
 import icon_right_outlined from '@/assets/svg/icon_right_outlined.svg'
 import referenceTable from '@/assets/svg/reference-table.svg'
-import icon_organization_outlined from '@/assets/svg/icon_organization_outlined.svg'
 import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
 import icon_sql_outlined_1 from '@/assets/svg/icon_sql_outlined_1.svg'
 import icon_warning_colorful from '@/assets/svg/icon_warning_colorful.svg'
 import icon_add_outlined from '@/assets/svg/icon_add_outlined.svg'
-import icon_refresh_outlined from '@/assets/svg/icon_refresh_outlined.svg'
-import icon_expandRight_filled from '@/assets/svg/icon_expand-right_filled.svg'
 import icon_switch_outlined from '@/assets/svg/icon_switch_outlined.svg'
 import icon_copy_outlined from '@/assets/svg/icon_copy_outlined.svg'
 import icon_deleteTrash_outlined from '@/assets/svg/icon_delete-trash_outlined.svg'
 import icon_edit_outlined from '@/assets/svg/icon_edit_outlined.svg'
 import icon_info_outlined from '@/assets/svg/icon_info_outlined.svg'
 import dayjs from 'dayjs'
-import {
-  iconFieldCalculatedMap,
-  iconFieldCalculatedQMap
-} from '@/components/icon-group/field-calculated-list'
 import { enumValueDs } from '@/api/dataset'
 import {
   ref,
@@ -31,7 +24,6 @@ import {
   computed,
   watch,
   provide,
-  h,
   onMounted,
   onBeforeUnmount
 } from 'vue'
@@ -41,8 +33,9 @@ import { useEmitt } from '@/hooks/web/useEmitt'
 import { ElIcon, ElMessageBox, ElMessage } from 'element-plus-secondary'
 import FixedSizeList from 'element-plus-secondary/es/components/virtual-list/src/components/fixed-size-list.mjs'
 import type { Action } from 'element-plus-secondary'
-import FieldMore from './FieldMore.vue'
-import EmptyBackground from '@/components/empty-background/src/EmptyBackground.vue'
+import DatasetFieldList from '../DatasetFieldList.vue'
+import DatasetFieldActions from '../DatasetFieldActions.vue'
+import DatasetIcon from '../DatasetIcon.vue'
 import { Icon } from '@/components/icon-custom'
 import { useWindowSize } from '@vueuse/core'
 import CalcFieldEdit from './CalcFieldEdit.vue'
@@ -66,6 +59,7 @@ import {
 } from '@/api/dataset'
 import type { Table } from '@/api/dataset'
 import DatasetUnion from './DatasetUnion.vue'
+import DatasetPreview from '../DatasetPreview.vue'
 import { cloneDeep, debounce } from 'lodash-es'
 import { XpackComponent } from '@/components/plugin'
 import { iconFieldMap } from '@/components/icon-group/field-list'
@@ -74,13 +68,6 @@ interface DragEvent extends MouseEvent {
   dataTransfer: DataTransfer
 }
 
-interface Field {
-  fieldShortName: string
-  name: string
-  dataeaseName: string
-  originName: string
-  deType: number
-}
 const { wsCache } = useCache()
 const appStore = useAppStoreWithOut()
 const embeddedStore = useEmbedded()
@@ -98,6 +85,27 @@ const editCalcField = ref(false)
 const calcEdit = ref()
 const editUnion = ref(false)
 const datasetDrag = ref()
+const previewWorkspace = ref()
+const workspaceView = ref('model')
+const previewRevision = ref(0)
+const showFields = ref(true)
+const previewDraft = () => {
+  const union = []
+  dfsNodeList(union, datasetDrag.value.getNodeList())
+  return { union, allFields: allfields.value, isCross: isCross.value }
+}
+const selectWorkspace = async (view: string) => {
+  tabActive.value = view === 'manage' ? 'manage' : 'preview'
+  await changeWorkspaceView(view === 'model' ? 'model' : 'preview')
+  if (view === 'manage') tabChange('manage')
+}
+const createField = (type: string) => (type === 'calc' ? addCalcField('q') : addGroupField())
+const changeWorkspaceView = async (value: string) => {
+  workspaceView.value = value
+  await nextTick()
+  quotaTableHeight.value = Math.max(180, window.innerHeight - 260)
+  window.dispatchEvent(new Event('resize'))
+}
 const datasetName = ref(t('data_set.unnamed_dataset'))
 const tabActive = ref('preview')
 const activeName = ref('')
@@ -137,6 +145,7 @@ const fieldTypes = index => {
 
 const changeUpdate = () => {
   isUpdate = true
+  previewRevision.value++
 }
 
 const fieldOptions = [
@@ -215,10 +224,6 @@ let nodeInfo = {
   name: ''
 }
 
-const defaultProps = {
-  children: 'children',
-  label: 'label'
-}
 const dragHeight = ref(260)
 
 let tableList = []
@@ -663,29 +668,6 @@ const confirmEditCalc = () => {
   })
 }
 
-const generateColumns = (arr: Field[]) =>
-  arr.map(ele => ({
-    key: ele.dataeaseName,
-    deType: ele.deType,
-    dataKey: ele.dataeaseName,
-    title: ele.name,
-    width: 150,
-    headerCellRenderer: ({ column }) => (
-      <div class="flex-align-center">
-        <ElIcon>
-          <Icon>
-            {h(iconFieldMap[fieldType[column.deType]], {
-              class: `svg-icon field-icon-${fieldType[column.deType]}`
-            })}
-          </Icon>
-        </ElIcon>
-        <span class="ellipsis" title={column.title} style={{ width: '120px', marginLeft: '4px' }}>
-          {column.title}
-        </span>
-      </div>
-    )
-  }))
-
 const dsChange = (val: string) => {
   dsLoading.value = true
   sqlNode.datasourceId = dataSource.value
@@ -852,8 +834,6 @@ const allfields = ref([])
 provide('allfields', allfields)
 provide('isCross', isCross)
 
-const expandedD = ref(true)
-const expandedQ = ref(true)
 const setGuid = (arr, id, datasourceId, oldArr) => {
   arr.forEach(ele => {
     if (!ele.id) {
@@ -1283,7 +1263,6 @@ const mouseupDrag = () => {
   document.querySelector('body').style.userSelect = 'auto'
   const dom = document.querySelector('.dataset-db')
   dom.removeEventListener('mousemove', calculateWidth)
-  dom.removeEventListener('mousemove', calculateHeight)
 }
 
 const crossDatasources = computed(() => {
@@ -1299,26 +1278,6 @@ const calculateWidth = (e: MouseEvent) => {
     return
   }
   LeftWidth.value = e.pageX
-}
-
-const mousedownDragH = () => {
-  document.querySelector('.dataset-db').addEventListener('mousemove', calculateHeight)
-}
-const calculateHeight = (e: MouseEvent) => {
-  const clientHeight = document.documentElement.clientHeight
-  if (e.pageY - 56 < 64) {
-    dragHeight.value = 64
-    sqlResultHeight.value = clientHeight - dragHeight.value - 56
-    return
-  }
-  if (e.pageY > clientHeight - 57) {
-    dragHeight.value = clientHeight - 113
-    sqlResultHeight.value = clientHeight - dragHeight.value - 56
-    return
-  }
-  dragHeight.value = e.pageY - 56
-  sqlResultHeight.value = clientHeight - dragHeight.value - 56
-  quotaTableHeight.value = sqlResultHeight.value - 242
 }
 
 const sqlResultHeight = ref(0)
@@ -1440,21 +1399,6 @@ const datasetSaveAndBack = () => {
 
 const datasetPreviewLoading = ref(false)
 
-const datasetPreview = () => {
-  if (datasetPreviewLoading.value) return
-  const arr = []
-  dfsNodeList(arr, datasetDrag.value.getNodeList())
-  datasetPreviewLoading.value = true
-  getPreviewData({ union: arr, allFields: allfields.value, isCross: isCross.value })
-    .then(res => {
-      columns.value = generateColumns((res.data.fields as Field[]) || [])
-      tableData.value = (res.data.data as Array<{}>) || []
-    })
-    .finally(() => {
-      datasetPreviewLoading.value = false
-    })
-}
-
 const dfsNodeList = (arr, list) => {
   list.forEach(ele => {
     const childrenDs = []
@@ -1528,15 +1472,6 @@ const setDeTypeSelection = () => {
   }
   deTypeArr.value =
     obj.deType === 1 && obj.deExtractType === 0 ? [1, obj.dateFormatType] : [obj.deType]
-}
-
-const rowClick = (_, __, event) => {
-  const element = event.target.parentNode.parentNode
-  if ([...element.classList].includes('no-hide')) {
-    element.classList.remove('no-hide')
-    return
-  }
-  element.classList.add('no-hide')
 }
 
 let oldArrValue = []
@@ -1705,18 +1640,14 @@ const getDsIconName = data => {
   if (!data.leaf) return dvFolder
   return iconDatasourceMap[data.type]
 }
-
-const getIconNameCalc = (deType, extField, dimension = false) => {
-  if (extField === 2) {
-    const iconFieldCalculated = dimension ? iconFieldCalculatedMap : iconFieldCalculatedQMap
-    return iconFieldCalculated[deType]
-  }
-  return iconFieldMap[fieldType[deType]]
-}
 </script>
 
 <template>
-  <div class="de-dataset-form" v-loading="loading">
+  <div
+    class="de-dataset-form"
+    :class="{ 'preview-mode': workspaceView === 'preview' }"
+    v-loading="loading"
+  >
     <div class="top">
       <span class="name">
         <el-icon @click="backToMain">
@@ -1737,6 +1668,23 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
           }}</span>
         </template>
       </span>
+      <nav class="dataset-workspace-nav" aria-label="数据集视图">
+        <button :class="{ active: workspaceView === 'model' }" @click="selectWorkspace('model')">
+          数据建模
+        </button>
+        <button
+          :class="{ active: workspaceView === 'preview' && tabActive === 'preview' }"
+          @click="selectWorkspace('preview')"
+        >
+          数据预览
+        </button>
+        <button
+          :class="{ active: workspaceView === 'preview' && tabActive === 'manage' }"
+          @click="selectWorkspace('manage')"
+        >
+          字段管理
+        </button>
+      </nav>
       <span class="operate">
         <el-button :disabled="showInput" type="primary" @click="datasetSaveAndBack">{{
           t('data_set.save_and_return')
@@ -1747,13 +1695,17 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
       </span>
     </div>
     <div class="container dataset-db" @mouseup="mouseupDrag">
-      <p v-show="!showLeft" class="arrow-right" @click="showLeft = true">
+      <p
+        v-show="workspaceView === 'model' && !showLeft"
+        class="arrow-right"
+        @click="showLeft = true"
+      >
         <el-icon>
           <Icon><icon_right_outlined class="svg-icon" /></Icon>
         </el-icon>
       </p>
       <div
-        v-show="showLeft"
+        v-show="workspaceView === 'model' && showLeft"
         :style="{ left: LeftWidth + 'px' }"
         class="drag-left"
         :class="isDragging && 'is-dragging'"
@@ -1761,7 +1713,7 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
       />
       <div
         v-loading="dsLoading"
-        v-show="showLeft"
+        v-show="workspaceView === 'model' && showLeft"
         class="table-list"
         :style="{ width: LeftWidth + 'px' }"
       >
@@ -1890,27 +1842,35 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
           </FixedSizeList>
         </div>
       </div>
-      <div class="drag-right" :style="{ width: `calc(100vw - ${showLeft ? LeftWidth : 0}px)` }">
-        <div v-if="crossDatasources" class="different-datasource">
+      <div
+        class="drag-right"
+        :style="{
+          width: `calc(100vw - ${workspaceView === 'model' && showLeft ? LeftWidth : 0}px)`
+        }"
+      >
+        <div v-if="crossDatasources && workspaceView === 'model'" class="different-datasource">
           <el-icon>
             <Icon name="icon_warning_colorful"><icon_warning_colorful class="svg-icon" /></Icon>
           </el-icon>
           {{ t('data_set.be_reported_incorrectly') }}
         </div>
-        <dataset-union
-          @reGetName="reGetName"
-          @join-editor="joinEditor"
-          @changeUpdate="changeUpdate"
-          :maskShow="maskShow"
-          :dragHeight="dragHeight"
-          :getDsName="getDsName"
-          :offsetX="offsetX"
-          :offsetY="offsetY"
-          ref="datasetDrag"
-          @updateAllfields="updateAllfields"
-          @addComplete="addComplete"
-        ></dataset-union>
+        <div v-show="workspaceView === 'model'" class="model-canvas">
+          <dataset-union
+            @reGetName="reGetName"
+            @join-editor="joinEditor"
+            @changeUpdate="changeUpdate"
+            :maskShow="maskShow"
+            :dragHeight="Math.max(200, height - (crossDatasources ? 110 : 70))"
+            :getDsName="getDsName"
+            :offsetX="offsetX"
+            :offsetY="offsetY"
+            ref="datasetDrag"
+            @updateAllfields="updateAllfields"
+            @addComplete="addComplete"
+          ></dataset-union>
+        </div>
         <div
+          v-show="workspaceView === 'preview'"
           class="sql-result"
           :style="{
             height: sqlResultHeight
@@ -1918,163 +1878,44 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
               : `calc(100% - ${crossDatasources ? dragHeight + 40 : dragHeight}px)`
           }"
         >
-          <div class="sql-title">
-            <span class="drag" @mousedown="mousedownDragH" />
-            <div class="field-data">
-              <el-button :disabled="!allfields.length" @click="addCalcField('q')" secondary>
-                <template #icon>
-                  <el-icon>
-                    <Icon name="icon_add_outlined"><icon_add_outlined class="svg-icon" /></Icon>
-                  </el-icon>
-                </template>
-                {{ t('dataset.add_calc_field') }}
-              </el-button>
-              <el-button :disabled="!allfields.length" @click="addGroupField" secondary>
-                <template #icon>
-                  <el-icon>
-                    <Icon><icon_organization_outlined class="svg-icon" /></Icon>
-                  </el-icon>
-                </template>
-                {{ t('dataset.create_grouping_field') }}
-              </el-button>
-              <el-button
-                style="min-width: 70px"
-                :disabled="!allfields.length"
-                v-loading="datasetPreviewLoading"
-                @click="datasetPreview"
-                secondary
-              >
-                <template #icon>
-                  <el-icon>
-                    <Icon name="icon_refresh_outlined"
-                      ><icon_refresh_outlined class="svg-icon"
-                    /></Icon>
-                  </el-icon>
-                </template>
-                {{ t('data_set.refresh_data') }}
-              </el-button>
-            </div>
-          </div>
-          <el-tabs class="padding-24" v-model="tabActive" @tab-change="tabChange">
-            <el-tab-pane :label="t('chart.data_preview')" name="preview" />
-            <el-tab-pane :label="t('dataset.batch_manage')" name="manage" />
-          </el-tabs>
-          <div v-show="tabActive === 'preview' && !!allfields.length" class="table-preview">
-            <div class="preview-field">
-              <div :class="['field-d', { open: expandedD }]">
-                <div :class="['title', { expanded: expandedD }]" @click="expandedD = !expandedD">
-                  <ElIcon class="expand">
-                    <Icon name="icon_expand-right_filled"
-                      ><icon_expandRight_filled class="svg-icon"
-                    /></Icon>
-                  </ElIcon>
-                  &nbsp;{{ t('chart.dimension') }}
-                </div>
-                <el-tree v-if="expandedD" :data="dimensions" :props="defaultProps">
-                  <template #default="{ data }">
-                    <span class="custom-tree-node father">
-                      <el-icon>
-                        <Icon
-                          ><component
-                            class="svg-icon"
-                            :class="`field-icon-${fieldType[[2, 3].includes(data.deType) ? 2 : 0]}`"
-                            :is="getIconNameCalc(data.deType, data.extField)"
-                          ></component
-                        ></Icon>
-                      </el-icon>
-                      <span :title="data.name" class="label-tooltip">{{ data.name }}</span>
-                      <div class="operate child">
-                        <field-more
-                          :extField="data.extField"
-                          :trans-type="t('data_set.convert_to_indicator')"
-                          :show-time="data.deExtractType === 0"
-                          @handle-command="type => handleFieldMore(data, type)"
-                        ></field-more>
-                      </div>
-                    </span>
-                  </template>
-                </el-tree>
-              </div>
-              <div :class="['field-q', { open: expandedQ }]">
-                <div :class="['title', { expanded: expandedQ }]" @click="expandedQ = !expandedQ">
-                  <ElIcon class="expand">
-                    <Icon name="icon_expand-right_filled"
-                      ><icon_expandRight_filled class="svg-icon"
-                    /></Icon>
-                  </ElIcon>
-                  &nbsp;{{ t('chart.quota') }}
-                </div>
-                <el-tree v-if="expandedQ" :data="quota" :props="defaultProps">
-                  <template #default="{ data }">
-                    <span class="custom-tree-node father">
-                      <el-icon>
-                        <Icon
-                          ><component
-                            class="svg-icon"
-                            :class="`field-icon-${fieldType[[2, 3].includes(data.deType) ? 2 : 0]}`"
-                            :is="getIconNameCalc(data.deType, data.extField, true)"
-                          ></component
-                        ></Icon>
-                      </el-icon>
-                      <span :title="data.name" class="label-tooltip">{{ data.name }}</span>
-                      <div class="operate child">
-                        <field-more
-                          :trans-type="t('data_set.convert_to_dimension')"
-                          typeColor="green-color"
-                          :show-time="data.deExtractType === 0"
-                          :extField="data.extField"
-                          @handle-command="type => handleFieldMore(data, type)"
-                        ></field-more>
-                      </div>
-                    </span>
-                  </template>
-                </el-tree>
-              </div>
-            </div>
+          <div
+            v-show="tabActive === 'preview' && !!allfields.length"
+            class="table-preview"
+            :class="{ 'fields-hidden': !showFields }"
+          >
+            <DatasetFieldList
+              v-show="showFields"
+              :fields="allfields"
+              @command="handleFieldMore"
+              @collapse="showFields = false"
+              @focus="field => previewWorkspace?.focusField(field)"
+            />
+            <aside v-if="!showFields" class="field-library-rail">
+              <button title="展开字段库" aria-label="展开字段库" @click="showFields = true">
+                <DatasetIcon name="expand" />
+              </button>
+            </aside>
             <div class="preview-data">
-              <el-table
-                class="dataset-preview_table"
-                @row-click="rowClick"
-                v-loading="datasetPreviewLoading"
-                header-class="header-cell"
-                :data="tableData"
-                border
-                style="width: 100%; height: 100%"
-              >
-                <el-table-column
-                  :key="column.dataKey + column.deType"
-                  v-for="(column, index) in columns"
-                  :prop="column.dataKey"
-                  :label="column.title"
-                  :width="columns.length - 1 === index ? 150 : 'auto'"
-                  :fixed="columns.length - 1 === index ? 'right' : false"
-                >
-                  <template #header>
-                    <div class="flex-align-center">
-                      <ElIcon style="margin-right: 6px">
-                        <Icon
-                          ><component
-                            class="svg-icon"
-                            :class="`field-icon-${
-                              fieldType[[2, 3].includes(column.deType) ? 2 : 0]
-                            }`"
-                            :is="iconFieldMap[fieldType[column.deType]]"
-                          ></component
-                        ></Icon>
-                      </ElIcon>
-                      <span class="ellipsis" :title="column.title" style="width: 120px">
-                        {{ column.title }}
-                      </span>
-                    </div>
-                  </template>
-                </el-table-column>
-                <template #empty>
-                  <empty-background :description="t('data_set.no_data')" img-type="noneWhite" />
-                </template>
-              </el-table>
+              <DatasetPreview
+                ref="previewWorkspace"
+                :dataset-id="nodeInfo.id"
+                :name="datasetName"
+                :fields="allfields"
+                :draft="previewDraft"
+                :revision="previewRevision"
+                :active="workspaceView === 'preview' && tabActive === 'preview'"
+                ><template #actions
+                  ><DatasetFieldActions
+                    :disabled="!allfields.length"
+                    @create="createField" /></template
+              ></DatasetPreview>
             </div>
           </div>
           <div v-show="tabActive !== 'preview' && !!allfields.length" class="batch-area">
+            <div class="field-management-toolbar">
+              <span>{{ allfields.length }} 个字段</span
+              ><DatasetFieldActions :disabled="!allfields.length" @create="createField" />
+            </div>
             <div class="manage-container">
               <el-collapse v-model="state.fieldCollapse" class="style-collapse">
                 <el-collapse-item
@@ -2588,9 +2429,10 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
     ref="creatDsFolder"
   ></creat-ds-group>
   <el-dialog
-    modal-class="calc-field-edit-dialog"
+    modal-class="calc-field-edit-dialog dataset-centered-overlay"
+    class="dataset-modern-field-dialog"
     v-model="editCalcField"
-    width="1000px"
+    width="min(1040px, 94vw)"
     :title="calcTitle"
   >
     <calc-field-edit ref="calcEdit" :crossDs="crossDatasources" />
@@ -2642,7 +2484,8 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
     </template>
   </el-dialog>
   <el-dialog
-    class="create-dialog group-fields_dialog"
+    class="create-dialog group-fields_dialog dataset-modern-field-dialog"
+    modal-class="dataset-centered-overlay"
     :title="titleForGroup"
     v-model="editGroupField"
     width="1000px"
@@ -3450,12 +3293,6 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
     padding-right: 15px;
   }
 }
-.calc-field-edit-dialog {
-  .ed-dialog__footer {
-    padding-top: 24px;
-    border: 1px solid rgba(31, 35, 41, 0.15);
-  }
-}
 .group-fields_dialog {
   .group-fields_item {
     padding: 16px;
@@ -3528,6 +3365,207 @@ const getIconNameCalc = (deType, extField, dimension = false) => {
     font-size: 14px;
     font-style: normal;
     font-weight: 400;
+  }
+}
+</style>
+
+<style scoped lang="less">
+.de-dataset-form {
+  --dataset-nav-height: 56px;
+}
+.de-dataset-form .top {
+  height: var(--dataset-nav-height);
+  padding: 0 20px;
+  background: #eef2f7;
+  color: #37465f;
+  border-bottom: 1px solid #dfe6ef;
+  box-shadow: none;
+  gap: 20px;
+}
+.de-dataset-form .top .name {
+  width: auto;
+  flex: 1;
+  min-width: 100px;
+  font-size: 16px;
+  color: #37465f;
+}
+.de-dataset-form .top .name .dataset-name {
+  width: auto;
+  max-width: min(360px, 32vw);
+}
+.de-dataset-form .top .operate {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  :deep(.ed-button) {
+    height: 32px;
+    font-size: 13px;
+    margin: 0;
+    border-radius: 5px;
+  }
+  :deep(.ed-button:first-child) {
+    background: transparent;
+    color: #5b70a8;
+    border-color: #bdc9df;
+  }
+}
+.dataset-workspace-nav {
+  align-self: stretch;
+  display: flex;
+  gap: 22px;
+  align-items: stretch;
+  margin-right: 12px;
+  button {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    padding: 0 4px;
+    color: #7788a2;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    &.active {
+      color: #5b70a8;
+      border-bottom-color: #5b70a8;
+      font-weight: 600;
+    }
+    &:hover {
+      color: #4d6498;
+    }
+  }
+}
+.de-dataset-form .container,
+.de-dataset-form .container .drag-right {
+  height: calc(100vh - var(--dataset-nav-height));
+}
+.de-dataset-form.preview-mode .dataset-db .drag-right .sql-result {
+  height: 100% !important;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+.de-dataset-form.preview-mode .dataset-db .drag-right .sql-result .table-preview {
+  display: flex;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.de-dataset-form.preview-mode .dataset-db .drag-right .sql-result .table-preview .preview-data {
+  float: none;
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+.field-library-rail {
+  flex: 0 0 44px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 10px;
+  border-right: 1px solid #e1e7f0;
+  background: #f5f7fb;
+  button {
+    width: 30px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #8191a9;
+    cursor: pointer;
+    &:hover {
+      background: #e8edf6;
+      color: #5b70a8;
+    }
+  }
+}
+.de-dataset-form.preview-mode .batch-area {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+.field-management-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #e3e8ef;
+  color: #8391a6;
+  font-size: 12px;
+}
+.de-dataset-form.preview-mode .manage-container {
+  min-height: 0;
+  padding: 16px 20px 0;
+  :deep(.ed-table th.ed-table__cell) {
+    background: #f5f7fa;
+    color: #667894;
+    font-weight: 500;
+  }
+  :deep(.ed-table) {
+    font-size: 13px;
+    --ed-table-border-color: #e5eaf2;
+    --ed-table-text-color: #435570;
+  }
+}
+@media (max-width: 1100px) {
+  .de-dataset-form .top {
+    padding: 0 14px;
+    gap: 12px;
+  }
+  .dataset-workspace-nav {
+    gap: 12px;
+    margin-right: 0;
+  }
+  .de-dataset-form .top .name .dataset-name {
+    max-width: 24vw;
+  }
+}
+</style>
+
+<style lang="less">
+.dataset-modern-field-dialog.ed-dialog {
+  padding: 0;
+  color: #35445d;
+  .ed-dialog__header {
+    padding: 20px 24px 16px;
+    margin: 0;
+  }
+  .ed-dialog__title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #35445d;
+  }
+  .ed-dialog__body {
+    padding: 0 24px;
+    max-height: calc(100dvh - 190px);
+    overflow: auto;
+  }
+  .ed-dialog__footer {
+    padding: 16px 24px;
+    border: 0 !important;
+    background: transparent;
+  }
+  .dialog-footer {
+    border: 0 !important;
+    padding: 0;
+  }
+  .ed-button {
+    border-radius: 7px;
+  }
+  .ed-input__wrapper,
+  .ed-select .ed-input__wrapper {
+    border-radius: 7px;
   }
 }
 </style>

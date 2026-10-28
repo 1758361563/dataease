@@ -1,7 +1,7 @@
 import { find, merge } from 'lodash-es'
 import { useI18n } from '@/hooks/web/useI18n'
 import { getLocale } from '@/utils/utils'
-import { parseJson } from '@/views/chart/components/js/util'
+import { parseJson } from '@/utils/parseJson'
 
 const { t } = useI18n()
 

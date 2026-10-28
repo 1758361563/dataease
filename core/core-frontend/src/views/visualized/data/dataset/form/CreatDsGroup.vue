@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import dvFolder from '@/assets/svg/dv-folder.svg'
+import dvFolder from '@/assets/svg/scent/folder.svg'
 import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
 import { ref, reactive, computed, watch, nextTick, unref } from 'vue'
 import treeSort from '@/utils/treeSortUtils'
@@ -447,5 +447,23 @@ const emits = defineEmits(['finish', 'onDatasetSave'])
       margin-right: 5px;
     }
   }
+}
+</style>
+
+<style scoped lang="less">
+:deep(.dataset-tree-select .ed-tree-node__content) {
+  min-height: 34px;
+}
+.tree-content .custom-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tree-content .node-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
 }
 </style>

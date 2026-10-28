@@ -36,7 +36,6 @@ import { useEmitt } from '@/hooks/web/useEmitt'
 import relationChart from '@/components/relation-chart/index.vue'
 import {
   ElIcon,
-  ElButton,
   ElMessageBox,
   ElMessage,
   type ElMessageBoxOptions,
@@ -49,25 +48,32 @@ import { useMoveLine } from '@/hooks/web/useMoveLine'
 import { useRouter, useRoute } from 'vue-router_2'
 import CreatDsGroup from './form/CreatDsGroup.vue'
 import type { BusiTreeNode, BusiTreeRequest } from '@/models/tree/TreeNode'
-import {
-  delDatasetTree,
-  getDatasetPreview,
-  barInfoApi,
-  perDelete,
-  exportDatasetData,
-  exportLimit,
-  getDatasetTotal
-} from '@/api/dataset'
+import { delDatasetTree, barInfoApi, perDelete } from '@/api/dataset'
 import EmptyBackground from '@/components/empty-background/src/EmptyBackground.vue'
 import DeResourceGroupOpt from '@/views/common/DeResourceGroupOpt.vue'
 import DatasetDetail from './DatasetDetail.vue'
+import DatasetPreview from './DatasetPreview.vue'
+const previewWorkspace = ref()
+const structureSearch = ref('')
+const structureFields = ref([])
+const filteredStructure = computed(() =>
+  structureFields.value.filter(field => matchesField(field, structureSearch.value))
+)
+import { matchesField } from './previewState'
+const previewFieldsChanged = fields => {
+  structureFields.value = fields
+  datasetTableFiled.value = fields
+  if (activeName.value === 'structPreview') tableData.value = filteredStructure.value
+}
+watch(structureSearch, () => {
+  if (activeName.value === 'structPreview') tableData.value = filteredStructure.value
+})
 import { guid } from '@/views/visualized/data/dataset/form/util'
 import { save } from '@/api/visualization/dataVisualization'
 import { cloneDeep } from 'lodash-es'
 import { fieldType } from '@/utils/attr'
 import { useAppStoreWithOut } from '@/store/modules/app'
 import treeSort from '@/utils/treeSortUtils'
-import RowAuth from '@/views/chart/components/editor/filter/auth-tree/RowAuth.vue'
 
 import {
   DEFAULT_CANVAS_STYLE_DATA_LIGHT,
@@ -78,20 +84,11 @@ import { timestampFormatDate } from './form/util'
 import { interactiveStoreWithOut } from '@/store/modules/interactive'
 import { XpackComponent } from '@/components/plugin'
 import { useCache } from '@/hooks/web/useCache'
-import { RefreshLeft } from '@element-plus/icons-vue'
 import { iconFieldMap } from '@/components/icon-group/field-list'
 import { exportPermission, isFreeFolder } from '@/utils/utils'
 const { t } = useI18n()
 const interactiveStore = interactiveStoreWithOut()
 const { wsCache } = useCache()
-interface Field {
-  fieldShortName: string
-  name: string
-  dataeaseName: string
-  originName: string
-  deType: number
-}
-
 interface Node {
   name: string
   createBy: string
@@ -104,27 +101,6 @@ interface Node {
 }
 const appStore = useAppStoreWithOut()
 const rootManage = ref(false)
-const showExport = ref(false)
-const rowAuth = ref()
-const exportDatasetLoading = ref(false)
-const limit = ref(t('data_set.ten_wan'))
-const exportForm = ref({})
-const table = ref({})
-const exportFormRef = ref()
-const exportFormRules = {
-  name: [
-    {
-      required: true,
-      message: t('commons.input_content'),
-      trigger: 'change'
-    },
-    {
-      max: 50,
-      message: t('commons.char_can_not_more_50'),
-      trigger: 'change'
-    }
-  ]
-}
 const datasetTableFiled = ref([])
 provide('filedList', datasetTableFiled)
 
@@ -208,10 +184,6 @@ const defaultNode = {
 
 const nodeInfo = reactive<Node>(cloneDeep(defaultNode))
 
-let allFields = []
-let columnsPreview = []
-let dataPreview = []
-
 const allFieldsColumns = [
   {
     key: 'name',
@@ -219,6 +191,7 @@ const allFieldsColumns = [
     title: t('data_set.field_name'),
     width: 250
   },
+  { key: 'originName', dataKey: 'originName', title: '原始字段名', width: 250 },
   {
     key: 'deType',
     dataKey: 'deType',
@@ -263,29 +236,6 @@ const { handleDrop, allowDrop, handleDragStart } = treeDraggble(
   'dataset',
   originResourceTree
 )
-
-const generateColumns = (arr: Field[]) =>
-  arr.map(ele => ({
-    key: ele.dataeaseName,
-    deType: ele.deType,
-    dataKey: ele.dataeaseName,
-    title: ele.name,
-    width: 150,
-    headerCellRenderer: ({ column }) => (
-      <div class="flex-align-center">
-        <ElIcon style={{ marginRight: '6px' }}>
-          <Icon>
-            {h(iconFieldMap[fieldType[column.deType]], {
-              class: `svg-icon field-icon-${fieldType[column.deType]}`
-            })}
-          </Icon>
-        </ElIcon>
-        <span class="ellipsis" title={column.title} style={{ width: '120px' }}>
-          {column.title}
-        </span>
-      </div>
-    )
-  }))
 
 const dtLoading = ref(false)
 const isCreated = ref(false)
@@ -351,12 +301,10 @@ onBeforeMount(() => {
   wsCache.delete('dv-info-id')
   loadInit()
   getData()
-  getLimit()
 })
 
 const columns = shallowRef([])
 const tableData = shallowRef([])
-const total = ref(null)
 
 const handleNodeClick = (data: BusiTreeNode) => {
   if (!data.leaf || data.weight === 0) {
@@ -368,107 +316,8 @@ const handleNodeClick = (data: BusiTreeNode) => {
     Object.assign(nodeInfo, nodeData)
     nodeInfo.weight = data.weight
     nodeInfo.ext = data.ext || 0
-    columnsPreview = []
-    dataPreview = []
     activeName.value = 'dataPreview'
     handleClick(activeName.value)
-  })
-}
-
-const exportDataset = () => {
-  showExport.value = true
-  exportForm.value.name = nodeInfo.name
-  exportForm.value.expressionTree = ''
-  nextTick(() => {
-    rowAuth.value.init({})
-    rowAuth.value.relationList = []
-    rowAuth.value.logic = 'or'
-  })
-}
-
-const closeExport = () => {
-  showExport.value = false
-}
-
-const save = ({ logic, items, errorMessage }) => {
-  table.value.id = nodeInfo.id
-  table.value.filename = exportForm.value.name
-  table.value.dataEaseBi = isDataEaseBi.value || appStore.getIsIframe
-  if (errorMessage) {
-    ElMessage.error(errorMessage)
-    return
-  }
-  table.value.expressionTree = JSON.stringify({ items, logic })
-  exportDatasetLoading.value = true
-  const embeddedSyncExport = wsCache.get('embeddedExportMode-backend') !== 'async'
-  exportDatasetData(table.value)
-    .then(res => {
-      if ((isDataEaseBi.value || appStore.getIsIframe) && embeddedSyncExport) {
-        const blob = new Blob([res.data], { type: 'application/vnd.ms-excel' })
-        const link = document.createElement('a')
-        link.style.display = 'none'
-        link.href = URL.createObjectURL(blob)
-        link.download = table.value.filename + '.xlsx' // 下载的文件名
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } else {
-        openMessageLoading(exportData)
-      }
-    })
-    .finally(() => {
-      exportDatasetLoading.value = false
-      showExport.value = false
-    })
-}
-
-const exportDatasetRequest = () => {
-  exportFormRef.value.validate(valid => {
-    if (valid) {
-      rowAuth.value.submit()
-    } else {
-      return false
-    }
-  })
-}
-
-const exportData = () => {
-  useEmitt().emitter.emit('data-export-center', { activeName: 'IN_PROGRESS' })
-}
-
-const rowClick = (_, __, event) => {
-  const element = event.target.parentNode.parentNode
-  if ([...element.classList].includes('no-hide')) {
-    element.classList.remove('no-hide')
-    return
-  }
-  element.classList.add('no-hide')
-}
-
-const openMessageLoading = cb => {
-  const iconClass = `el-icon-loading`
-  const customClass = `de-message-loading de-message-export`
-  ElMessage({
-    message: h('p', null, [
-      t('data_set.can_go_to'),
-      h(
-        ElButton,
-        {
-          text: true,
-          size: 'small',
-          class: 'btn-text',
-          onClick: () => {
-            cb()
-          }
-        },
-        t('data_export.export_center')
-      ),
-      t('data_set.progress_and_download')
-    ]),
-    iconClass,
-    icon: h(RefreshLeft),
-    showClose: true,
-    customClass
   })
 }
 
@@ -510,32 +359,10 @@ const createDataset = (data?: BusiTreeNode) => {
 const handleClick = (tabName: TabPaneName) => {
   switch (tabName) {
     case 'dataPreview':
-      if (columnsPreview.length) {
-        columns.value = columnsPreview
-        tableData.value = dataPreview
-        break
-      }
-      dataPreviewLoading.value = true
-      total.value = null
-      getDatasetPreview(nodeInfo.id)
-        .then(res => {
-          allFields = (res?.allFields as unknown as Field[]) || []
-          datasetTableFiled.value = allFields
-          columnsPreview = generateColumns((res?.data?.fields as Field[]) || [])
-          dataPreview = (res?.data?.data as Array<{}>) || []
-          columns.value = columnsPreview
-          tableData.value = dataPreview
-        })
-        .finally(() => {
-          dataPreviewLoading.value = false
-        })
-      getDatasetTotal(nodeInfo.id).then(res => {
-        total.value = res
-      })
       break
     case 'structPreview':
       columns.value = allFieldsColumns
-      tableData.value = allFields
+      tableData.value = filteredStructure.value
       break
     case 'row':
       break
@@ -738,12 +565,6 @@ const loadInit = () => {
   if (historyTreeSort) {
     state.curSortType = historyTreeSort
   }
-}
-
-const getLimit = () => {
-  exportLimit().then(res => {
-    limit.value = res
-  })
 }
 
 const sortTypeTip = computed(() => {
@@ -1022,7 +843,11 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
                   /></Icon> </template
                 >{{ t('data_set.new_data_screen') }}
               </el-button>
-              <el-button v-if="exportPermissions[0]" secondary @click="exportDataset">
+              <el-button
+                v-if="exportPermissions[0]"
+                secondary
+                @click="previewWorkspace?.exportData('xlsx')"
+              >
                 <template #icon>
                   <Icon name="icon_download_outlined"
                     ><icon_download_outlined class="svg-icon"
@@ -1053,11 +878,28 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
             />
           </div>
         </div>
-        <div class="dataset-table-info">
-          <div v-if="activeName === 'dataPreview'" class="preview-num">
-            {{ t('data_set.pieces_in_total', { msg: total }) }}
-          </div>
-          <template v-if="['dataPreview', 'structPreview'].includes(activeName)">
+        <div
+          class="dataset-table-info"
+          :class="{ 'preview-workbench': activeName === 'dataPreview' }"
+        >
+          <DatasetPreview
+            v-if="nodeInfo.id"
+            v-show="activeName === 'dataPreview'"
+            :key="nodeInfo.id"
+            ref="previewWorkspace"
+            :dataset-id="nodeInfo.id"
+            :name="nodeInfo.name"
+            :can-export="exportPermissions[0]"
+            @fields="previewFieldsChanged"
+          />
+          <el-input
+            v-if="activeName === 'structPreview'"
+            v-model="structureSearch"
+            clearable
+            placeholder="搜索字段显示名或原始名"
+            style="width: 320px; margin-bottom: 12px"
+          />
+          <template v-if="activeName === 'structPreview'">
             <div class="info-table" :class="[{ 'struct-preview': activeName === 'structPreview' }]">
               <el-auto-resizer v-if="activeName === 'structPreview'">
                 <template #default="{ height, width }">
@@ -1078,46 +920,6 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
                   ></el-table-v2>
                 </template>
               </el-auto-resizer>
-              <template v-if="activeName === 'dataPreview'">
-                <el-table
-                  v-loading="dataPreviewLoading"
-                  class="dataset-preview_table"
-                  :data="tableData"
-                  @row-click="rowClick"
-                  key="dataPreview"
-                  border
-                  style="width: 100%; height: 100%"
-                >
-                  <el-table-column
-                    :key="column.dataKey"
-                    v-for="(column, index) in columns"
-                    :prop="column.dataKey"
-                    :label="column.title"
-                    :min-width="150"
-                    :fixed="columns.length - 1 === index ? 'right' : false"
-                  >
-                    <template #header>
-                      <div class="flex-align-center">
-                        <ElIcon style="margin-right: 6px">
-                          <Icon :className="`field-icon-${fieldType[column.deType]}`"
-                            ><component
-                              class="svg-icon"
-                              :class="`field-icon-${fieldType[column.deType]}`"
-                              :is="iconFieldMap[fieldType[column.deType]]"
-                            ></component
-                          ></Icon>
-                        </ElIcon>
-                        <span class="ellipsis" :title="column.title" style="width: 120px">
-                          {{ column.title }}
-                        </span>
-                      </div>
-                    </template>
-                  </el-table-column>
-                  <template #empty>
-                    <empty-background :description="t('data_set.no_data')" img-type="noneWhite" />
-                  </template>
-                </el-table>
-              </template>
             </div>
           </template>
           <template v-if="['row', 'column'].includes(activeName)">
@@ -1148,44 +950,6 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
     ></de-resource-group-opt>
     <creat-ds-group @finish="getData()" ref="creatDsFolder"></creat-ds-group>
   </div>
-  <!--导出数据集弹框-->
-  <el-dialog
-    v-if="showExport"
-    v-model="showExport"
-    width="800px"
-    class="de-dialog-form form-tree-cont"
-    :title="$t('dataset.export_dataset')"
-    append-to-body
-  >
-    <el-form
-      ref="exportFormRef"
-      class="de-form-item"
-      @submit.prevent
-      :model="exportForm"
-      :rules="exportFormRules"
-      :before-close="closeExport"
-    >
-      <el-form-item :label="$t('dataset.filename')" prop="name">
-        <el-input v-model.trim="exportForm.name" :placeholder="$t('dataset.pls_input_filename')" />
-      </el-form-item>
-      <el-form-item :label="$t('dataset.export_filter')" prop="expressionTree">
-        <div class="tree-cont">
-          <div class="content">
-            <RowAuth @save="save" ref="rowAuth" />
-          </div>
-        </div>
-      </el-form-item>
-    </el-form>
-    <span class="tip">{{ t('data_set.pieces_of_data', { limit: limit }) }}</span>
-    <template v-slot:footer>
-      <div class="dialog-footer">
-        <el-button secondary @click="closeExport">{{ $t('dataset.cancel') }} </el-button>
-        <el-button v-loading="exportDatasetLoading" type="primary" @click="exportDatasetRequest"
-          >{{ $t('dataset.confirm') }}
-        </el-button>
-      </div>
-    </template>
-  </el-dialog>
 </template>
 
 <style lang="less" scoped>
@@ -1465,5 +1229,10 @@ const proxyAllowDrop = throttle((arg1, arg2) => {
 .node-disabled-custom {
   color: rgba(187, 191, 196, 1);
   cursor: not-allowed;
+}
+.dataset-manage .dataset-content .dataset-table-info.preview-workbench {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 </style>

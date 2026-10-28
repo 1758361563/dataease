@@ -307,13 +307,14 @@ const delParamsToQuota = () => {
   })
 }
 initFunction()
+const referenceTab = ref('fields')
 </script>
 
 <template>
   <div @keydown.stop @keyup.stop class="calcu-field">
     <div class="calcu-cont">
-      <div style="flex: 1">
-        <div style="max-width: 488px">
+      <div class="formula-workspace">
+        <div class="formula-content">
           <el-form
             require-asterisk-position="right"
             ref="formField"
@@ -359,7 +360,7 @@ initFunction()
                 </div>
               </el-form-item>
               <el-form-item class="mr0" :label="t('dataset.field_type')">
-                <el-select v-model="fieldForm.deType" style="width: 376px">
+                <el-select v-model="fieldForm.deType" style="width: 100%">
                   <template #prefix>
                     <el-icon>
                       <Icon
@@ -414,187 +415,202 @@ initFunction()
             :quotaMap="state.quotaData.map(ele => ele.name)"
             :dimensionMap="state.dimensionData.map(ele => ele.name)"
             ref="myCm"
+            class="formula-editor"
             height="318px"
             dom-id="calcField"
           ></code-mirror>
         </div>
       </div>
-      <div class="padding-lr">
-        <span class="mb8">
-          {{ t('dataset.click_ref_field') }}
-          <el-tooltip class="item" effect="dark" placement="bottom">
-            <template #content>
-              {{ t('dataset.calc_tips.tip3') }}
-              <br />
-              {{ t('dataset.calc_tips.tip4') }}
-              <br />
-              {{ t('dataset.calc_tips.tip5') }}
-            </template>
-            <el-icon size="16px">
-              <Icon name="icon_info_outlined"><icon_info_outlined class="svg-icon" /></Icon>
-            </el-icon>
-          </el-tooltip>
-        </span>
-        <div class="padding-lr-content">
-          <el-input v-model="searchField" :placeholder="t('dataset.edit_search')" clearable>
-            <template #prefix>
-              <el-icon>
-                <Icon name="icon_search-outline_outlined"
-                  ><icon_searchOutline_outlined class="svg-icon"
-                /></Icon>
-              </el-icon>
-            </template>
-          </el-input>
-          <div class="field-height">
-            <el-scrollbar>
-              <span>{{ t('chart.dimension') }}</span>
-              <div v-if="state.dimensionData.length" class="field-list">
-                <span
-                  v-for="item in state.dimensionData"
-                  :key="item.id"
-                  class="item-dimension flex-align-center"
-                  :title="item.name"
-                  @click="insertFieldToCodeMirror('[' + item.name + ']')"
-                >
-                  <el-icon>
-                    <Icon
-                      ><component
-                        class="svg-icon"
-                        :class="`field-icon-${fieldType[item.deType]}`"
-                        :is="iconFieldMap[fieldType[item.deType]]"
-                      ></component
-                    ></Icon>
-                  </el-icon>
-                  <span class="ellipsis" :title="item.name">{{ item.name }}</span>
-                </span>
-              </div>
-
-              <div v-else class="class-na">{{ t('dataset.na') }}</div>
-            </el-scrollbar>
-          </div>
-          <div class="quota-btn_de">
-            <span>{{ t('chart.quota') }}</span>
-            <el-tooltip
-              effect="dark"
-              :content="
-                disableCaParams
-                  ? t('data_set.parameter_is_supported')
-                  : t('data_set.add_calculation_parameters')
-              "
-              placement="top"
-            >
-              <el-icon class="hover-icon_quota" @click="addParamsToQuota">
-                <Icon
-                  :class="[`field-icon-${fieldType[0]}`, disableCaParams && 'not-allow']"
-                  style="color: #646a73"
-                  name="icon_adjustment_outlined"
-                  ><icon_adjustment_outlined class="svg-icon"
-                /></Icon>
+      <aside class="formula-reference">
+        <div class="reference-tabs">
+          <button :class="{ active: referenceTab === 'fields' }" @click="referenceTab = 'fields'">
+            字段</button
+          ><button
+            :class="{ active: referenceTab === 'functions' }"
+            @click="referenceTab = 'functions'"
+          >
+            函数
+          </button>
+        </div>
+        <div v-show="referenceTab === 'fields'" class="padding-lr">
+          <span class="mb8">
+            {{ t('dataset.click_ref_field') }}
+            <el-tooltip class="item" effect="dark" placement="bottom">
+              <template #content>
+                {{ t('dataset.calc_tips.tip3') }}
+                <br />
+                {{ t('dataset.calc_tips.tip4') }}
+                <br />
+                {{ t('dataset.calc_tips.tip5') }}
+              </template>
+              <el-icon size="16px">
+                <Icon name="icon_info_outlined"><icon_info_outlined class="svg-icon" /></Icon>
               </el-icon>
             </el-tooltip>
-          </div>
-          <div class="field-height">
-            <el-scrollbar>
-              <div v-if="state.quotaData.length" class="field-list">
-                <span
-                  v-for="item in state.quotaData"
-                  :key="item.id"
-                  class="item-quota flex-align-center"
-                  @click="insertFieldToCodeMirror('[' + item.name + ']')"
-                >
-                  <el-icon v-if="!item.groupType">
-                    <Icon name="icon_adjustment_outlined"
-                      ><icon_adjustment_outlined class="svg-icon"
-                    /></Icon>
-                  </el-icon>
-                  <el-icon v-else>
-                    <Icon
-                      ><component
-                        class="svg-icon"
-                        :class="`field-icon-${fieldType[item.deType]}`"
-                        :is="iconFieldMap[fieldType[item.deType]]"
-                      ></component
-                    ></Icon>
-                  </el-icon>
-                  <span class="ellipsis" :title="item.name">{{ item.name }}</span>
-                  <div v-if="!item.groupType" class="icon-right">
-                    <el-icon @click.stop="updateParamsToQuota" class="hover-icon">
-                      <Icon name="icon_edit_outlined"><icon_edit_outlined class="svg-icon" /></Icon>
+          </span>
+          <div class="padding-lr-content">
+            <el-input v-model="searchField" :placeholder="t('dataset.edit_search')" clearable>
+              <template #prefix>
+                <el-icon>
+                  <Icon name="icon_search-outline_outlined"
+                    ><icon_searchOutline_outlined class="svg-icon"
+                  /></Icon>
+                </el-icon>
+              </template>
+            </el-input>
+            <div class="field-height">
+              <el-scrollbar>
+                <span>{{ t('chart.dimension') }}</span>
+                <div v-if="state.dimensionData.length" class="field-list">
+                  <span
+                    v-for="item in state.dimensionData"
+                    :key="item.id"
+                    class="item-dimension flex-align-center"
+                    :title="item.name"
+                    @click="insertFieldToCodeMirror('[' + item.name + ']')"
+                  >
+                    <el-icon>
+                      <Icon
+                        ><component
+                          class="svg-icon"
+                          :class="`field-icon-${fieldType[item.deType]}`"
+                          :is="iconFieldMap[fieldType[item.deType]]"
+                        ></component
+                      ></Icon>
                     </el-icon>
-                    <el-icon @click.stop="delParamsToQuota" class="hover-icon">
-                      <Icon name="icon_delete-trash_outlined"
-                        ><icon_deleteTrash_outlined class="svg-icon"
+                    <span class="ellipsis" :title="item.name">{{ item.name }}</span>
+                  </span>
+                </div>
+
+                <div v-else class="class-na">{{ t('dataset.na') }}</div>
+              </el-scrollbar>
+            </div>
+            <div class="quota-btn_de">
+              <span>{{ t('chart.quota') }}</span>
+              <el-tooltip
+                effect="dark"
+                :content="
+                  disableCaParams
+                    ? t('data_set.parameter_is_supported')
+                    : t('data_set.add_calculation_parameters')
+                "
+                placement="top"
+              >
+                <el-icon class="hover-icon_quota" @click="addParamsToQuota">
+                  <Icon
+                    :class="[`field-icon-${fieldType[0]}`, disableCaParams && 'not-allow']"
+                    style="color: #646a73"
+                    name="icon_adjustment_outlined"
+                    ><icon_adjustment_outlined class="svg-icon"
+                  /></Icon>
+                </el-icon>
+              </el-tooltip>
+            </div>
+            <div class="field-height">
+              <el-scrollbar>
+                <div v-if="state.quotaData.length" class="field-list">
+                  <span
+                    v-for="item in state.quotaData"
+                    :key="item.id"
+                    class="item-quota flex-align-center"
+                    @click="insertFieldToCodeMirror('[' + item.name + ']')"
+                  >
+                    <el-icon v-if="!item.groupType">
+                      <Icon name="icon_adjustment_outlined"
+                        ><icon_adjustment_outlined class="svg-icon"
                       /></Icon>
                     </el-icon>
-                  </div>
-                </span>
-              </div>
-              <div v-else class="class-na">{{ t('dataset.na') }}</div>
-            </el-scrollbar>
+                    <el-icon v-else>
+                      <Icon
+                        ><component
+                          class="svg-icon"
+                          :class="`field-icon-${fieldType[item.deType]}`"
+                          :is="iconFieldMap[fieldType[item.deType]]"
+                        ></component
+                      ></Icon>
+                    </el-icon>
+                    <span class="ellipsis" :title="item.name">{{ item.name }}</span>
+                    <div v-if="!item.groupType" class="icon-right">
+                      <el-icon @click.stop="updateParamsToQuota" class="hover-icon">
+                        <Icon name="icon_edit_outlined"
+                          ><icon_edit_outlined class="svg-icon"
+                        /></Icon>
+                      </el-icon>
+                      <el-icon @click.stop="delParamsToQuota" class="hover-icon">
+                        <Icon name="icon_delete-trash_outlined"
+                          ><icon_deleteTrash_outlined class="svg-icon"
+                        /></Icon>
+                      </el-icon>
+                    </div>
+                  </span>
+                </div>
+                <div v-else class="class-na">{{ t('dataset.na') }}</div>
+              </el-scrollbar>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="padding-lr">
-        <span class="mb8">
-          {{ t('dataset.click_ref_function') }}
-          <el-tooltip class="item" effect="dark" placement="bottom">
-            <template #content>
-              <div v-if="props.crossDs">
-                {{ t('dataset.calc_tips.tip6') }}
-                <br />
-                {{ t('dataset.calc_tips.tip8') }}
-                <br />
-                https://calcite.apache.org/docs/reference.html
-              </div>
-              <div v-else>{{ t('dataset.calc_tips.tip7') }}</div>
-            </template>
-            <el-icon size="16px">
-              <Icon name="icon_info_outlined"><icon_info_outlined class="svg-icon" /></Icon>
-            </el-icon>
-          </el-tooltip>
-        </span>
-        <div class="padding-lr-content">
-          <el-input
-            v-model="searchFunction"
-            style="margin-bottom: 8px"
-            :placeholder="t('dataset.edit_search')"
-            clearable
-          >
-            <template #prefix>
-              <el-icon>
-                <Icon name="icon_search-outline_outlined"
-                  ><icon_searchOutline_outlined class="svg-icon"
-                /></Icon>
+        <div v-show="referenceTab === 'functions'" class="padding-lr">
+          <span class="mb8">
+            {{ t('dataset.click_ref_function') }}
+            <el-tooltip class="item" effect="dark" placement="bottom">
+              <template #content>
+                <div v-if="props.crossDs">
+                  {{ t('dataset.calc_tips.tip6') }}
+                  <br />
+                  {{ t('dataset.calc_tips.tip8') }}
+                  <br />
+                  https://calcite.apache.org/docs/reference.html
+                </div>
+                <div v-else>{{ t('dataset.calc_tips.tip7') }}</div>
+              </template>
+              <el-icon size="16px">
+                <Icon name="icon_info_outlined"><icon_info_outlined class="svg-icon" /></Icon>
               </el-icon>
-            </template>
-          </el-input>
-          <el-row class="function-height">
-            <div v-if="state.functionData.length" style="width: 100%">
-              <el-popover
-                v-for="(item, index) in state.functionData"
-                :key="index"
-                class="function-pop"
-                placement="right"
-                width="200"
-                trigger="hover"
-                :open-delay="500"
-              >
-                <template #reference>
-                  <span
-                    class="function-style flex-align-center"
-                    @click="insertParamToCodeMirror(item.func)"
-                    >{{ item.func }}</span
-                  >
-                </template>
-                <p class="pop-title">{{ item.name }}</p>
-                <p class="pop-info">{{ item.func }}</p>
-                <p class="pop-info">{{ item.desc }}</p>
-              </el-popover>
-            </div>
-            <div v-else class="class-na">{{ t('chart.no_function') }}</div>
-          </el-row>
+            </el-tooltip>
+          </span>
+          <div class="padding-lr-content">
+            <el-input
+              v-model="searchFunction"
+              style="margin-bottom: 8px"
+              :placeholder="t('dataset.edit_search')"
+              clearable
+            >
+              <template #prefix>
+                <el-icon>
+                  <Icon name="icon_search-outline_outlined"
+                    ><icon_searchOutline_outlined class="svg-icon"
+                  /></Icon>
+                </el-icon>
+              </template>
+            </el-input>
+            <el-row class="function-height">
+              <div v-if="state.functionData.length" style="width: 100%">
+                <el-popover
+                  v-for="(item, index) in state.functionData"
+                  :key="index"
+                  class="function-pop"
+                  placement="right"
+                  width="200"
+                  trigger="hover"
+                  :open-delay="500"
+                >
+                  <template #reference>
+                    <span
+                      class="function-style flex-align-center"
+                      @click="insertParamToCodeMirror(item.func)"
+                      >{{ item.func }}</span
+                    >
+                  </template>
+                  <p class="pop-title">{{ item.name }}</p>
+                  <p class="pop-info">{{ item.func }}</p>
+                  <p class="pop-info">{{ item.desc }}</p>
+                </el-popover>
+              </div>
+              <div v-else class="class-na">{{ t('chart.no_function') }}</div>
+            </el-row>
+          </div>
         </div>
-      </div>
+      </aside>
     </div>
     <el-dialog
       :before-close="formQuotaClose"
@@ -893,5 +909,104 @@ initFunction()
   .cm-focused {
     outline: none;
   }
+}
+</style>
+
+<style scoped lang="less">
+.calcu-field .calcu-cont {
+  gap: 20px;
+  height: min(560px, calc(100dvh - 190px));
+  min-height: 320px;
+}
+.formula-workspace {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.formula-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  .formula-editor {
+    flex: 1;
+    min-height: 160px;
+    height: auto !important;
+  }
+  :deep(.ed-form-item) {
+    margin-bottom: 16px;
+  }
+  :deep(.ed-form--inline) {
+    display: flex;
+    .mr0 {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+}
+.formula-reference {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: #f6f8fb;
+  border-radius: 10px;
+  padding: 12px;
+  min-height: 0;
+}
+.reference-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  button {
+    flex: 1;
+    border: 0;
+    border-radius: 6px;
+    padding: 7px;
+    color: #8390a5;
+    background: transparent;
+    cursor: pointer;
+    &.active {
+      background: white;
+      color: #5b70a8;
+      box-shadow: 0 1px 4px #23345112;
+    }
+  }
+}
+.calcu-field .padding-lr {
+  width: auto;
+  margin: 0;
+  min-height: 0;
+  flex: 1;
+  > .mb8 {
+    display: none;
+  }
+  .padding-lr-content {
+    height: 100%;
+    border: 0;
+    padding: 0;
+    overflow: auto;
+  }
+}
+.calcu-field .field-height {
+  height: auto;
+  margin-top: 12px;
+  overflow: visible;
+}
+.calcu-field .quota-btn_de {
+  margin: 16px 0 0;
+}
+.calcu-field .item-dimension,
+.calcu-field .item-quota {
+  border: 0;
+  background: transparent;
+  min-height: 32px;
+  margin-top: 2px;
+  &:hover {
+    background: #e8edf7;
+  }
+}
+.calcu-field .function-height {
+  height: auto;
+  width: 100%;
+  margin: 0;
 }
 </style>

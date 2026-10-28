@@ -207,6 +207,40 @@ export const getPreviewData = async (data): Promise<IResponse> => {
   })
 }
 
+export interface PreviewRule {
+  fieldId: string
+  operator: string
+  deType?: number
+  values: string[]
+}
+
+export interface PreviewQuery {
+  id?: string | number
+  draft?: Record<string, any>
+  rules?: PreviewRule[]
+  logic?: 'and' | 'or'
+  columnIds?: string[]
+  page?: number
+  size?: number
+  valueFieldId?: string
+  searchText?: string
+}
+
+export const encodePreviewQuery = (query: PreviewQuery): PreviewQuery => {
+  const copy = cloneDeep(query)
+  if (copy.draft) originNameHandle(copy.draft.allFields || [])
+  return copy
+}
+
+export const queryDatasetPreview = async (
+  query: PreviewQuery,
+  mode: 'previewQuery' | 'previewCount' | 'previewValues' = 'previewQuery'
+) => {
+  const res = await request.post({ url: `/datasetData/${mode}`, data: encodePreviewQuery(query) })
+  if (!res || res.code !== 0) throw new Error(res?.msg || '数据预览请求失败')
+  return res.data
+}
+
 export const getDatasetPreview = async (id): Promise<FieldData> => {
   return request.post({ url: `/datasetTree/get/${id}`, data: {} }).then(res => {
     return res?.data

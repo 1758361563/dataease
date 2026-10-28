@@ -1,4 +1,5 @@
 import { cloneDeep, isNumber } from 'lodash-es'
+import { parseJson } from '@/utils/parseJson'
 import { DEFAULT_TITLE_STYLE } from '../editor/util/chart'
 import { equalsAny, includesAny } from '../editor/util/StringUtils'
 import { FeatureCollection } from '@antv/l7plot/dist/esm/plots/choropleth/types'
@@ -479,12 +480,7 @@ export function resetRgbOpacity(sourceColor: string, times: number): string {
   return sourceColor
 }
 
-export function parseJson<T>(str: T | JSONString<T>): T {
-  if (typeof str !== 'string') {
-    return str as T
-  }
-  return JSON.parse(str) as T
-}
+export { parseJson }
 
 type FlowFunction<P, R> = (param: P, result: R, context?: Record<string, any>, thisArg?: any) => R
 

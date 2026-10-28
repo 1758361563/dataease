@@ -159,9 +159,11 @@ const handleChange = () => {
     trigger="click"
   >
     <template #reference>
-      <el-icon class="menu-more">
-        <Icon name="more_v"><more_v class="svg-icon" /></Icon>
-      </el-icon>
+      <button type="button" class="menu-more" aria-label="字段操作" title="字段操作">
+        <el-icon
+          ><Icon name="more_v"><more_v class="svg-icon" /></Icon
+        ></el-icon>
+      </button>
     </template>
     <ElCascaderPanel
       v-model="deTypeArr"
@@ -195,6 +197,13 @@ const handleChange = () => {
 </template>
 <style lang="less" scoped>
 .menu-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
   cursor: pointer;
   height: 24px;
   width: 24px;
