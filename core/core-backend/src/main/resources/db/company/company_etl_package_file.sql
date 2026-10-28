@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS company_etl_package_file (
+ package_id BIGINT NOT NULL, path VARCHAR(255) NOT NULL, sha256 CHAR(64) NOT NULL, content LONGTEXT NOT NULL,
+ PRIMARY KEY(package_id,path)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

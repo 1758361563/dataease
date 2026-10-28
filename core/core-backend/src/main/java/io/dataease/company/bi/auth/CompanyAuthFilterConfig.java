@@ -58,7 +58,7 @@ public class CompanyAuthFilterConfig {
         FilterRegistrationBean<CompanyCapabilityPathFilter> filter = new FilterRegistrationBean<>();
         filter.setName("companyEtlAdminFilter");
         filter.setFilter(new CompanyCapabilityPathFilter(permissionDecisionService,
-                CompanyCapability.ETL_ACCESS, List.of("/sync")));
+                CompanyCapability.ETL_ACCESS, List.of("/sync", "/company/etl")));
         filter.addUrlPatterns("/*");
         filter.setOrder(9);
         return filter;

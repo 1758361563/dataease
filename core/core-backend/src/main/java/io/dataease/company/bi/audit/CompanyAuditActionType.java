@@ -14,5 +14,12 @@ public enum CompanyAuditActionType {
     GROUP_MEMBER_REMOVE,
     ACL_GRANT,
     ACL_CHANGE,
-    ACL_REVOKE
+    ACL_REVOKE,
+    ETL_SETTINGS,
+    ETL_SWITCH,
+    ETL_TASK,
+    ETL_IMPORT,
+    ETL_ACTIVATE,
+    ETL_INITIALIZE,
+    ETL_RUN
 }

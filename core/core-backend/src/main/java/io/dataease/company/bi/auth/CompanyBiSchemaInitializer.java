@@ -41,7 +41,12 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             "db/company/company_feishu_subscription_recipient.sql",
             "db/company/company_feishu_delivery_run.sql",
             "db/company/company_feishu_delivery_target.sql",
-            "db/company/company_feishu_source.sql"
+            "db/company/company_feishu_source.sql",
+            "db/company/company_etl_setting.sql",
+            "db/company/company_etl_task.sql",
+            "db/company/company_etl_package.sql",
+            "db/company/company_etl_package_file.sql",
+            "db/company/company_etl_batch.sql"
     };
 
     private final DataSource dataSource;
