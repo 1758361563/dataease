@@ -35,6 +35,9 @@ export function requiredCapabilityForPath(path: string): CompanyCapabilityName |
   if (normalized.startsWith('/company-admin/audit')) {
     return 'AUDIT_VIEW'
   }
+  if (normalized.startsWith('/integrations/refresh')) {
+    return 'ETL_ACCESS'
+  }
   if (normalized.startsWith('/company-admin/feishu') || normalized.startsWith('/integrations')) {
     return 'FEISHU_SUBSCRIPTION_MANAGE'
   }
@@ -136,7 +139,19 @@ export function buildIntegrationRoutes(capabilities: CompanyCapabilityName[] | u
           inLayout: true,
           component: 'company/integrations/connections',
           meta: { title: '应用连接' }
-        }
+        },
+        ...(hasCapability(capabilities, 'ETL_ACCESS')
+          ? [
+              {
+                path: 'refresh',
+                name: 'integration-refresh',
+                hidden: false,
+                inLayout: true,
+                component: 'company/integrations/refresh',
+                meta: { title: '数据刷新' }
+              }
+            ]
+          : [])
       ]
     },
     {
@@ -316,7 +331,12 @@ export function grantPayloadFromUi(params: {
 }
 
 export function isCompanyAdminApi(url?: string): boolean {
-  return !!url && (url.includes('/company/bi/admin/') || url.includes('/company/bi/feishu'))
+  return (
+    !!url &&
+    (url.includes('/company/bi/admin/') ||
+      url.includes('/company/bi/feishu') ||
+      url.includes('/company/etl/'))
+  )
 }
 
 export const ROLE_LABELS: Record<string, string> = {

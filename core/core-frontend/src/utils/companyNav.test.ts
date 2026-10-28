@@ -1,9 +1,15 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { keepStringId, SNOWFLAKE_SAMPLE, isUnsafeNumberId, BOOTSTRAP_ADMIN_ID } from './companyIds.ts'
+import {
+  keepStringId,
+  SNOWFLAKE_SAMPLE,
+  isUnsafeNumberId,
+  BOOTSTRAP_ADMIN_ID
+} from './companyIds.ts'
 import {
   applyCompanyCapabilityToMenus,
   buildCompanyAdminRoutes,
+  buildIntegrationRoutes,
   canVisitCompanyPath,
   grantPayloadFromUi,
   hasCapability,
@@ -12,6 +18,16 @@ import {
 } from './companyNav.ts'
 
 describe('P4-2 company nav', () => {
+  it('ETL refresh is available to administrators in integration center', () => {
+    const routes = buildIntegrationRoutes(['FEISHU_SUBSCRIPTION_MANAGE', 'ETL_ACCESS'])
+    assert.ok(routes[0].children.some(route => route.path === 'refresh'))
+    assert.equal(requiredCapabilityForPath('/integrations/refresh'), 'ETL_ACCESS')
+  })
+
+  it('normal users cannot visit the refresh page', () => {
+    assert.equal(canVisitCompanyPath('/integrations/refresh', ['DASHBOARD_VIEW']), false)
+    assert.deepEqual(buildIntegrationRoutes(['DASHBOARD_VIEW']), [])
+  })
   it('T1 ADMIN capabilities show management menu', () => {
     const caps = ['USER_MANAGE', 'GROUP_MANAGE', 'ACL_MANAGE', 'AUDIT_VIEW']
     assert.equal(isAdminManagementVisible(caps), true)
