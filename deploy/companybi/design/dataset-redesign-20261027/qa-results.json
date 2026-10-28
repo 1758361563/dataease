@@ -1,0 +1,23 @@
+[
+  {
+    "variant": "a",
+    "passed": true,
+    "candidateValues": 22,
+    "filterRows": 5,
+    "fieldSearchFixed": true
+  },
+  {
+    "variant": "b",
+    "passed": true,
+    "candidateValues": 22,
+    "filterRows": 5,
+    "fieldSearchFixed": true
+  },
+  {
+    "variant": "c",
+    "passed": true,
+    "candidateValues": 22,
+    "filterRows": 5,
+    "fieldSearchFixed": true
+  }
+]
