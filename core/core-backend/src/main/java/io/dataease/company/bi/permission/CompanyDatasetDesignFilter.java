@@ -19,6 +19,9 @@ public class CompanyDatasetDesignFilter implements Filter {
 
     static final Set<String> DESIGN_EXACT = Set.of(
             "/datasetData/previewData",
+            "/datasetData/previewQuery",
+            "/datasetData/previewCount",
+            "/datasetData/previewValues",
             "/datasetData/previewSql",
             "/datasetData/previewSqlCheck",
             "/datasetData/tableField",

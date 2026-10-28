@@ -10,6 +10,9 @@ import io.dataease.constant.LogOT;
 import io.dataease.constant.LogST;
 import io.dataease.constant.XpackSettingConstants;
 import io.dataease.dataset.manage.DatasetGroupManage;
+import io.dataease.dataset.manage.DatasetPreviewManage;
+import io.dataease.dataset.manage.DatasetPreviewRequest;
+import io.dataease.utils.JsonUtil;
 import io.dataease.exportCenter.manage.ExportCenterDownLoadManage;
 import io.dataease.exportCenter.manage.ExportCenterManage;
 import io.dataease.extensions.datasource.dto.DatasetTableDTO;
@@ -30,6 +33,8 @@ import java.util.*;
 @RestController
 @RequestMapping("datasetTree")
 public class DatasetTreeServer implements DatasetTreeApi {
+    @Resource
+    private DatasetPreviewManage datasetPreviewManage;
     @Resource
     private DatasetGroupManage datasetGroupManage;
     @Resource
@@ -110,6 +115,15 @@ public class DatasetTreeServer implements DatasetTreeApi {
 
     @Override
     public void exportDataset(DataSetExportRequest request, HttpServletResponse response) throws Exception {
+        request.fileExtension();
+        if (StringUtils.isNotBlank(request.getPreviewJson())) {
+            DatasetPreviewRequest preview = JsonUtil.parseObject(request.getPreviewJson(), DatasetPreviewRequest.class);
+            datasetPreviewManage.snapshot(preview);
+            request.setId(preview.getId() == null ? 0L : preview.getId());
+            request.setPreviewJson(JsonUtil.toJSONString(preview).toString());
+        } else if ("csv".equals(request.getFormat())) {
+            throw new IllegalArgumentException("CSV 导出需要预览查询条件");
+        }
         boolean embeddedSyncExport = !StringUtils.equalsIgnoreCase(exportCenterManage.singleValue(XpackSettingConstants.EMBEDDED_EXPORT_MODE), "async");
         if (request.isDataEaseBi() && embeddedSyncExport) {
             exportCenterDownLoadManage.downloadDataset(request, response);

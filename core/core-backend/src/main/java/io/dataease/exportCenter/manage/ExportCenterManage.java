@@ -66,6 +66,8 @@ import java.util.concurrent.Future;
 @Component
 @Transactional(rollbackFor = Exception.class)
 public class ExportCenterManage implements BaseExportApi {
+    @Autowired(required = false)
+    private io.dataease.company.bi.auth.CompanyTokenSecret companyTokenSecret;
     @Resource
     private CoreExportTaskMapper exportTaskMapper;
     @Resource
@@ -156,7 +158,7 @@ public class ExportCenterManage implements BaseExportApi {
         }
         if (exportTask.getExportFromType().equalsIgnoreCase("dataset")) {
             DataSetExportRequest request = JsonUtil.parseObject(exportTask.getParams(), DataSetExportRequest.class);
-            exportCenterDownLoadManage.startDatasetTask(resolveExportTaskFileTarget(safeTaskId), exportTask.getExportFrom(), request);
+            exportCenterDownLoadManage.startDatasetTask(resolveDatasetTarget(safeTaskId, request), exportTask.getExportFrom(), request);
         }
         if (exportTask.getExportFromType().equalsIgnoreCase("data_filling")) {
             HashMap request = JsonUtil.parseObject(exportTask.getParams(), HashMap.class);
@@ -233,6 +235,10 @@ public class ExportCenterManage implements BaseExportApi {
             exportTaskDTO.setExportFromName(dataVisualizationServer.getAbsPath(exportTaskDTO.getExportFrom()));
         }
         if (exportTaskDTO.getExportFromType().equalsIgnoreCase("dataset")) {
+            if (exportTaskDTO.getExportFrom() == null || exportTaskDTO.getExportFrom() == 0L) {
+                exportTaskDTO.setExportFromName("未保存的数据集");
+                return;
+            }
             List<String> fullName = new ArrayList<>();
             datasetGroupManage.geFullName(Long.valueOf(exportTaskDTO.getExportFrom()), fullName);
             Collections.reverse(fullName);
@@ -287,7 +293,7 @@ public class ExportCenterManage implements BaseExportApi {
     }
 
     public void addTask(Long exportFrom, String exportFromType, DataSetExportRequest request) throws Exception {
-        datasetGroupManage.getDatasetGroupInfoDTO(exportFrom, null);
+        if (exportFrom != null && exportFrom > 0) datasetGroupManage.getDatasetGroupInfoDTO(exportFrom, null);
         Long currentUserId = currentUserId();
         CoreExportTask exportTask = new CoreExportTask();
         exportTask.setId(IDUtils.snowID().toString());
@@ -295,14 +301,14 @@ public class ExportCenterManage implements BaseExportApi {
         exportTask.setExportFrom(exportFrom);
         exportTask.setExportFromType(exportFromType);
         exportTask.setExportStatus("PENDING");
-        exportTask.setFileName(request.getFilename() + ".xlsx");
+        exportTask.setFileName(request.getFilename() + request.fileExtension());
         exportTask.setExportProgress("0");
         exportTask.setExportTime(System.currentTimeMillis());
         exportTask.setParams(JsonUtil.toJSONString(request).toString());
         exportTask.setExportMachineName(hostName());
         exportTaskMapper.insert(exportTask);
         String safeTaskId = validateExportTaskId(exportTask.getId());
-        exportCenterDownLoadManage.startDatasetTask(resolveExportTaskFileTarget(safeTaskId), exportTask.getExportFrom(), request);
+        exportCenterDownLoadManage.startDatasetTask(resolveDatasetTarget(safeTaskId, request), exportTask.getExportFrom(), request);
     }
 
     @Override
@@ -427,10 +433,17 @@ public class ExportCenterManage implements BaseExportApi {
     }
 
     private ExportTaskFileTarget resolveDownloadTarget(String taskId, CoreExportTask exportTask) {
+        if (exportTask.getFileName() != null && exportTask.getFileName().endsWith(".csv")) {
+            return new ExportTaskFileTarget(taskId, resolveExportTaskFilePath(taskId, taskId + ".csv"));
+        }
         if (exportTask.getExportTime() < 1730277243491L) {
             return new ExportTaskFileTarget(taskId, resolveExportTaskFilePath(taskId, resolveDownloadFileName(exportTask)));
         }
         return resolveExportTaskFileTarget(taskId);
+    }
+
+    private ExportTaskFileTarget resolveDatasetTarget(String taskId, DataSetExportRequest request) {
+        return new ExportTaskFileTarget(taskId, resolveExportTaskFilePath(taskId, taskId + request.fileExtension()));
     }
 
     private Path resolveExportTaskFilePath(String taskId, String fileName) {
@@ -552,6 +565,7 @@ public class ExportCenterManage implements BaseExportApi {
     }
 
     private String resolveTicketSecret(Long userId) {
+        if (companyTokenSecret != null) return companyTokenSecret.getSecret() + ":export-download";
         String secret = null;
         if (ObjectUtils.isEmpty(CommonBeanFactory.getBean("loginServer"))) {
             secret = io.dataease.auth.config.SubstituleLoginConfig.getTokenSecret();

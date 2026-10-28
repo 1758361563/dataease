@@ -117,3 +117,14 @@ core/core-frontend/src/assets/fsSvg.html
 !/core/core-backend/src/test/java/io/dataease/company/bi/feishu/
 /core/core-backend/src/test/java/io/dataease/company/bi/feishu/*
 !/core/core-backend/src/test/java/io/dataease/company/bi/feishu/CompanyFeishuConnectionServiceTest.java
+
+# Dataset preview query-only state and export implementation.
+!/core/core-backend/src/main/java/io/dataease/dataset/manage/DatasetPreview*.java
+!/core/core-backend/src/main/java/io/dataease/dataset/server/DatasetPreviewServer.java
+!/core/core-backend/src/main/java/io/dataease/exportCenter/manage/DatasetPreviewExportWriter.java
+!/core/core-backend/src/test/java/io/dataease/dataset/
+!/core/core-backend/src/test/java/io/dataease/dataset/manage/
+!/core/core-backend/src/test/java/io/dataease/dataset/manage/DatasetPreviewRequestTest.java
+!/core/core-backend/src/test/java/io/dataease/exportCenter/
+!/core/core-backend/src/test/java/io/dataease/exportCenter/manage/
+!/core/core-backend/src/test/java/io/dataease/exportCenter/manage/DatasetPreviewExportWriterTest.java

@@ -82,6 +82,8 @@ import java.util.stream.Collectors;
 @Transactional(rollbackFor = Exception.class)
 public class ExportCenterDownLoadManage {
     @Resource
+    private DatasetPreviewExportWriter previewExportWriter;
+    @Resource
     private CoreExportTaskMapper exportTaskMapper;
     @Resource
     private CoreChartViewMapper coreChartViewMapper;
@@ -171,7 +173,8 @@ public class ExportCenterDownLoadManage {
             exportTaskDTO.setExportFromName(coreChartViewMapper.selectById(exportTaskDTO.getExportFrom()).getTitle());
         }
         if (exportTaskDTO.getExportFromType().equalsIgnoreCase("dataset")) {
-            exportTaskDTO.setExportFromName(coreDatasetGroupMapper.selectById(exportTaskDTO.getExportFrom()).getName());
+            CoreDatasetGroup dataset = coreDatasetGroupMapper.selectById(exportTaskDTO.getExportFrom());
+            exportTaskDTO.setExportFromName(dataset == null ? "未保存的数据集" : dataset.getName());
         }
         if (exportTaskDTO.getExportFromType().equalsIgnoreCase("data_filling")) {
             exportTaskDTO.setExportFromName(getDataFillingApi().get(exportTaskDTO.getExportFrom()).getName());
@@ -201,6 +204,25 @@ public class ExportCenterDownLoadManage {
 
     @DeLog(id = "#p0.exportFrom", ot = LogOT.EXPORT, st = LogST.DATASET)
     public void startDatasetTask(ExportTaskFileTarget exportTarget, Long exportFrom, DataSetExportRequest request) {
+        if (StringUtils.isNotBlank(request.getPreviewJson())) {
+            exportTarget.createParentDirectory();
+            TokenUserBO user = AuthUtils.getUser();
+            Future<?> task = scheduledThreadPoolExecutor.submit(() -> {
+                AuthUtils.setUser(user);
+                try (OutputStream output = exportTarget.newOutputStream()) {
+                    updateExportTask(exportTarget.taskId(), "IN_PROGRESS", "0", null, null, null);
+                    previewExportWriter.write(request, output, value -> updateExportTask(exportTarget.taskId(), "IN_PROGRESS", value, null, null, null), this::addWatermarkTools);
+                    updateExportTaskSuccess(exportTarget, "100");
+                } catch (Exception e) {
+                    LogUtil.error("Failed to export preview", e);
+                    updateExportTask(exportTarget.taskId(), "FAILED", null, e.getMessage(), null, null);
+                } finally {
+                    AuthUtils.setUser(null);
+                }
+            });
+            Running_Task.put(exportTarget.taskId(), task);
+            return;
+        }
         exportTarget.createParentDirectory();
 
         TokenUserBO tokenUserBO = AuthUtils.getUser();
@@ -605,6 +627,7 @@ public class ExportCenterDownLoadManage {
 
     public void addWatermarkTools(Workbook wb) {
         VisualizationWatermark watermark = watermarkMapper.selectById("system_default");
+        if (watermark == null || StringUtils.isBlank(watermark.getSettingContent())) return;
         WatermarkContentDTO watermarkContent = JsonUtil.parseObject(watermark.getSettingContent(), WatermarkContentDTO.class);
         if (watermarkContent.getEnable() && watermarkContent.getExcelEnable()) {
             UserFormVO userInfo = visualizationMapper.queryInnerUserInfo(AuthUtils.getUser().getUserId());
@@ -630,6 +653,12 @@ public class ExportCenterDownLoadManage {
     }
 
     public void downloadDataset(DataSetExportRequest request, HttpServletResponse response) throws Exception {
+        if (StringUtils.isNotBlank(request.getPreviewJson())) {
+            response.setContentType("csv".equals(request.getFormat()) ? "text/csv;charset=UTF-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-disposition", "attachment;filename=" + URLEncoder.encode(request.getFilename(), StandardCharsets.UTF_8) + request.fileExtension());
+            previewExportWriter.write(request, response.getOutputStream(), value -> {}, this::addWatermarkTools);
+            return;
+        }
         OutputStream outputStream = response.getOutputStream();
         try {
             CoreDatasetGroup coreDatasetGroup = coreDatasetGroupMapper.selectById(request.getId());

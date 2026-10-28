@@ -35,6 +35,7 @@ import io.dataease.extensions.datasource.constant.SqlPlaceholderConstants;
 import io.dataease.extensions.datasource.dto.*;
 import io.dataease.extensions.datasource.factory.ProviderFactory;
 import io.dataease.extensions.datasource.model.SQLMeta;
+import io.dataease.extensions.datasource.model.SQLObj;
 import io.dataease.extensions.datasource.provider.Provider;
 import io.dataease.extensions.datasource.vo.DatasourceConfiguration;
 import io.dataease.extensions.view.dto.ChartExtFilterDTO;
@@ -221,6 +222,11 @@ public class DatasetDataManage {
     }
 
     public Map<String, Object> previewDataWithLimit(DatasetGroupInfoDTO datasetGroupInfoDTO, Integer start, Integer count, boolean checkPermission, boolean encode) throws Exception {
+        return previewDataWithLimit(datasetGroupInfoDTO, start, count, checkPermission, encode, null, false, false);
+    }
+
+    public Map<String, Object> previewDataWithLimit(DatasetGroupInfoDTO datasetGroupInfoDTO, Integer start, Integer count,
+            boolean checkPermission, boolean encode, DatasetPreviewRequest preview, boolean countOnly, boolean distinct) throws Exception {
         if (encode) {
             DatasetUtils.dsDecode(datasetGroupInfoDTO);
         }
@@ -273,12 +279,45 @@ public class DatasetDataManage {
         Table2SQLObj.table2sqlobj(sqlMeta, null, "(" + sql + ")", crossDs);
         Field2SQLObj.field2sqlObj(sqlMeta, fields, fields, crossDs, dsMap, Utils.getParams(fields), null, pluginManage);
         WhereTree2Str.transFilterTrees(sqlMeta, rowPermissionsTree, fields, crossDs, dsMap, Utils.getParams(fields), null, pluginManage);
-        Order2SQLObj.getOrders(sqlMeta, datasetGroupInfoDTO.getSortFields(), fields, crossDs, dsMap, Utils.getParams(fields), null, pluginManage);
+        if (preview != null) {
+            DataSetRowPermissionsTreeDTO filter = new DataSetRowPermissionsTreeDTO();
+            filter.setTree(preview.conditionTree(fields));
+            SQLMeta filterMeta = new SQLMeta();
+            filterMeta.setTable(sqlMeta.getTable());
+            WhereTree2Str.transFilterTrees(filterMeta, List.of(filter), fields, crossDs, dsMap, Utils.getParams(fields), null, pluginManage);
+            if (StringUtils.isNotBlank(filterMeta.getWhereTrees())) {
+                String permissions = sqlMeta.getWhereTrees();
+                sqlMeta.setWhereTrees(StringUtils.isBlank(permissions) ? filterMeta.getWhereTrees()
+                        : "(" + permissions + ") AND (" + filterMeta.getWhereTrees() + ")");
+                if (sqlMeta.getWhereTreesDialect() == null) sqlMeta.setWhereTreesDialect(new HashMap<>());
+                sqlMeta.getWhereTreesDialect().putAll(filterMeta.getWhereTreesDialect());
+            }
+            if (preview.getColumnIds() != null) {
+                Map<String, DatasetTableFieldDTO> byId = fields.stream().collect(Collectors.toMap(f -> String.valueOf(f.getId()), f -> f));
+                List<DatasetTableFieldDTO> selected = new ArrayList<>();
+                for (String id : preview.getColumnIds()) {
+                    if (!byId.containsKey(id)) throw new IllegalArgumentException("预览列已失效或没有查看权限");
+                    if (!selected.contains(byId.get(id))) selected.add(byId.get(id));
+                }
+                if (selected.isEmpty()) throw new IllegalArgumentException("至少选择一列");
+                Field2SQLObj.field2sqlObj(sqlMeta, selected, fields, crossDs, dsMap, Utils.getParams(fields), null, pluginManage);
+                fields = selected;
+            }
+        }
+        if (preview == null) {
+            Order2SQLObj.getOrders(sqlMeta, datasetGroupInfoDTO.getSortFields(), fields, crossDs, dsMap, Utils.getParams(fields), null, pluginManage);
+        } else {
+            applyPreviewOrder(sqlMeta, datasetGroupInfoDTO.getSortFields(), countOnly);
+        }
+        if (countOnly) {
+            String fullSql = provider.rebuildSQL(SQLProvider.createQuerySQL(sqlMeta, false, false, distinct), sqlMeta, crossDs, dsMap);
+            return Collections.singletonMap("total", getDatasetTotal(datasetGroupInfoDTO, fullSql, null));
+        }
         String querySQL;
         if (start == null || count == null) {
-            querySQL = SQLProvider.createQuerySQL(sqlMeta, false, needOrder, false);
+            querySQL = SQLProvider.createQuerySQL(sqlMeta, false, needOrder, distinct);
         } else {
-            querySQL = SQLProvider.createQuerySQLWithLimit(sqlMeta, false, needOrder, false, start, count);
+            querySQL = SQLProvider.createQuerySQLWithLimit(sqlMeta, false, needOrder, distinct, start, count);
         }
         querySQL = provider.rebuildSQL(querySQL, sqlMeta, crossDs, dsMap);
         logger.debug("calcite data preview sql: " + querySQL);
@@ -307,6 +346,29 @@ public class DatasetDataManage {
         }
         map.put("sql", Base64.getEncoder().encodeToString(querySQL.getBytes()));
         return map;
+    }
+
+    /** Sort the actual projected values, never re-expand calculation expressions for a detail query. */
+    static void applyPreviewOrder(SQLMeta meta, List<DeSortField> configured, boolean countOnly) {
+        List<SQLObj> orders = new ArrayList<>();
+        if (!countOnly && meta.getXFields() != null) {
+            List<SQLObj> columns = meta.getXFields();
+            if (configured == null || configured.isEmpty()) {
+                for (SQLObj column : columns) orders.add(previewOrder(column, "asc"));
+            } else {
+                for (DeSortField sort : configured) {
+                    columns.stream().filter(column -> Objects.equals(column.getId(), sort.getId())).findFirst()
+                            .ifPresent(column -> orders.add(previewOrder(column, sort.getOrderDirection())));
+                }
+            }
+        }
+        meta.setXOrders(orders);
+    }
+
+    private static SQLObj previewOrder(SQLObj column, String direction) {
+        String alias = String.format(SQLConstants.FIELD_DOT, column.getFieldAlias());
+        return SQLObj.builder().orderField(alias).orderAlias(alias)
+                .orderDirection("desc".equalsIgnoreCase(direction) ? "desc" : "asc").build();
     }
 
     public Long getDatasetTotal(Long datasetGroupId) throws Exception {
