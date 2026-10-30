@@ -254,7 +254,11 @@ onUnmounted(() => clearInterval(timer))
         :closable="false"
         :title="
           state.effective
-            ? `正式刷新已启用 · ${state.setting.chainEnabled ? `下次执行 ${state.nextFireTime || '触发器尚未注册'}` : '整条链已暂停'}`
+            ? `正式刷新已启用 · ${
+                state.setting.chainEnabled
+                  ? `下次执行 ${state.nextFireTime || '触发器尚未注册'}`
+                  : '整条链已暂停'
+              }`
             : state.reason
         "
       />
