@@ -21,5 +21,9 @@ public enum CompanyAuditActionType {
     ETL_IMPORT,
     ETL_ACTIVATE,
     ETL_INITIALIZE,
-    ETL_RUN
+    ETL_RUN,
+    DATA_UPDATE_SAVE,
+    DATA_UPDATE_RUN,
+    DATA_UPDATE_CANCEL,
+    DATA_UPDATE_DELETE
 }

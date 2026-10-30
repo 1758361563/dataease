@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS company_data_update_group (
+ id VARCHAR(36) PRIMARY KEY, version BIGINT NOT NULL, definition MEDIUMTEXT NOT NULL, updated_at DATETIME(3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

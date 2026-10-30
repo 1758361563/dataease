@@ -46,7 +46,16 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             "db/company/company_etl_task.sql",
             "db/company/company_etl_package.sql",
             "db/company/company_etl_package_file.sql",
-            "db/company/company_etl_batch.sql"
+            "db/company/company_etl_batch.sql",
+            "db/company/company_data_update_task.sql",
+            "db/company/company_data_update_run.sql",
+            "db/company/company_data_update_guard.sql",
+            "db/company/company_data_update_ddl.sql",
+            "db/company/company_data_update_claim.sql",
+            "db/company/company_data_update_group.sql",
+            "db/company/company_data_update_member.sql",
+            "db/company/company_data_update_group_run.sql",
+            "db/company/company_data_update_group_node.sql"
     };
 
     private final DataSource dataSource;

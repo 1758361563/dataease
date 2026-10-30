@@ -166,3 +166,10 @@ core/core-frontend/src/assets/fsSvg.html
 !/core/core-backend/src/test/resources/company-etl/refresh-2.sha256
 !/core/core-backend/src/test/resources/company-etl/refresh-2.sql
 /core/core-frontend/target-etl-ui/
+
+# Per-table data updates (independent of the legacy ETL package runner).
+!/core/core-backend/src/main/java/io/dataease/company/bi/dataupdate/
+!/core/core-backend/src/main/java/io/dataease/company/bi/dataupdate/*.java
+!/core/core-backend/src/main/resources/db/company/company_data_update_*.sql
+!/core/core-backend/src/test/java/io/dataease/company/bi/dataupdate/
+!/core/core-backend/src/test/java/io/dataease/company/bi/dataupdate/*.java

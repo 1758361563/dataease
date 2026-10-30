@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS company_data_update_run (
+ id VARCHAR(36) PRIMARY KEY,
+ task_id VARCHAR(36) NOT NULL,
+ task_version BIGINT NOT NULL,
+ trigger_key CHAR(64) NOT NULL,
+ trigger_type VARCHAR(16) NOT NULL,
+ business_date DATE NOT NULL,
+ definition MEDIUMTEXT NOT NULL,
+ upstream_runs TEXT NOT NULL,
+ status VARCHAR(24) NOT NULL,
+ requested_at DATETIME(3) NOT NULL,
+ started_at DATETIME(3) NULL,
+ finished_at DATETIME(3) NULL,
+ row_count BIGINT NOT NULL DEFAULT 0,
+ message VARCHAR(1000) NOT NULL DEFAULT '',
+ cancel_requested TINYINT NOT NULL DEFAULT 0,
+ UNIQUE KEY uk_data_update_trigger (task_id, trigger_key),
+ KEY idx_data_update_history (task_id, requested_at),
+ KEY idx_data_update_dependency (task_id, business_date, status),
+ KEY idx_data_update_completed (task_id, status, finished_at),
+ KEY idx_data_update_consumed (task_id, task_version, business_date, requested_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

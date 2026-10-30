@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS company_data_update_guard (
+ id INT PRIMARY KEY
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

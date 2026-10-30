@@ -1,5 +1,8 @@
 <script lang="tsx" setup>
 import icon_down_outlined1 from '@/assets/svg/icon_down_outlined-1.svg'
+import DataUpdateDrawer from './DataUpdateDrawer.vue'
+import DataUpdateWorkspace from './DataUpdateWorkspace.vue'
+import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
 import icon_down_outlined from '@/assets/svg/icon_down_outlined.svg'
 import icon_copy_filled from '@/assets/svg/icon_copy_filled.svg'
 import icon_dataset from '@/assets/svg/icon_dataset.svg'
@@ -23,6 +26,8 @@ import icon_close_filled from '@/assets/svg/icon_close_filled.svg'
 import icon_replace_outlined from '@/assets/svg/icon_replace_outlined.svg'
 import iconMaybe_outlined from '@/assets/svg/icon-maybe_outlined.svg'
 import { computed, h, unref, reactive, ref, shallowRef, nextTick, watch, onMounted } from 'vue'
+const dataUpdateDrawer = ref<InstanceType<typeof DataUpdateDrawer>>()
+const dataUpdatePermission = useCompanyPermissionStoreWithOut()
 import { dsTypes } from '@/views/visualized/data/datasource/form/option'
 import type { TabPaneName, ElMessageBoxOptions } from 'element-plus-secondary'
 import {
@@ -1050,6 +1055,14 @@ const uploadExcel = editType => {
     })
 }
 const activeName = ref('table')
+watch(
+  () => nodeInfo.type,
+  type => {
+    if (activeName.value === 'update' && !['mysql', 'pg', 'sqlServer'].includes(type)) {
+      activeName.value = 'table'
+    }
+  }
+)
 const defaultProps = {
   children: 'children',
   label: 'name',
@@ -1116,6 +1129,7 @@ const getMenuList = (val: boolean) => {
 
 <template>
   <div class="datasource-manage" v-loading="dsLoading">
+    <DataUpdateDrawer ref="dataUpdateDrawer" />
     <ArrowSide
       :style="{ left: (sideTreeStatus ? width - 12 : 0) + 'px' }"
       @change-side-tree-status="changeSideTreeStatus"
@@ -1415,10 +1429,23 @@ const getMenuList = (val: boolean) => {
             <el-tabs v-model="activeName" @tab-change="handleClick">
               <el-tab-pane :label="t('datasource.config')" name="config"></el-tab-pane>
               <el-tab-pane :label="t('datasource.table')" name="table"></el-tab-pane>
+              <el-tab-pane
+                v-if="
+                  dataUpdatePermission.hasCapability('ETL_ACCESS') &&
+                  ['mysql', 'pg', 'sqlServer'].includes(nodeInfo.type)
+                "
+                label="数据更新"
+                name="update"
+              />
             </el-tabs>
           </div>
         </div>
-        <div v-if="activeName === 'table'" class="datasource-table">
+        <DataUpdateWorkspace
+          v-if="activeName === 'update'"
+          :datasource-id="String(nodeInfo.id)"
+          :type="nodeInfo.type"
+        />
+        <div v-else-if="activeName === 'table'" class="datasource-table">
           <div class="search-operate">
             <el-input
               ref="search"
@@ -1504,9 +1531,18 @@ const getMenuList = (val: boolean) => {
                 key="__operation"
                 :label="t('commons.operating')"
                 fixed="right"
-                width="108"
+                width="208"
               >
                 <template #default="scope">
+                  <el-button
+                    v-if="
+                      dataUpdatePermission.hasCapability('ETL_ACCESS') &&
+                      ['mysql', 'pg', 'sqlServer'].includes(nodeInfo.type)
+                    "
+                    text
+                    @click.stop="dataUpdateDrawer?.open(String(nodeInfo.id), scope.row.tableName)"
+                    >数据更新</el-button
+                  >
                   <el-tooltip effect="dark" :content="t('data_set.a_new_dataset')" placement="top">
                     <el-button
                       @click.stop="createDataset(scope.row.tableName)"
