@@ -7,6 +7,47 @@ import org.junit.Test;
 
 public class Det2AppDatasetRebindV1ManageTest {
 
+    @Test
+    public void comparisonDateIsActiveEvenWithoutDateAxis() {
+        var chart = new io.dataease.extensions.view.dto.ChartViewDTO();
+        var metric = io.dataease.utils.JsonUtil.parseObject(
+                "{\"id\":\"50\",\"compareCalc\":{\"type\":\"year_yoy\",\"field\":\"81\"}}",
+                ChartViewFieldDTO.class);
+        chart.setYAxis(java.util.List.of(metric));
+        Assert.assertEquals(java.util.Set.of(50L, 81L),
+                manage.collectActiveFieldIds(java.util.Map.of(1L, chart), "[]"));
+        metric.getCompareCalc().setType("none");
+        Assert.assertEquals(java.util.Set.of(50L),
+                manage.collectActiveFieldIds(java.util.Map.of(1L, chart), "[]"));
+    }
+
+    @Test
+    public void comparisonReferencesRemapWithoutChangingLiteralFields() throws Exception {
+        String source = "{\"field\":\"81\",\"yAxis\":[{\"id\":\"50\",\"compareCalc\":{\"type\":\"year_yoy\",\"field\":\"81\"}},{\"compareCalc\":{\"type\":\"month_yoy\",\"field\":81}}]}";
+        var result = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+                io.dataease.visualization.calculation.DashboardCalculationLifecycle.json(
+                        source, java.util.Map.of(50L, 150L, 81L, 181L), java.util.Map.of(), null));
+        Assert.assertEquals("81", result.path("field").asText());
+        Assert.assertEquals("150", result.path("yAxis").get(0).path("id").asText());
+        Assert.assertEquals("181", result.path("yAxis").get(0).path("compareCalc").path("field").asText());
+        Assert.assertEquals(181L, result.path("yAxis").get(1).path("compareCalc").path("field").asLong());
+    }
+
+    @Test
+    public void candidateCatalogDoesNotMakeUnusedFieldsActive() {
+        var chart = new io.dataease.extensions.view.dto.ChartViewDTO();
+        var date = placement(81L, "日期", "d", "d", null, null);
+        var channel = placement(82L, "渠道", "d", "d", null, null);
+        chart.setViewFields(java.util.List.of(date, channel));
+        chart.setXAxis(java.util.List.of(channel));
+        Assert.assertEquals(java.util.Set.of(82L),
+                manage.collectActiveFieldIds(java.util.Map.of(1L, chart), "[]"));
+        chart.setXAxis(java.util.List.of(date));
+        Assert.assertEquals(java.util.Set.of(81L),
+                manage.collectActiveFieldIds(java.util.Map.of(1L, chart), "[]"));
+        Assert.assertFalse(manage.isDeTypeCompatible(0, 1));
+    }
+
     private final Det2AppDatasetRebindV1Manage manage = new Det2AppDatasetRebindV1Manage();
 
     @Test

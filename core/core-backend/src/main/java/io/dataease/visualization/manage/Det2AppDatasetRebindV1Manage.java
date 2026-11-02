@@ -294,7 +294,7 @@ public class Det2AppDatasetRebindV1Manage {
                 }
                 continue;
             }
-            if (!isDeTypeCompatible(src.getDeType(), tgt.getDeType())) {
+            if (active && !isDeTypeCompatible(src.getDeType(), tgt.getDeType())) {
                 if (active) {
                     errors.add(Det2AppRebindError.field(
                             "DE_TYPE_CONFLICT",
@@ -357,7 +357,7 @@ public class Det2AppDatasetRebindV1Manage {
         }
     }
 
-    private Set<Long> collectActiveFieldIds(Map<Long, ChartViewDTO> canvasViews, String componentDataJson) {
+    Set<Long> collectActiveFieldIds(Map<Long, ChartViewDTO> canvasViews, String componentDataJson) {
         Set<Long> ids = new HashSet<>();
         if (canvasViews != null) {
             for (ChartViewDTO view : canvasViews.values()) {
@@ -378,7 +378,8 @@ public class Det2AppDatasetRebindV1Manage {
         collectFieldIdsFromList(view.getExtLabel(), ids);
         collectFieldIdsFromList(view.getExtTooltip(), ids);
         collectFieldIdsFromList(view.getDrillFields(), ids);
-        collectFieldIdsFromList(view.getViewFields(), ids);
+        // viewFields is the editor's candidate catalog, not a chart placement.
+        // Calculation dependencies are collected separately before physical matching.
         collectFieldIdsFromList(view.getFlowMapStartName(), ids);
         collectFieldIdsFromList(view.getFlowMapEndName(), ids);
         collectFieldIdsFromList(view.getExtColor(), ids);
@@ -391,6 +392,12 @@ public class Det2AppDatasetRebindV1Manage {
         for (ChartViewFieldDTO f : fields) {
             if (f != null && f.getId() != null) {
                 ids.add(f.getId());
+                if (f.getCompareCalc() != null
+                        && StringUtils.isNotBlank(f.getCompareCalc().getType())
+                        && !"none".equalsIgnoreCase(f.getCompareCalc().getType())
+                        && f.getCompareCalc().getField() != null) {
+                    ids.add(f.getCompareCalc().getField());
+                }
             }
         }
     }

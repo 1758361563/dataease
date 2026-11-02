@@ -82,6 +82,12 @@ public class DashboardCalculationLifecycle {
             ObjectNode result = JSON.createObjectNode();
             node.fields().forEachRemaining(entry -> {
                 String name = entry.getKey();
+                // Comparison date fields are references; other properties named "field"
+                // can contain literal values and must retain their original meaning.
+                if ("compareCalc".equals(key) && "field".equals(name)) {
+                    result.set(name, rewrite(entry.getValue(), "fieldId", ids, aliases, dashboardId));
+                    return;
+                }
                 if (Set.of("dashboardParameterValues", "dashboardParameterReference", "calculationConfig").contains(name)) return;
                 // Grouping stores its source column as a bare ID, not a formula [ID].
                 if ("originName".equals(name) && node.path("extField").asInt() == 3) {
