@@ -8,7 +8,9 @@ import static io.dataease.company.bi.dataupdate.UpdateDefinition.require;
 public record SheetSource(String sourceId, String name, String connectionKey, String url,
         String sheetId, String sheetName, int headerRow, int dataStartRow, Integer dataEndRow,
         String columnRange, List<Field> fields, List<String> nullValues) {
-    public record Field(String source, String target, boolean required, String dateFormat) { }
+    public record Field(String source, String target, boolean required, String dateFormat, String decimalMode, Integer decimalPlaces) {
+        public Field(String source,String target,boolean required,String dateFormat) { this(source,target,required,dateFormat,null,null); }
+    }
     public SheetSource withId(String id) {
         return new SheetSource(id,name,connectionKey,url,sheetId,sheetName,headerRow,dataStartRow,dataEndRow,columnRange,fields,nullValues);
     }
@@ -33,6 +35,8 @@ public record SheetSource(String sourceId, String name, String connectionKey, St
         Set<String> sources=new HashSet<>(), targets=new HashSet<>();
         for(Field f:fields) {
             require(f!=null,"字段映射无效"); UpdateDefinition.identifier(f.source()); UpdateDefinition.identifier(f.target());
+            require(f.decimalMode()==null || Set.of("PRESERVE","ROUND","FLOOR","CEILING").contains(f.decimalMode()),"数值处理方式无效");
+            require(f.decimalPlaces()==null || f.decimalPlaces()>=0 && f.decimalPlaces()<=30,"小数位数须为 0–30");
             require(sources.add(f.source()) && targets.add(f.target()),"来源列和目标列不能重复映射");
             require(f.dateFormat()==null || Set.of("","yyyy-MM-dd","yyyy/MM/dd","yyyy/M/d","yyyy-M-d","yyyyMMdd","yyyy-MM-dd HH:mm:ss","yyyy/MM/dd HH:mm:ss").contains(f.dateFormat()),"日期格式不支持");
         }

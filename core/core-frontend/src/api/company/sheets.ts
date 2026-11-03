@@ -7,6 +7,8 @@ export interface SheetField {
   target: string
   required: boolean
   dateFormat: string
+  decimalMode?: 'PRESERVE' | 'ROUND' | 'FLOOR' | 'CEILING' | null
+  decimalPlaces?: number | null
 }
 export interface SheetSource {
   sourceId: string | null

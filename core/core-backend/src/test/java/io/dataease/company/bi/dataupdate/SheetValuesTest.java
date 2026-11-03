@@ -41,6 +41,35 @@ class SheetValuesTest {
         assertEquals(java.sql.Date.valueOf("2026-08-12"),SheetValues.convert("2026/8/12",explicit,target,List.of(),2));
         assertThrows(IllegalArgumentException.class,()->SheetValues.convert("2026-8-12",explicit,target,List.of(),2));
     }
+    private Object decimal(String value,String mode,int places,int precision,int scale) {
+        return SheetValues.convert(value,new SheetSource.Field("目标","目标",false,"",mode,places),column(Types.DECIMAL,"DECIMAL",precision,scale,true),List.of(),22);
+    }
+    @Test void formulaResultsCanBeRoundedToWholeMembers() {
+        assertEquals(new BigDecimal("18"),decimal("17.798594847775176","ROUND",0,10,0));
+        assertEquals(new BigDecimal("17"),decimal("17.798594847775176","FLOOR",0,10,0));
+        assertEquals(new BigDecimal("18"),decimal("17.798594847775176","CEILING",0,10,0));
+        assertThrows(IllegalArgumentException.class,()->decimal("17.798594847775176","PRESERVE",0,10,0));
+    }
+    @Test void roundingDirectionsAndTiesAreExplicitForNegativeValues() {
+        assertEquals(new BigDecimal("-2"),decimal("-1.5","ROUND",0,10,0));
+        assertEquals(new BigDecimal("2"),decimal("1.5","ROUND",0,10,0));
+        assertEquals(new BigDecimal("-2"),decimal("-1.1","FLOOR",0,10,0));
+        assertEquals(new BigDecimal("-1"),decimal("-1.9","CEILING",0,10,0));
+        assertEquals(new BigDecimal("1.2300"),decimal("1.234","ROUND",2,10,4));
+    }
+    @Test void decimalLimitsRemainEnforcedAfterRounding() {
+        assertThrows(IllegalArgumentException.class,()->decimal("99.9","ROUND",0,2,0));
+        assertThrows(IllegalArgumentException.class,()->decimal("1.2","ROUND",3,10,2));
+        assertThrows(IllegalArgumentException.class,()->decimal("1.2","ROUND",-1,10,2));
+        assertThrows(IllegalArgumentException.class,()->decimal("1.2","UNKNOWN",0,10,2));
+        assertEquals(new BigDecimal("1.2000"),decimal("1.2000","PRESERVE",1,10,4));
+        assertThrows(IllegalArgumentException.class,()->decimal("1.21","PRESERVE",1,10,4));
+    }
+    @Test void decimalPolicyIsValidatedEvenForAnEmptySample() {
+        var f=new SheetSource.Field("目标","目标",false,"","ROUND",3);
+        var shape=new UpdateInspection.Structure(List.of(column(Types.DECIMAL,"DECIMAL",10,2,true)),List.of(),"x");
+        assertThrows(IllegalArgumentException.class,()->SheetValues.mapping(source(List.of(f)),List.of("目标"),shape));
+    }
     @Test void textLimitsAndUnknownColumnsFail() {
         assertThrows(IllegalArgumentException.class,()->SheetValues.convert("abc",field,column(Types.VARCHAR,"VARCHAR",2,0,true),List.of(),3));
         var config=source(List.of(field));

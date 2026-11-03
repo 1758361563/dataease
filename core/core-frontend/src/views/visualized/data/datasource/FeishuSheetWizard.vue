@@ -89,6 +89,12 @@ const status = (value?: string) =>
 const overdue = computed(
   () => state.value.tasks.find(t => t.definition.id === task.value.id)?.freshness === 'OVERDUE'
 )
+const decimalColumn = (row: { target: string }) =>
+  structure.value?.columns.find(c => c.name === row.target && /^(DECIMAL|NUMERIC)/i.test(c.type))
+function resetConversion(row: { decimalMode?: string | null; decimalPlaces?: number | null }) {
+  row.decimalMode = null
+  row.decimalPlaces = null
+}
 const dateFormats = [
   'yyyy-MM-dd',
   'yyyy/MM/dd',
@@ -643,7 +649,7 @@ defineExpose({ open })
                 ></el-table-column>
                 <el-table-column label="目标字段" min-width="170"
                   ><template #default="{ row }"
-                    ><el-select v-model="row.target" filterable
+                    ><el-select v-model="row.target" @change="resetConversion(row)" filterable
                       ><el-option
                         v-for="c in structure?.columns.filter(c => !c.generated) || []"
                         :key="c.name"
@@ -654,15 +660,56 @@ defineExpose({ open })
                             : ''
                         }`" /></el-select></template
                 ></el-table-column>
-                <el-table-column label="源日期格式" width="180"
+                <el-table-column label="字段转换" width="260"
                   ><template #default="{ row }"
-                    ><el-select v-model="row.dateFormat" clearable placeholder="自动识别"
+                    ><div v-if="decimalColumn(row)" class="decimal-conversion">
+                      <el-select
+                        :model-value="row.decimalMode || 'PRESERVE'"
+                        @update:model-value="row.decimalMode = $event"
+                        aria-label="数值处理方式"
+                      >
+                        <el-option label="四舍五入" value="ROUND" /><el-option
+                          label="向下"
+                          value="FLOOR"
+                        /><el-option label="向上" value="CEILING" /><el-option
+                          label="保留"
+                          value="PRESERVE"
+                        />
+                      </el-select>
+                      <el-input-number
+                        :model-value="row.decimalPlaces ?? decimalColumn(row).scale"
+                        @update:model-value="row.decimalPlaces = $event ?? null"
+                        :min="0"
+                        :max="Math.min(30, decimalColumn(row).scale)"
+                        :precision="0"
+                        controls-position="right"
+                        aria-label="小数位数"
+                      />
+                      <AdminHelp
+                        :content="
+                          '小数位数上限 ' +
+                          Math.min(30, decimalColumn(row).scale) +
+                          '。四舍五入：半值远离零；向下：趋向负无穷；向上：趋向正无穷。保留：不舍入，超出所选位数报错。'
+                        "
+                      />
+                    </div>
+                    <el-select
+                      v-else-if="
+                        structure?.columns.find(
+                          c => c.name === row.target && /DATE|TIME/i.test(c.type)
+                        )
+                      "
+                      v-model="row.dateFormat"
+                      clearable
+                      placeholder="源日期格式：自动识别"
                       ><el-option
                         v-for="format in dateFormats"
                         :key="format"
                         :value="format"
-                        :label="format" /></el-select></template
-                ></el-table-column>
+                        :label="format" /></el-select
+                    ><span v-else>—</span></template
+                  ></el-table-column
+                >
                 <el-table-column label="必填" width="60"
                   ><template #default="{ row }"><el-checkbox v-model="row.required" /></template
                 ></el-table-column>
@@ -696,7 +743,12 @@ defineExpose({ open })
           <section v-show="step === 2">
             <div class="section-title">
               <div>
-                <h4>数据预览 <AdminHelp content="预览最多 15 行；执行时会校验完整读取结果。" /></h4>
+                <h4>
+                  数据预览
+                  <AdminHelp
+                    content="预览最多 15 行，映射字段显示转换后的结果；执行时会校验完整读取结果。"
+                  />
+                </h4>
               </div>
               <el-button @click="inspect">{{ preview ? '重新预览' : '预览并校验' }}</el-button>
             </div>
@@ -1086,6 +1138,19 @@ defineExpose({ open })
   color: var(--muted);
   font-size: 12px;
   line-height: 1.8;
+}
+.decimal-conversion {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  :deep(.ed-select) {
+    flex: 1;
+    min-width: 0;
+  }
+  :deep(.ed-input-number) {
+    width: 80px;
+    flex: 0 0 80px;
+  }
 }
 .form-grid {
   display: grid;

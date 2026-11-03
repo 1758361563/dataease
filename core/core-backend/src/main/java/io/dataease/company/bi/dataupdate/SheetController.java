@@ -83,11 +83,12 @@ public class SheetController {
         var headers=reader.headers(task.sheet());SheetValues.mapping(task.sheet(),headers,target);
         var page=reader.read(task.sheet(),task.sheet().dataStartRow(),Math.min(task.sheet().dataStartRow()+14,task.sheet().dataEndRow()==null?1_000_000:task.sheet().dataEndRow()));
         List<String> errors=new ArrayList<>();
+        List<List<Object>> converted=new ArrayList<>();
         for(int r=0;r<page.rows().size();r++) {
-            var row=page.rows().get(r);if(row.stream().allMatch(v->v==null || v.toString().isEmpty()))continue;
+            var row=new ArrayList<Object>(page.rows().get(r));converted.add(row);if(row.stream().allMatch(v->v==null || v.toString().isEmpty()))continue;
             for(var field:task.sheet().fields()) {
                 int index=headers.indexOf(field.source());var column=target.columns().stream().filter(c->c.name().equals(field.target())).findFirst().orElseThrow();
-                try{SheetValues.convert(index<row.size()?row.get(index):null,field,column,task.sheet().nullValues(),task.sheet().dataStartRow()+r);}
+                try{Object value=SheetValues.convert(index<row.size()?row.get(index):null,field,column,task.sheet().nullValues(),task.sheet().dataStartRow()+r);while(row.size()<=index)row.add(null);row.set(index,value==null?null:value.toString());}
                 catch(IllegalArgumentException e){if(errors.size()<30)errors.add(e.getMessage());}
             }
         }
@@ -97,7 +98,7 @@ public class SheetController {
             require(tickets.size()<256,"预览请求较多，请稍后重试");token=UUID.randomUUID().toString();
             tickets.put(token,new Ticket(user,signature(task),target.fingerprint(),System.currentTimeMillis()+900_000));
         }
-        return Map.of("headers",headers,"rows",bounded(page.rows()),"target",target,"errors",errors,"token",token,"sampled",true,"sheetRows",page.sheetRows());
+        return Map.of("headers",headers,"rows",bounded(converted),"target",target,"errors",errors,"token",token,"sampled",true,"sheetRows",page.sheetRows());
     }
     public record Save(UpdateDefinition definition,String previewToken,boolean takeoverConfirmed) { }
     @PostMapping public UpdateDefinition save(@RequestBody Save body,HttpServletRequest request)throws Exception {

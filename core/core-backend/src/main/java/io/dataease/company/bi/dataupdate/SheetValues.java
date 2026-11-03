@@ -18,7 +18,15 @@ public final class SheetValues {
         try {
             return switch(column.jdbcType()) {
                 case Types.DECIMAL,Types.NUMERIC -> {
-                    BigDecimal n=new BigDecimal(value.strip()).setScale(column.scale(),RoundingMode.UNNECESSARY);
+                    decimalPolicy(field,column);
+                    int places=field.decimalPlaces()==null?column.scale():field.decimalPlaces();
+                    RoundingMode mode=switch(Objects.toString(field.decimalMode(),"PRESERVE")) {
+                        case "ROUND" -> RoundingMode.HALF_UP;
+                        case "FLOOR" -> RoundingMode.FLOOR;
+                        case "CEILING" -> RoundingMode.CEILING;
+                        default -> RoundingMode.UNNECESSARY;
+                    };
+                    BigDecimal n=new BigDecimal(value.strip()).setScale(places,mode).setScale(column.scale(),RoundingMode.UNNECESSARY);
                     require(n.precision()<=column.precision(),"decimal 超出精度"); yield n;
                 }
                 case Types.TINYINT,Types.SMALLINT,Types.INTEGER,Types.BIGINT -> {
@@ -42,7 +50,16 @@ public final class SheetValues {
                 }
                 default -> throw new IllegalArgumentException("目标类型不支持："+column.type());
             };
-        } catch(Exception e) { throw new UpdateDefinition.ValidationException("第 "+row+" 行「"+field.source()+"」无法写入 "+column.type()+"：请检查类型、精度或日期格式"); }
+        } catch(Exception e) {
+            String reason=column.jdbcType()==Types.DECIMAL || column.jdbcType()==Types.NUMERIC
+                    ? "：请检查数值、处理方式和小数位数；目标精度为 ("+column.precision()+","+column.scale()+")，保留模式不舍入"
+                    : "：请检查类型、精度或日期格式";
+            throw new UpdateDefinition.ValidationException("第 "+row+" 行「"+field.source()+"」无法写入 "+column.type()+reason);
+        }
+    }
+    private static void decimalPolicy(SheetSource.Field field,UpdateInspection.Column column) {
+        require(field.decimalMode()==null || Set.of("PRESERVE","ROUND","FLOOR","CEILING").contains(field.decimalMode()),"数值处理方式无效");
+        require(field.decimalPlaces()==null || field.decimalPlaces()>=0 && field.decimalPlaces()<=Math.min(30,column.scale()),"小数位数超过目标列上限");
     }
     private static DateTimeFormatter format(SheetSource.Field field,String fallback) {
         String pattern=field.dateFormat()==null || field.dateFormat().isBlank()?fallback:field.dateFormat();
@@ -62,6 +79,8 @@ public final class SheetValues {
             require(headers.contains(field.source()),"缺少约定源字段："+field.source());
             var target=structure.columns().stream().filter(c->c.name().equals(field.target())).findFirst().orElseThrow(()->new UpdateDefinition.ValidationException("目标字段不存在："+field.target()));
             require(!target.generated(),"自动生成字段无需映射："+target.name()); supplied.add(target.name());
+            if(target.jdbcType()==Types.DECIMAL || target.jdbcType()==Types.NUMERIC)decimalPolicy(field,target);
+            else require(field.decimalMode()==null && field.decimalPlaces()==null,"数值转换仅适用于 DECIMAL 字段："+target.name());
         }
         for(var column:structure.columns()) require(supplied.contains(column.name()) || column.nullable() || column.generated() || column.defaultValue()!=null,"目标必填字段未映射："+column.name());
     }
