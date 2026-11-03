@@ -34,7 +34,7 @@ public record SheetSource(String sourceId, String name, String connectionKey, St
         for(Field f:fields) {
             require(f!=null,"字段映射无效"); UpdateDefinition.identifier(f.source()); UpdateDefinition.identifier(f.target());
             require(sources.add(f.source()) && targets.add(f.target()),"来源列和目标列不能重复映射");
-            require(f.dateFormat()==null || Set.of("","yyyy-MM-dd","yyyy/MM/dd","yyyyMMdd","yyyy-MM-dd HH:mm:ss","yyyy/MM/dd HH:mm:ss").contains(f.dateFormat()),"日期格式不支持");
+            require(f.dateFormat()==null || Set.of("","yyyy-MM-dd","yyyy/MM/dd","yyyy/M/d","yyyy-M-d","yyyyMMdd","yyyy-MM-dd HH:mm:ss","yyyy/MM/dd HH:mm:ss").contains(f.dateFormat()),"日期格式不支持");
         }
     }
 }

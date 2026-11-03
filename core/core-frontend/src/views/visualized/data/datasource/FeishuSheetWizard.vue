@@ -92,6 +92,8 @@ const overdue = computed(
 const dateFormats = [
   'yyyy-MM-dd',
   'yyyy/MM/dd',
+  'yyyy/M/d',
+  'yyyy-M-d',
   'yyyyMMdd',
   'yyyy-MM-dd HH:mm:ss',
   'yyyy/MM/dd HH:mm:ss'
@@ -652,9 +654,9 @@ defineExpose({ open })
                             : ''
                         }`" /></el-select></template
                 ></el-table-column>
-                <el-table-column label="日期格式" width="180"
+                <el-table-column label="源日期格式" width="180"
                   ><template #default="{ row }"
-                    ><el-select v-model="row.dateFormat" clearable placeholder="默认格式"
+                    ><el-select v-model="row.dateFormat" clearable placeholder="自动识别"
                       ><el-option
                         v-for="format in dateFormats"
                         :key="format"

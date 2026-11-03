@@ -35,7 +35,7 @@ public final class SheetValues {
                     require(Set.of("0","1","true","false").contains(value.toLowerCase(Locale.ROOT)),"布尔值须为 true/false 或 1/0");
                     yield value.equals("1") || value.equalsIgnoreCase("true");
                 }
-                case Types.DATE -> java.sql.Date.valueOf(LocalDate.parse(value.strip(),format(field,"yyyy-MM-dd")));
+                case Types.DATE -> java.sql.Date.valueOf(date(value.strip(),field));
                 case Types.TIMESTAMP,Types.TIMESTAMP_WITH_TIMEZONE -> java.sql.Timestamp.valueOf(LocalDateTime.parse(value.strip(),format(field,"yyyy-MM-dd HH:mm:ss")));
                 case Types.CHAR,Types.VARCHAR,Types.LONGVARCHAR,Types.NCHAR,Types.NVARCHAR,Types.LONGNVARCHAR -> {
                     require(column.precision()<=0 || value.codePointCount(0,value.length())<=column.precision(),"文本超过目标长度"); yield value;
@@ -47,6 +47,14 @@ public final class SheetValues {
     private static DateTimeFormatter format(SheetSource.Field field,String fallback) {
         String pattern=field.dateFormat()==null || field.dateFormat().isBlank()?fallback:field.dateFormat();
         return DateTimeFormatter.ofPattern(pattern.replace("yyyy","uuuu")).withResolverStyle(ResolverStyle.STRICT);
+    }
+    private static LocalDate date(String value,SheetSource.Field field) {
+        if(field.dateFormat()!=null && !field.dateFormat().isBlank())return LocalDate.parse(value,format(field,"yyyy-MM-dd"));
+        // Only unambiguous year-first calendar dates. Never guess day/month order or serial numbers.
+        String pattern=value.matches("[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}")?"uuuu-M-d"
+                :value.matches("[0-9]{4}/[0-9]{1,2}/[0-9]{1,2}")?"uuuu/M/d":null;
+        require(pattern!=null,"请选择源日期格式");
+        return LocalDate.parse(value,DateTimeFormatter.ofPattern(pattern).withResolverStyle(ResolverStyle.STRICT));
     }
     public static void mapping(SheetSource source,List<String> headers,UpdateInspection.Structure structure) {
         Set<String> supplied=new HashSet<>();

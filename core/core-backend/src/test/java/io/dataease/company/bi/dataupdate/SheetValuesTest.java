@@ -29,6 +29,18 @@ class SheetValuesTest {
         assertThrows(IllegalArgumentException.class,()->SheetValues.convert("128",field,column(Types.TINYINT,"TINYINT",3,0,true),List.of(),5));
         assertEquals(java.sql.Date.valueOf("2026-11-02"),SheetValues.convert("2026/11/02",new SheetSource.Field("目标","目标",false,"yyyy/MM/dd"),column(Types.DATE,"DATE",0,0,true),List.of(),5));
     }
+    @Test void automaticDateParsingAcceptsYearFirstSheetDisplayFormats() {
+        var target=column(Types.DATE,"DATE",0,0,true);
+        for(String raw:List.of("2026/8/12","2026/08/12","2026-8-12","2026-08-12"))
+            assertEquals(java.sql.Date.valueOf("2026-08-12"),SheetValues.convert(raw,field,target,List.of(),2));
+        assertEquals(java.sql.Date.valueOf("2024-02-29"),SheetValues.convert("2024/2/29",field,target,List.of(),2));
+        for(String raw:List.of("2026/2/29","2026/13/1","8/12/2026","46300","2026/8/12 10:00:00"))
+            assertThrows(IllegalArgumentException.class,()->SheetValues.convert(raw,field,target,List.of(),2));
+        var explicit=new SheetSource.Field("目标","目标",false,"yyyy/M/d");
+        source(List.of(explicit)).validate(true);
+        assertEquals(java.sql.Date.valueOf("2026-08-12"),SheetValues.convert("2026/8/12",explicit,target,List.of(),2));
+        assertThrows(IllegalArgumentException.class,()->SheetValues.convert("2026-8-12",explicit,target,List.of(),2));
+    }
     @Test void textLimitsAndUnknownColumnsFail() {
         assertThrows(IllegalArgumentException.class,()->SheetValues.convert("abc",field,column(Types.VARCHAR,"VARCHAR",2,0,true),List.of(),3));
         var config=source(List.of(field));
