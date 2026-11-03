@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getData } from '@/api/chart'
+import { beginChartDataBatch } from '@/api/chart'
 import {
   ref,
   reactive,
@@ -534,6 +534,7 @@ const calcData = (viewArg, callback) => {
       promise: Promise<any> | null
     }
     const prevTasks: PrevTask[] = []
+    const batch = beginChartDataBatch(base)
     groups.forEach((g, key) => {
       const shifted = cloneViewWithShiftedDateFilter(base, g.fieldId, g.type)
       if (!shifted) {
@@ -544,10 +545,10 @@ const calcData = (viewArg, callback) => {
         ...shifted,
         yAxis: g.items.map(it => stripCompareCalc(it.quota))
       }
-      prevTasks.push({ key, items: g.items, promise: getData(prevReq) })
+      prevTasks.push({ key, items: g.items, promise: batch.getData(prevReq) })
     })
 
-    const tasks: Promise<any>[] = [getData(currentReq)]
+    const tasks: Promise<any>[] = [batch.getData(currentReq)]
     prevTasks.forEach(pt => {
       if (pt.promise) tasks.push(pt.promise)
     })
@@ -652,6 +653,7 @@ const calcData = (viewArg, callback) => {
         callback?.()
       })
       .finally(() => {
+        batch.finish()
         if (requestSequence === calcRequestSequence) state.loading = false
       })
   } else {

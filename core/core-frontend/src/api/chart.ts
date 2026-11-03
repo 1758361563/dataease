@@ -60,14 +60,27 @@ export const deleteChartFieldByChartId = async (chartId): Promise<IResponse> => 
 }
 
 // 通过图表对象获取数据
-export const getData = async (data): Promise<IResponse> => {
+/** One card render may need several concurrent period queries. They share one stale-response guard. */
+export const beginChartDataBatch = data => {
+  const chart = cloneDeep(data)
+  attachDashboardParameters(chart)
+  const editor = dvMainStoreWithOut()
+  attachDashboardEditorContext(chart, editor.dvInfo, editor.canvasViewInfo)
+  const query = beginDashboardQuery(chart)
+  return { getData: request => getData(request, query), finish: query.finish }
+}
+
+export const getData = async (
+  data,
+  batchQuery?: ReturnType<typeof beginDashboardQuery>
+): Promise<IResponse> => {
   ensurePivotDimensionInstances(data)
   delete data.data
   const copyData = cloneDeep(data)
   attachDashboardParameters(copyData)
   const editor = dvMainStoreWithOut()
   attachDashboardEditorContext(copyData, editor.dvInfo, editor.canvasViewInfo)
-  const query = beginDashboardQuery(copyData)
+  const query = batchQuery || beginDashboardQuery(copyData)
   const fields = [
     'xAxis',
     'xAxisExt',
@@ -101,7 +114,9 @@ export const getData = async (data): Promise<IResponse> => {
         return res
       }
     })
-    .finally(query.finish)
+    .finally(() => {
+      if (!batchQuery) query.finish()
+    })
 }
 
 export const innerExportDetails = async (data): Promise<IResponse> => {

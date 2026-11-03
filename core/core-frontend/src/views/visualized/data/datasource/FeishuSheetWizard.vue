@@ -53,6 +53,37 @@ const legacy = ref<LegacySheet[]>([])
 const takeover = ref(false)
 const headers = ref<string[]>([])
 const structure = ref<Structure | null>(null)
+const structureLoading = ref(false)
+const structureError = ref(false)
+let structureRequest = 0
+let structureTimer: ReturnType<typeof setTimeout> | undefined
+const targetKey = () => JSON.stringify([task.value.datasourceId, task.value.table])
+async function loadTargetStructure() {
+  if (!visible.value || !task.value.datasourceId || !task.value.table.trim() || createTarget.value)
+    return
+  const key = targetKey(),
+    version = epoch,
+    request = ++structureRequest
+  structureLoading.value = true
+  structureError.value = false
+  try {
+    const result = await readUpdateStructure(task.value.datasourceId, task.value.table)
+    if (
+      request !== structureRequest ||
+      key !== targetKey() ||
+      version !== epoch ||
+      !visible.value ||
+      createTarget.value
+    )
+      return
+    structure.value = result
+  } catch {
+    if (request === structureRequest && key === targetKey() && version === epoch)
+      structureError.value = true
+  } finally {
+    if (request === structureRequest) structureLoading.value = false
+  }
+}
 const preview = ref<SheetPreview | null>(null)
 const tokenKey = ref('')
 const saved = ref('')
@@ -164,6 +195,7 @@ async function open(datasourceId = '', table = '', existing?: DataUpdateDefiniti
   headers.value = []
   preview.value = null
   structure.value = null
+  structureError.value = false
   records.value = []
   createTarget.value = false
   ddl.value = ''
@@ -253,8 +285,8 @@ async function continueSource() {
 }
 async function inspectTarget() {
   await work(async () => {
-    structure.value = await readUpdateStructure(task.value.datasourceId, task.value.table)
-    ElMessage.success('已读取目标表结构')
+    await loadTargetStructure()
+    if (structure.value) ElMessage.success('已读取目标表结构')
   })
 }
 async function checkDdl() {
@@ -397,13 +429,30 @@ async function beforeClose(done: () => void) {
   done()
 }
 watch(
-  () => [task.value.datasourceId, task.value.table],
+  targetKey,
   () => {
+    ++structureRequest
+    structureLoading.value = false
+    structureError.value = false
     structure.value = null
     ddlChecked.value = ''
+  },
+  { flush: 'sync' }
+)
+watch(
+  () => [visible.value, step.value, task.value.datasourceId, task.value.table, createTarget.value],
+  () => {
+    if (structureTimer) clearTimeout(structureTimer)
+    if (visible.value && step.value === 1 && !createTarget.value && !structure.value) {
+      structureTimer = setTimeout(() => {
+        void loadTargetStructure()
+      }, 350)
+    }
   }
 )
 onBeforeUnmount(() => {
+  if (structureTimer) clearTimeout(structureTimer)
+  ++structureRequest
   ++epoch
   stop()
 })
@@ -621,6 +670,12 @@ defineExpose({ open })
                 }`"
                 description="请到目标数据源的数据更新页查看建表记录，核查并解除占用后继续。"
               />
+              <el-alert
+                v-if="structureError"
+                type="error"
+                :closable="false"
+                title="目标表结构读取失败，请核对数据源与表名后重新读取。"
+              />
               <div v-if="structure" class="structure-note">
                 已读取 {{ structure.columns.length }} 个目标字段 ·
                 {{ structure.indexes.length }} 个索引列定义
@@ -707,7 +762,14 @@ defineExpose({ open })
                         :key="format"
                         :value="format"
                         :label="format" /></el-select
-                    ><span v-else>—</span></template
+                    ><span v-else-if="structureLoading">读取类型中…</span>
+                    <el-button v-else-if="!structure" text @click="inspectTarget">{{
+                      structureError ? '重试读取结构' : '读取目标结构'
+                    }}</el-button>
+                    <span v-else-if="!structure.columns.some(c => c.name === row.target)"
+                      >请选择目标字段</span
+                    >
+                    <span v-else>无需转换</span></template
                   ></el-table-column
                 >
                 <el-table-column label="必填" width="60"
