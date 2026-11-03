@@ -52,6 +52,34 @@ class UpdateExecutorTest {
         int create=index(f.commands,"CREATE TEMPORARY"), delete=index(f.commands,"DELETE FROM"), insert=index(f.commands,"INSERT INTO");
         assertTrue(create<delete && delete<insert); verify(f.source).setReadOnly(true); verify(f.source).rollback();
     }
+    private UpdateDefinition sheetTask() {
+        return new UpdateDefinition("sheet",1,"123456789012345678","analytics","target",UpdateDefinition.Mode.FEISHU,
+                "123456789012345678","",UpdateDefinition.Strategy.FULL,List.of(),"",1,false,
+                UpdateDefinition.Trigger.MANUAL,false,"","Asia/Shanghai",List.of(),60,1000,"test","",1,null);
+    }
+    @Test void sheetReadFailureRollsBackWithoutAttemptingPublication() throws Exception {
+        Fixture f=new Fixture(true);SheetExecutor sheets=mock(SheetExecutor.class);
+        when(sheets.execute(any(),any(),any(),anyString(),any())).thenThrow(new IllegalArgumentException("invalid source value"));
+        var execution=new UpdateExecution(60);
+        assertThrows(IllegalArgumentException.class,()->new UpdateExecutor(f.connections,sheets).execute(sheetTask(),DATE,execution));
+        verify(f.target).rollback();verify(f.target,never()).commit();
+        assertFalse(execution.publicationAttempted());
+    }
+    @Test void sheetCommitDisconnectRequiresReviewEvenIfRollbackReturns() throws Exception {
+        Fixture f=new Fixture(true);SheetExecutor sheets=mock(SheetExecutor.class);
+        when(sheets.execute(any(),any(),any(),anyString(),any())).thenReturn(3L);
+        doThrow(new SQLException("lost connection during commit","08006")).when(f.target).commit();
+        var execution=new UpdateExecution(60);
+        assertThrows(SQLException.class,()->new UpdateExecutor(f.connections,sheets).execute(sheetTask(),DATE,execution));
+        assertTrue(execution.publicationAttempted());verify(f.target).rollback();
+    }
+    @Test void sheetLostOwnershipStopsBeforeCommitAndDoesNotMarkPublication() throws Exception {
+        Fixture f=new Fixture(true);SheetExecutor sheets=mock(SheetExecutor.class);
+        when(sheets.execute(any(),any(),any(),anyString(),any())).thenReturn(3L);
+        var execution=new UpdateExecution(60);execution.commitGuard(()->false);
+        assertThrows(SQLException.class,()->new UpdateExecutor(f.connections,sheets).execute(sheetTask(),DATE,execution));
+        assertFalse(execution.publicationAttempted());verify(f.target,never()).commit();verify(f.target).rollback();
+    }
     @Test void emptyExtractionDoesNotDeleteTarget() throws Exception {
         Fixture f=new Fixture(false);
         assertThrows(IllegalArgumentException.class,()->f.run(UpdateCoreTest.task("a",List.of()),new UpdateExecution(60)));

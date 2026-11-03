@@ -64,7 +64,7 @@ public class CompanyFeishuWorker {
     }
     public Map<String, Object> call(String method, Map<String, Object> args) {
         if (!ready) CompanyAdminErrors.invalid("BI 正在启动，请稍后重试");
-        if (!connections.enabled("runtimeEnabled")) CompanyAdminErrors.invalid("请先在集成中心配置并启用飞书连接");
+        if (!method.startsWith("sheets.") && !connections.enabled("runtimeEnabled")) CompanyAdminErrors.invalid("请先在集成中心配置并启用飞书连接");
         String id = String.valueOf(ids.incrementAndGet());
         CompletableFuture<Map<String, Object>> result = new CompletableFuture<>();
         try {

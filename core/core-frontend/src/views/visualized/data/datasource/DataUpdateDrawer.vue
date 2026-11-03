@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import AdminHelp from '@/views/company/admin/AdminHelp.vue'
+import '@/views/company/admin/admin.less'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { Codemirror } from 'vue-codemirror'
 import { sql } from '@codemirror/lang-sql'
+import FeishuSheetWizard from './FeishuSheetWizard.vue'
+const sheetWizard = ref<InstanceType<typeof FeishuSheetWizard>>()
 import {
   cancelDataUpdate,
   deleteDataUpdate,
@@ -12,6 +16,7 @@ import {
   fetchDataUpdates,
   newDataUpdate,
   runDataUpdate,
+  runDataUpdateRange,
   saveDataUpdate
 } from '@/api/company/dataUpdate'
 import type { DataUpdateDefinition, DataUpdateRun, DataUpdateState } from '@/api/company/dataUpdate'
@@ -26,7 +31,8 @@ const checkKey = () =>
     form.value.sourceDatasourceId,
     form.value.strategy,
     form.value.keys,
-    form.value.windowColumn
+    form.value.windowColumn,
+    form.value.windowDays
   ])
 const emit = defineEmits<{ (event: 'saved'): void }>()
 async function inspect(preview: boolean) {
@@ -59,7 +65,40 @@ const state = ref<DataUpdateState>({
   hardDisabled: false
 })
 const runs = ref<DataUpdateRun[]>([])
-const businessDate = ref('')
+const rangeVisible = ref(false)
+const rangeAll = ref(false)
+const rangeDates = ref<string[]>([])
+const rangeColumn = ref('')
+const rangeStrategy = ref<'WINDOW' | 'UPSERT'>('WINDOW')
+const firstSync = computed(() => !currentTask.value?.latest?.lastSuccessAt)
+const usesDateParameters = computed(() => /{{window_(start|end)}}/.test(form.value.sql))
+function openRange() {
+  rangeAll.value = false
+  rangeDates.value = []
+  rangeColumn.value = form.value.windowColumn
+  rangeStrategy.value = form.value.strategy === 'UPSERT' ? 'UPSERT' : 'WINDOW'
+  rangeVisible.value = true
+}
+async function runRange() {
+  if (!form.value.id || dirty.value || (!rangeAll.value && rangeDates.value?.length !== 2)) return
+  running.value = true
+  try {
+    await runDataUpdateRange(form.value.id, {
+      version: form.value.version,
+      all: rangeAll.value,
+      start: rangeDates.value?.[0] || '',
+      end: rangeDates.value?.[1] || '',
+      column: rangeColumn.value,
+      strategy: rangeStrategy.value
+    })
+    rangeVisible.value = false
+    activeTab.value = 'history'
+    await refreshRuns()
+    ElMessage.success('已加入更新队列')
+  } finally {
+    running.value = false
+  }
+}
 const sqlExtensions = [sql()]
 const keyText = computed({
   get: () => form.value.keys.join(', '),
@@ -115,7 +154,7 @@ async function open(datasourceId: string, table: string) {
   form.value = newDataUpdate(String(datasourceId), table)
   inspection.value = null
   runs.value = []
-  businessDate.value = ''
+  rangeVisible.value = false
   saved.value = JSON.stringify(form.value)
   try {
     const result = await fetchDataUpdates()
@@ -127,6 +166,11 @@ async function open(datasourceId: string, table: string) {
       task =>
         task.definition.datasourceId === String(datasourceId) && task.definition.table === table
     )
+    if (existing?.definition.mode === 'FEISHU') {
+      visible.value = false
+      await sheetWizard.value?.open(datasourceId, table, existing.definition)
+      return
+    }
     if (existing) form.value = structuredClone(existing.definition)
     saved.value = JSON.stringify(form.value)
     const daily = /^0 (\d{1,2}) (\d{1,2}) \* \* \?$/.exec(form.value.cron)
@@ -191,7 +235,7 @@ async function run() {
   }
   running.value = true
   try {
-    await runDataUpdate(form.value.id, form.value.version, businessDate.value || '')
+    await runDataUpdate(form.value.id, form.value.version, '')
     activeTab.value = 'history'
     await refreshRuns()
     ElMessage.success('已加入更新队列')
@@ -271,8 +315,10 @@ defineExpose({ open })
 </script>
 
 <template>
+  <FeishuSheetWizard ref="sheetWizard" @saved="emit('saved')" />
   <el-drawer
     v-model="visible"
+    class="company-admin-drawer update-task-drawer"
     title="数据更新"
     size="min(960px, 96vw)"
     :before-close="beforeClose"
@@ -305,21 +351,20 @@ defineExpose({ open })
         <el-tab-pane label="更新配置" name="configuration">
           <el-form label-position="top" :disabled="loading || saving || busy">
             <section>
-              <h3>执行方式</h3>
               <el-form-item label="更新方式"
                 ><el-radio-group v-model="form.mode"
                   ><el-radio-button value="QUERY">查询抽取</el-radio-button
                   ><el-radio-button value="SCRIPT">完整 SQL 脚本</el-radio-button></el-radio-group
                 ></el-form-item
               >
-              <p v-if="form.mode === 'QUERY'" class="hint">
-                从选定数据源执行查询，通过字段名映射写入当前表。支持 MySQL、PostgreSQL、SQL Server
-                之间抽取；目标表须已存在。
-              </p>
-              <p v-else class="hint">
-                在当前数据源执行完整脚本，由 SQL 决定写入逻辑。脚本中的 DDL
-                可能立即提交；请使用分号分隔语句，事务由执行器管理。
-              </p>
+              <AdminHelp
+                v-if="form.mode === 'QUERY'"
+                content="从选定数据源执行查询，通过字段名映射写入当前表。支持 MySQL、PostgreSQL、SQL Server 之间抽取；目标表须已存在。"
+              />
+              <AdminHelp
+                v-else
+                content="在当前数据源执行完整脚本，由 SQL 决定写入逻辑。脚本中的 DDL 可能立即提交；请使用分号分隔语句，事务由执行器管理。"
+              />
               <div class="two-columns">
                 <el-form-item label="目标 schema / 数据库（来自数据源）"
                   ><el-input v-model="form.schema" disabled placeholder="使用连接默认值"
@@ -348,9 +393,9 @@ defineExpose({ open })
               <template v-if="form.mode === 'QUERY'">
                 <el-button :loading="inspecting" @click="inspect(false)">检查字段</el-button>
                 <el-button :loading="inspecting" @click="inspect(true)">预览最多 20 行</el-button>
-                <p class="hint">
-                  检查会访问查询数据源，最长 15 秒。保存后，正式运行会检查目标结构是否变化。
-                </p>
+                <AdminHelp
+                  content="检查会访问查询数据源，最长 15 秒。保存后，正式运行会检查目标结构是否变化。"
+                />
                 <template v-if="inspection && checkedQuery === checkKey()">
                   <el-alert
                     v-for="message in inspection.errors"
@@ -431,20 +476,25 @@ defineExpose({ open })
                   ><el-radio value="UPSERT">按主键更新</el-radio></el-radio-group
                 ></el-form-item
               >
-              <p v-if="form.mode === 'QUERY' && form.strategy === 'UPSERT'" class="hint">
-                匹配主键时更新查询包含的字段，未匹配时插入；其他已有字段保持原值。查询结果中的重复或空主键会使本次更新失败。
-              </p>
+              <AdminHelp
+                v-if="form.mode === 'QUERY' && form.strategy === 'UPSERT'"
+                content="匹配主键时更新查询包含的字段，未匹配时插入；其他已有字段保持原值。查询结果中的重复或空主键会使本次更新失败。"
+              />
               <div class="two-columns">
-                <el-form-item label="窗口天数"
-                  ><el-input-number v-model="form.windowDays" :min="1" :max="3660" />
-                  <p class="hint">
-                    窗口为业务日期向前 N 天，包含起点、不包含业务日期当天。
-                  </p></el-form-item
-                >
                 <el-form-item
-                  v-if="form.mode === 'QUERY' && form.strategy === 'WINDOW'"
-                  label="目标窗口字段"
-                  ><el-input v-model="form.windowColumn" placeholder="时间或日期字段名"
+                  v-if="
+                    (form.mode === 'QUERY' && form.strategy === 'WINDOW') ||
+                    (form.strategy === 'UPSERT' && !!form.windowColumn) ||
+                    usesDateParameters
+                  "
+                  label="最近天数"
+                  ><el-input-number v-model="form.windowDays" :min="1" :max="3660" />
+                  <AdminHelp content="窗口为业务日期向前 N 天，包含起点、不包含业务日期当天。"
+                /></el-form-item>
+                <el-form-item
+                  v-if="form.mode === 'QUERY' && form.strategy !== 'FULL'"
+                  :label="form.strategy === 'WINDOW' ? '日期字段' : '日期字段（留空读取全部）'"
+                  ><el-input v-model="form.windowColumn" placeholder="查询结果中的日期字段名"
                 /></el-form-item>
               </div>
               <el-form-item
@@ -517,9 +567,9 @@ defineExpose({ open })
                       task.definition.table
                     }`"
                 /></el-select>
-                <p class="hint">
-                  同一业务日期的上游任务全部成功后才能执行。依赖触发按上游运行组合去重；手动和定时执行也检查上游。修改上游配置后需重新运行上游。
-                </p>
+                <AdminHelp
+                  content="同一业务日期的上游任务全部成功后才能执行。依赖触发按上游运行组合去重；手动和定时执行也检查上游。修改上游配置后需重新运行上游。"
+                />
               </el-form-item>
               <p v-if="currentTask?.nextFireTime" class="hint">
                 下次定时执行：{{ formatUtc(currentTask.nextFireTime) }}
@@ -552,7 +602,14 @@ defineExpose({ open })
               ><template #default="{ row }"
                 ><div class="run-detail">
                   <p>运行 ID：{{ row.id }}</p>
-                  <p>配置版本：{{ row.version }} · 业务日期：{{ row.businessDate }}</p>
+                  <p>
+                    配置版本：{{ row.version }} ·
+                    {{
+                      row.rangeStart
+                        ? `同步范围：${row.rangeStart} ～ ${row.rangeEnd}`
+                        : `运行日期：${row.businessDate}`
+                    }}
+                  </p>
                   <p>结束：{{ formatUtc(row.finishedAt) }}</p>
                   <p>{{ row.message || '等待执行结果' }}</p>
                 </div></template
@@ -608,13 +665,18 @@ defineExpose({ open })
           @click="removeConfiguration"
           >删除配置</el-button
         >
-        <el-date-picker
-          v-model="businessDate"
-          type="date"
-          value-format="YYYY-MM-DD"
-          placeholder="业务日期（默认今天）"
-          :clearable="true"
-        /><el-button
+        <el-button
+          :disabled="
+            !form.id ||
+            dirty ||
+            busy ||
+            running ||
+            currentTask?.grouped ||
+            !!form.dependencies.length
+          "
+          @click="openRange"
+          >{{ firstSync ? '首次同步' : '补跑历史' }}</el-button
+        ><el-button
           :disabled="
             !form.id ||
             dirty ||
@@ -638,6 +700,71 @@ defineExpose({ open })
       <p v-if="dirty" class="hint">保存配置后可立即更新。</p></template
     >
   </el-drawer>
+  <el-dialog
+    v-model="rangeVisible"
+    :title="firstSync ? '首次同步' : '补跑历史'"
+    width="520px"
+    class="update-surface"
+    append-to-body
+    :close-on-click-modal="false"
+  >
+    <el-form label-position="top" :disabled="running">
+      <el-form-item v-if="firstSync && form.mode === 'QUERY'" label="同步范围"
+        ><el-radio-group v-model="rangeAll"
+          ><el-radio :value="false">指定日期</el-radio
+          ><el-radio :value="true" :disabled="usesDateParameters"
+            >全部查询结果</el-radio
+          ></el-radio-group
+        ></el-form-item
+      ><el-form-item v-if="!rangeAll" label="日期范围"
+        ><el-date-picker
+          v-model="rangeDates"
+          type="daterange"
+          value-format="YYYY-MM-DD"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          style="width: 100%"
+      /></el-form-item>
+      <el-form-item v-if="form.mode === 'QUERY' && !rangeAll" label="日期字段"
+        ><el-input v-model="rangeColumn" placeholder="查询结果中的日期字段"
+      /></el-form-item>
+      <el-form-item v-if="form.mode === 'QUERY' && !rangeAll" label="写入方式"
+        ><el-radio-group v-model="rangeStrategy"
+          ><el-radio value="WINDOW">覆盖所选区间</el-radio
+          ><el-radio value="UPSERT" :disabled="!form.keys.length"
+            >按主键合并</el-radio
+          ></el-radio-group
+        ></el-form-item
+      >
+      <el-alert
+        :closable="false"
+        type="info"
+        :title="
+          rangeAll
+            ? '将以全部查询结果替换目标表内容。'
+            : form.mode === 'SCRIPT'
+            ? '按脚本中的起止参数执行；写入范围由脚本控制。'
+            : '包含起止两天，仅执行本次范围，不修改日常计划。'
+        "
+      />
+    </el-form>
+    <template #footer
+      ><el-button :disabled="running" @click="rangeVisible = false">取消</el-button
+      ><el-button
+        type="primary"
+        :loading="running"
+        :disabled="
+          !rangeAll &&
+          (rangeDates?.length !== 2 ||
+            (form.mode === 'QUERY' &&
+              !rangeColumn &&
+              (!usesDateParameters || rangeStrategy === 'WINDOW')))
+        "
+        @click="runRange"
+        >开始同步</el-button
+      ></template
+    >
+  </el-dialog>
 </template>
 
 <style scoped lang="less">
@@ -648,9 +775,9 @@ defineExpose({ open })
   display: flex;
   align-items: baseline;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   strong {
-    font-size: 20px;
+    font-size: 15px;
     word-break: break-all;
   }
   span {
@@ -659,18 +786,18 @@ defineExpose({ open })
   }
 }
 section {
-  padding: 4px 0 20px;
+  padding: 0 0 14px;
   margin-bottom: 20px;
   border-bottom: 1px solid #e8ebf0;
   h3 {
-    margin: 12px 0 20px;
-    font-size: 16px;
+    margin: 12px 0;
+    font-size: 13px;
   }
 }
 .two-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 16px;
 }
 .hint {
   font-size: 12px;
@@ -709,6 +836,28 @@ section {
   .two-columns {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+}
+.data-update :deep(.admin-help) {
+  margin: 0 0 10px 4px;
+}
+.data-update :deep(.ed-form-item) {
+  margin-bottom: 16px;
+}
+</style>
+<style lang="less">
+.update-task-drawer {
+  .ed-drawer__header {
+    padding: 14px 20px;
+  }
+  .ed-drawer__body {
+    padding: 16px 20px;
+    min-height: 0;
+    overflow: auto;
+  }
+  .ed-drawer__footer {
+    padding: 10px 20px;
+    background: #fff;
   }
 }
 </style>

@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import AdminHelp from '@/views/company/admin/AdminHelp.vue'
+import '@/views/company/admin/admin.less'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { Codemirror } from 'vue-codemirror'
 import { sql } from '@codemirror/lang-sql'
 import DataUpdateDrawer from './DataUpdateDrawer.vue'
+import FeishuSheetWizard from './FeishuSheetWizard.vue'
+const sheetWizard = ref<InstanceType<typeof FeishuSheetWizard>>()
 import { fetchDataUpdates, dataUpdateStatus } from '@/api/company/dataUpdate'
 import type { DataUpdateState } from '@/api/company/dataUpdate'
 import {
@@ -328,9 +332,13 @@ reloadInBackground()
 </script>
 
 <template>
-  <div v-loading="loading" class="update-workspace">
+  <div v-loading="loading" class="update-workspace update-surface">
+    <FeishuSheetWizard ref="sheetWizard" @saved="reload" />
     <div class="toolbar">
       <h3>数据更新</h3>
+      <el-button v-if="type === 'mysql'" @click="sheetWizard?.open(datasourceId)"
+        >接入飞书表格</el-button
+      >
       <el-button @click="reload">刷新</el-button
       ><el-button @click="editGroup()">新建任务组</el-button
       ><el-button type="primary" @click="newTask">新建更新任务</el-button>
@@ -341,7 +349,11 @@ reloadInBackground()
       >
       <el-table-column label="执行方式" width="130"
         ><template #default="{ row }">{{
-          row.definition.mode === 'QUERY' ? '查询抽取' : 'SQL 聚合'
+          row.definition.mode === 'FEISHU'
+            ? '飞书电子表格'
+            : row.definition.mode === 'QUERY'
+            ? '查询抽取'
+            : 'SQL 聚合'
         }}</template></el-table-column
       >
       <el-table-column label="调度" width="180"
@@ -361,6 +373,14 @@ reloadInBackground()
           status(row.latest?.status || '—')
         }}</template></el-table-column
       >
+      <el-table-column label="更新状态" width="120"
+        ><template #default="{ row }"
+          ><el-tag v-if="row.freshness === 'OVERDUE'" type="warning">更新已超期</el-tag
+          ><span v-else>{{
+            row.freshness === 'WAITING' ? '等待首次计划' : row.grouped ? '跟随任务组' : '—'
+          }}</span></template
+        ></el-table-column
+      >
       <el-table-column label="最近成功（UTC）" min-width="180"
         ><template #default="{ row }">{{
           row.latest?.lastSuccessAt || '—'
@@ -368,9 +388,9 @@ reloadInBackground()
       >
     </el-table>
     <h3>任务组</h3>
-    <p class="hint">
-      组内任务每批执行一次，依赖使用本批输入；共享输入在本批结束前保持稳定。加入组后由组统一调度。
-    </p>
+    <AdminHelp
+      content="组内任务每批执行一次，依赖使用本批输入；共享输入在本批结束前保持稳定。加入组后由组统一调度。"
+    />
     <el-table :data="localGroups" empty-text="暂无任务组">
       <el-table-column prop="name" label="名称" /><el-table-column label="任务数" width="90"
         ><template #default="{ row }">{{ row.tasks.length }}</template></el-table-column
@@ -415,6 +435,7 @@ reloadInBackground()
     <DataUpdateDrawer ref="drawer" @saved="reload" />
 
     <el-dialog
+      class="update-surface"
       v-model="createVisible"
       title="新建更新任务"
       width="min(850px, 96vw)"
@@ -430,9 +451,9 @@ reloadInBackground()
           ><el-radio v-if="type === 'mysql'" value="create">手写 SQL 建表</el-radio></el-radio-group
         >
         <template v-if="mode === 'create'">
-          <p class="hint">
-            第一条 CREATE TABLE，后续可添加该表的 CREATE INDEX。建表只执行一次；每日刷新另行配置。
-          </p>
+          <AdminHelp
+            content="第一条 CREATE TABLE，后续可添加该表的 CREATE INDEX。建表只执行一次；每日刷新另行配置。"
+          />
           <Codemirror
             v-model="ddl"
             :extensions="extensions"
@@ -490,6 +511,7 @@ reloadInBackground()
       >
     </el-dialog>
     <el-dialog
+      class="update-surface"
       v-model="groupVisible"
       title="任务组"
       width="min(720px, 96vw)"
@@ -509,9 +531,9 @@ reloadInBackground()
               :label="task.definition.table"
               :disabled="otherGroup(task.definition.id || '')" /></el-select
         ></el-form-item>
-        <p class="hint">
-          在各任务中配置上游；请将完整依赖链一起加入组。执行时固定所有任务版本，失败后阻断后续节点。
-        </p>
+        <AdminHelp
+          content="在各任务中配置上游；请将完整依赖链一起加入组。执行时固定所有任务版本，失败后阻断后续节点。"
+        />
         <el-form-item label="自动调度"><el-switch v-model="groupForm.enabled" /></el-form-item>
         <el-form-item label="Quartz Cron（秒 分 时 日 月 周）"
           ><el-input v-model="groupForm.cron"
@@ -525,6 +547,7 @@ reloadInBackground()
       >
     </el-dialog>
     <el-drawer
+      class="company-admin-drawer update-task-drawer"
       v-model="historyVisible"
       :title="selectedGroup?.name || '批次记录'"
       size="min(1000px, 96vw)"
@@ -538,7 +561,7 @@ reloadInBackground()
         /><el-button type="primary" :loading="submitting" @click="startGroup">运行整组</el-button
         ><el-button @click="refreshHistory">刷新</el-button>
       </div>
-      <p class="hint">各输出表分别提交；批次失败时，已成功的输出保留。记录时间为 UTC。</p>
+      <AdminHelp content="各输出表分别提交；批次失败时，已成功的输出保留。记录时间为 UTC。" />
       <el-table :data="history" row-key="id" @expand-change="expandRun">
         <el-table-column type="expand"
           ><template #default="{ row }"
@@ -582,14 +605,15 @@ reloadInBackground()
 
 <style scoped lang="less">
 .update-workspace {
-  padding: 24px;
+  padding: 20px 24px;
   overflow: auto;
-  height: 100%;
+  min-height: 0;
+  background: #fff;
 }
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
   h3 {
@@ -598,7 +622,9 @@ reloadInBackground()
   }
 }
 h3 {
-  margin-top: 28px;
+  margin: 22px 0 12px;
+  font-size: 14px;
+  font-weight: 600;
 }
 .hint {
   color: #646b78;
@@ -608,5 +634,17 @@ h3 {
 :deep(.cm-editor) {
   border: 1px solid #dcdfe6;
   margin: 12px 0;
+}
+.update-workspace :deep(.ed-table__empty-block) {
+  min-height: 96px;
+}
+.update-workspace :deep(.ed-table__empty-text) {
+  line-height: 24px;
+}
+.update-workspace > :deep(.admin-help) {
+  margin: -4px 0 12px;
+}
+.toolbar :deep(.ed-button + .ed-button) {
+  margin-left: 0;
 }
 </style>

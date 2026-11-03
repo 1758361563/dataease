@@ -13,7 +13,10 @@ import static io.dataease.company.bi.dataupdate.UpdateConnections.Dialect;
 @ConditionalOnProperty(name="company.bi.auth.enabled", havingValue="true", matchIfMissing=true)
 public class UpdateExecutor {
     private final UpdateConnections connections;
-    public UpdateExecutor(UpdateConnections connections) { this.connections = connections; }
+    private final SheetExecutor sheets;
+    public UpdateExecutor(UpdateConnections connections) { this(connections,null); }
+    @org.springframework.beans.factory.annotation.Autowired
+    public UpdateExecutor(UpdateConnections connections,SheetExecutor sheets) { this.connections = connections; this.sheets=sheets; }
 
     public long execute(UpdateDefinition task, LocalDate date, UpdateExecution execution) throws Exception {
         require(Objects.equals(UpdateDefinition.clean(connections.schema(task.datasourceId())),task.schema()),"数据源 schema 已变化，请核查并重新配置目标表");
@@ -25,10 +28,14 @@ public class UpdateExecutor {
             }
             target.setAutoCommit(false);
             try {
-                long count = task.mode() == UpdateDefinition.Mode.SCRIPT
+                long count = task.mode() == UpdateDefinition.Mode.FEISHU
+                        ? sheets.execute(task,target,dialect,table,execution)
+                        : task.mode() == UpdateDefinition.Mode.SCRIPT
                         ? script(target, UpdateSql.render(task.sql(), date, task.windowDays(), table), execution)
                         : extract(task, date, target, dialect, table, execution);
-                execution.beforeCommit(); target.commit(); return count;
+                execution.beforeCommit();
+                if(task.mode()==UpdateDefinition.Mode.FEISHU) execution.publicationStarted();
+                target.commit(); return count;
             } catch (Exception e) {
                 try { target.rollback(); } catch (SQLException rollback) { e.addSuppressed(rollback); }
                 throw e;
@@ -71,7 +78,7 @@ public class UpdateExecutor {
             try (var sourceHandle = connections.open(task.sourceDatasourceId())) {
                 Connection source = sourceHandle.connection(); Dialect sourceDialect = Dialect.of(source);
                 source.setReadOnly(true); source.setAutoCommit(false);
-                String sql = UpdateSql.requireQuery(UpdateSql.render(task.sql(), date, task.windowDays(), table));
+                String sql = UpdateSql.sourceQuery(task, date, table, sourceDialect);
                 Statement query = execution.watch(source.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY));
                 try (query) {
                     query.setFetchSize(sourceDialect == Dialect.MYSQL ? Integer.MIN_VALUE : 500);

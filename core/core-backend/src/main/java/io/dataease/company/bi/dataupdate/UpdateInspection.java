@@ -56,7 +56,7 @@ public class UpdateInspection {
             Connection source=handle.connection(); source.setReadOnly(true); source.setAutoCommit(false);
             try(Statement query=source.createStatement()) {
                 query.setQueryTimeout(15); query.setMaxRows(preview?20:1); query.setFetchSize(1);
-                String sql=UpdateSql.requireQuery(UpdateSql.render(task.sql(),task.businessDate(Instant.now()),task.windowDays(),UpdateConnections.Dialect.of(source).quote(task.table())));
+                String sql=UpdateSql.sourceQuery(task,task.businessDate(Instant.now()),UpdateConnections.Dialect.of(source).quote(task.table()),UpdateConnections.Dialect.of(source));
                 try(ResultSet rs=query.executeQuery(sql)) {
                     ResultSetMetaData meta=rs.getMetaData(); List<Column> fields=new ArrayList<>();
                     require(meta.getColumnCount()<=256,"检查与预览最多支持 256 个查询字段，请减少字段");

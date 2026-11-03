@@ -7,7 +7,13 @@ import { build, transform } from 'esbuild'
 import { parse, compileScript, compileTemplate, compileStyleAsync } from '@vue/compiler-sfc'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-for (const name of ['DataUpdateDrawer.vue', 'DataUpdateWorkspace.vue', 'index.vue']) {
+for (const name of [
+  'DataUpdateDrawer.vue',
+  'DataUpdateWorkspace.vue',
+  'FeishuSheetWizard.vue',
+  'form/index.vue',
+  'index.vue'
+]) {
   const filename = path.join(root, 'src/views/visualized/data/datasource', name)
   const { descriptor, errors } = parse(await readFile(filename, 'utf8'), { filename })
   assert.deepEqual(errors, [], `${name}: parse`)
@@ -103,6 +109,38 @@ assert.ok(globalThis.updateRequests.at(-1).url.endsWith('/group%2Fa/run'))
 assert.deepEqual(globalThis.updateRequests.at(-1).data, { version: 5, businessDate: '2026-10-30' })
 await setup.reconcileGroupRun('run/a')
 assert.ok(globalThis.updateRequests.at(-1).url.endsWith('/runs/run%2Fa/reconcile'))
+const sheets = await loadApi('sheets.ts')
+const sheet = sheets.newSheetSource()
+assert.equal(sheet.sourceId, null)
+assert.equal(sheet.dataStartRow, 2)
+assert.deepEqual(sheet.nullValues, [])
+await sheets.sheetWorksheets('app-key', 'https://example.feishu.cn/sheets/token')
+assert.deepEqual(globalThis.updateRequests.at(-1).data, {
+  connectionKey: 'app-key',
+  url: 'https://example.feishu.cn/sheets/token'
+})
+await sheets.saveSheet({ ...task, mode: 'FEISHU', sheet }, 'preview-token', true)
+assert.deepEqual(globalThis.updateRequests.at(-1).data, {
+  definition: { ...task, mode: 'FEISHU', sheet },
+  previewToken: 'preview-token',
+  takeoverConfirmed: true
+})
+await sheets.reconcileSheetRun('run/a')
+assert.ok(globalThis.updateRequests.at(-1).url.endsWith('/runs/run%2Fa/reconcile'))
+console.log(
+  'PASS Feishu APIs: source defaults, selected connection, preview-bound save and reconciliation'
+)
+await api.runDataUpdateRange('task/a', {
+  version: 7,
+  start: '2024-02-28',
+  end: '2024-02-29',
+  column: 'order_date',
+  strategy: 'WINDOW',
+  all: false
+})
+assert.ok(globalThis.updateRequests.at(-1).url.endsWith('/task%2Fa/range'))
+assert.equal(globalThis.updateRequests.at(-1).data.end, '2024-02-29')
+assert.equal(globalThis.updateRequests.at(-1).data.all, false)
 delete globalThis.updateRequests
 delete globalThis.updateResponse
 console.log(

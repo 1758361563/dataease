@@ -82,7 +82,12 @@ public class UpdateGroups {
     public List<Pending> pending(String owner){return db.query("SELECT id,business_date,status,snapshot FROM company_data_update_group_run WHERE owner_id=? AND status IN ('QUEUED','RUNNING') ORDER BY created_at",(rs,n)->new Pending(rs.getString(1),rs.getString(2),rs.getString(3),parse(rs.getString(4),Snapshot.class)),owner);}
     public boolean start(String id){return db.update("UPDATE company_data_update_group_run SET status='RUNNING' WHERE id=? AND status='QUEUED'",id)==1;}
     public boolean cancelled(String id){return Boolean.TRUE.equals(db.queryForObject("SELECT cancel_requested FROM company_data_update_group_run WHERE id=?",Boolean.class,id));}
-    public void node(String run,String task,String status,long rows,String message){db.update("UPDATE company_data_update_group_node SET status=?,row_count=?,message=?,started_at=COALESCE(started_at,UTC_TIMESTAMP(3)),finished_at=IF(?='RUNNING',NULL,UTC_TIMESTAMP(3)) WHERE run_id=? AND task_id=?",status,rows,message,status,run,task);}
+    public void node(String run,String task,String status,long rows,String message){
+        tx.executeWithoutResult(transaction->{
+            db.update("UPDATE company_data_update_group_node SET status=?,row_count=?,message=?,started_at=COALESCE(started_at,UTC_TIMESTAMP(3)),finished_at=IF(?='RUNNING',NULL,UTC_TIMESTAMP(3)) WHERE run_id=? AND task_id=?",status,rows,message,status,run,task);
+            if("SUCCESS".equals(status))db.update("UPDATE company_feishu_source SET latest_success_at=? WHERE managed_task_id=?",System.currentTimeMillis(),task);
+        });
+    }
     public void finish(String run,String result,String message,boolean release){tx.executeWithoutResult(status->{
         db.update("UPDATE company_data_update_group_run SET status=?,message=?,finished_at=UTC_TIMESTAMP(3) WHERE id=?",result,message,run);
         db.update("UPDATE company_data_update_group_node SET status=IF(status='RUNNING','INTERRUPTED','BLOCKED'),finished_at=UTC_TIMESTAMP(3) WHERE run_id=? AND status IN ('WAITING','RUNNING')",run);

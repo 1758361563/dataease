@@ -17,6 +17,7 @@ const { schedulerTick } = await import('./scheduler.mjs')
 const { withSchedulerLock } = await import('./store.mjs')
 const { closeBrowser } = await import('./session.mjs')
 const { chromium } = await import('playwright')
+const { managedSheets } = await import('./managed-sheets.mjs')
 
 let queue = Promise.resolve()
 let queuedWork = 0
@@ -32,6 +33,7 @@ function serialize(fn) {
   return current
 }
 function publicError(err) {
+  if (err?.sheetError) return err.message
   // Avoid returning raw process/SQL diagnostics, tokens or request payloads to browsers.
   if (err?.missingScope) return `飞书通讯录权限不足：${err.missingScope}`
   if (err?.status === 404) return '通讯录中未找到该员工'
@@ -44,6 +46,7 @@ async function withConfig(fn) {
   return fn(config)
 }
 async function handle(method, args) {
+  if (method === 'sheets.list' || method === 'sheets.read') return managedSheets(method, args)
   if (method === 'status') return { running: true, browserInstalled: fs.existsSync(chromium.executablePath()), lastSchedulerError }
   return withConfig(async config => {
     if (method === 'search') return { matches: await searchEmployees(args.query) }

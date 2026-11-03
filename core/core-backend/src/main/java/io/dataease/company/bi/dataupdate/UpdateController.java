@@ -35,7 +35,10 @@ public class UpdateController {
     @GetMapping public Map<String,Object> state() throws Exception {
         admin();
         List<Map<String,Object>> tasks = new ArrayList<>();
-        for (UpdateDefinition task : store.all()) tasks.add(Map.of("definition", task, "nextFireTime", schedules.next(task.id()), "effective", task.enabled() && runtime.owns(task) && !store.grouped(task.id()),"grouped",store.grouped(task.id()),"latest",store.latest(task.id())));
+        for (UpdateDefinition task : store.all()) {
+            boolean grouped=store.grouped(task.id());var latest=store.latest(task.id());
+            tasks.add(Map.of("definition", task, "nextFireTime", schedules.next(task.id()), "effective", task.enabled() && runtime.owns(task) && !grouped,"grouped",grouped,"latest",latest,"freshness",store.freshness(task,latest,grouped)));
+        }
         Map<String,Object> result = new LinkedHashMap<>(); result.put("tasks", tasks); result.put("instanceId", runtime.owner()); result.put("hardDisabled", runtime.disabled());
         result.put("datasources", db.query("SELECT id,name,type FROM core_datasource WHERE type IN ('mysql','pg','sqlServer') ORDER BY name",
                 (rs,n) -> Map.of("id", rs.getString(1), "name", rs.getString(2), "type", rs.getString(3), "schema", connections.schema(rs.getString(1)))));
@@ -43,6 +46,8 @@ public class UpdateController {
     }
     @PostMapping public UpdateDefinition save(@RequestBody UpdateDefinition task, HttpServletRequest request) {
         long user = admin();
+        require(task.mode()!=UpdateDefinition.Mode.FEISHU,"请通过飞书来源配置入口保存");
+        if(task.id()!=null && !task.id().isBlank()) require(store.get(task.id()).mode()!=UpdateDefinition.Mode.FEISHU,"飞书任务请通过来源配置入口编辑");
         String owner = runtime.owner();
         require(!task.enabled() || owner != null, "启用自动更新前请配置 COMPANY_BI_INSTANCE_ID");
         UpdateDefinition normalized = task.normalized(task.id(), task.version(), owner).withSchema(connections.schema(task.datasourceId())); normalized.validate();
@@ -67,6 +72,18 @@ public class UpdateController {
         String run = runtime.submit(task, "MANUAL", Instant.now(), date,
                 () -> record(request, user, CompanyAuditActionType.DATA_UPDATE_RUN, id, Map.of("businessDate", date.toString(), "version", task.version())));
         return Map.of("id", run);
+    }
+    @PostMapping("/{id}/range") public Map<String,String> range(@PathVariable String id,@RequestBody UpdateRange.Request body,HttpServletRequest request) {
+        long user=admin();var task=store.get(id);
+        require(task.version()==body.version(),"配置已变化，请重新加载");
+        require(task.dependencies().isEmpty(),"含上游依赖的任务请通过任务组补跑");
+        require(!body.all() || store.latest(id).get("lastSuccessAt").isBlank(),"全部数据初始化仅适用于尚未成功同步的任务");
+        String type=db.queryForObject("SELECT type FROM core_datasource WHERE id=?",String.class,task.sourceDatasourceId());
+        var dialect="sqlServer".equals(type)?UpdateConnections.Dialect.SQLSERVER:"pg".equals(type)?UpdateConnections.Dialect.POSTGRES:UpdateConnections.Dialect.MYSQL;
+        var execution=UpdateRange.prepare(task,body,dialect);
+        String run=runtime.submit(execution.task(),body.all()?"INITIAL":"RANGE",Instant.now(),execution.endExclusive(),
+            ()->record(request,user,CompanyAuditActionType.DATA_UPDATE_RUN,id,Map.of("start",UpdateDefinition.clean(body.start()),"end",UpdateDefinition.clean(body.end()),"strategy",execution.task().strategy().name(),"version",task.version())));
+        return Map.of("id",run);
     }
     @GetMapping("/{id}/runs") public List<UpdateStore.Run> runs(@PathVariable String id, @RequestParam(defaultValue="50") int limit) { admin(); store.get(id); return store.history(id,limit); }
     @PostMapping("/{id}/runs/{run}/cancel") public void cancel(@PathVariable String id, @PathVariable String run, HttpServletRequest request) {

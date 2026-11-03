@@ -13,7 +13,7 @@ Company BI 是公司定制的 DataEase（仓库 `1758361563/dataease`，分支 `
 | 本地隔离测试 | `tests/`：`static-audit.sh`（静态审计）、`local-e2e.sh`（A–F 全量）、`release-verify.sh`（**正式发布文件**的冒烟 + 数据库真实恢复） |
 | 服务器检查方案（尚未执行） | [docs/plan-A-personal-server-test.md](docs/plan-A-personal-server-test.md)（个人服务器隔离部署）、[docs/plan-B-tower-readonly-check.md](docs/plan-B-tower-readonly-check.md)（塔内只读检查）+ `scripts/tower-readonly-check.sh` |
 
-文档：[docs/release-process.md](docs/release-process.md)（**怎么基于 `company/bi` 发布**）、[docs/deployment.md](docs/deployment.md)（完整流程）、[docs/rollback.md](docs/rollback.md)（回滚与故障恢复）。
+文档：[docs/simple-update-runbook.md](docs/simple-update-runbook.md)（**日常简化更新，含可直接交给AI的指令和命令**）、[docs/release-process.md](docs/release-process.md)（完整发布验证）、[docs/deployment.md](docs/deployment.md)（安装部署）、[docs/rollback.md](docs/rollback.md)（回滚与故障恢复）。
 
 ## 一图看懂
 

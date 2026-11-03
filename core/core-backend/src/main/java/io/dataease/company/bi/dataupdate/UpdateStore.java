@@ -45,11 +45,45 @@ public class UpdateStore {
     }
     public boolean grouped(String id) {return db.queryForObject("SELECT COUNT(*) FROM company_data_update_member WHERE task_id=?",Integer.class,id)>0;}
     public boolean claimed(UpdateDefinition task) {return db.queryForObject("SELECT COUNT(*) FROM company_data_update_claim WHERE target_key=?",Integer.class,targetKey(task))>0;}
+    public boolean startSheet(String run,UpdateDefinition task) {
+        return Boolean.TRUE.equals(tx.execute(status->{
+            db.queryForObject("SELECT id FROM company_data_update_guard WHERE id=1 FOR UPDATE",Integer.class);
+            require(!claimed(task) && !grouped(task.id()),"目标表已被占用或加入任务组");
+            if(!start(run))return false;
+            db.update("INSERT INTO company_data_update_claim(target_key,owner_id,created_at) VALUES (?,?,UTC_TIMESTAMP(3))",targetKey(task),run);
+            return true;
+        }));
+    }
+    public void finishSheet(String run,String status,long rows,String message,boolean release) {
+        tx.executeWithoutResult(txStatus->{
+            finish(run,status,rows,message);
+            if("SUCCESS".equals(status)) db.update("UPDATE company_feishu_source SET latest_success_at=? WHERE managed_task_id=(SELECT task_id FROM company_data_update_run WHERE id=?)",System.currentTimeMillis(),run);
+            if(release)db.update("DELETE FROM company_data_update_claim WHERE owner_id=?",run);
+        });
+    }
     public Map<String,String> latest(String taskId) {
         String union="SELECT status,finished_at,requested_at AS event_at FROM company_data_update_run WHERE task_id=? UNION ALL SELECT n.status,n.finished_at,COALESCE(n.started_at,r.created_at) AS event_at FROM company_data_update_group_node n JOIN company_data_update_group_run r ON r.id=n.run_id WHERE n.task_id=?";
         List<String> statuses=db.query("SELECT status FROM ("+union+") r ORDER BY event_at DESC LIMIT 1",(rs,n)->rs.getString(1),taskId,taskId);
         String success=db.queryForObject("SELECT CAST(MAX(finished_at) AS CHAR) FROM ("+union+") r WHERE status='SUCCESS'",String.class,taskId,taskId);
-        return Map.of("status",statuses.isEmpty()?"":statuses.getFirst(),"lastSuccessAt",Objects.toString(success,""));
+        String dailyUnion=union.replace("WHERE task_id=?", "WHERE task_id=? AND trigger_type NOT IN ('RANGE','INITIAL')");
+        String daily=db.queryForObject("SELECT CAST(MAX(finished_at) AS CHAR) FROM ("+dailyUnion+") r WHERE status='SUCCESS'",String.class,taskId,taskId);
+        return Map.of("status",statuses.isEmpty()?"":statuses.getFirst(),"lastSuccessAt",Objects.toString(success,""),"lastDailySuccessAt",Objects.toString(daily,""));
+    }
+    public String freshness(UpdateDefinition task,Map<String,String> latest,boolean grouped) {
+        if(grouped)return "GROUP";
+        if(!task.enabled() || task.trigger()!=UpdateDefinition.Trigger.CRON)return "MANUAL";
+        try {
+            String updated=db.queryForObject("SELECT CAST(updated_at AS CHAR) FROM company_data_update_task WHERE id=?",String.class,task.id());
+            java.time.Instant since=java.time.LocalDateTime.parse(updated.replace(' ','T')).toInstant(java.time.ZoneOffset.UTC);
+            String success=latest.get("lastDailySuccessAt");
+            if(success!=null && !success.isBlank()) {
+                var last=java.time.LocalDateTime.parse(success.replace(' ','T')).toInstant(java.time.ZoneOffset.UTC);
+                if(last.isAfter(since))since=last;
+            }
+            var cron=new org.quartz.CronExpression(task.cron());cron.setTimeZone(TimeZone.getTimeZone(task.timezone()));
+            var due=cron.getNextValidTimeAfter(Date.from(since));
+            return due!=null && java.time.Instant.now().isAfter(due.toInstant().plusSeconds(task.timeoutSeconds()+60L))?"OVERDUE":success==null || success.isBlank()?"WAITING":"CURRENT";
+        } catch(Exception e) { return "UNKNOWN"; }
     }
     public UpdateDefinition save(UpdateDefinition incoming, String owner, Runnable audit) {
         return tx.execute(status -> {
@@ -81,16 +115,18 @@ public class UpdateStore {
         });
     }
     public record Run(String id, String taskId, long version, String triggerType, String businessDate,
-                      String status, String requestedAt, String startedAt, String finishedAt, long rows, String message) { }
+                      String status, String requestedAt, String startedAt, String finishedAt, long rows, String message, String rangeStart, String rangeEnd) { }
     public void delete(String id, long version, Runnable audit) {
         tx.executeWithoutResult(status -> {
             db.queryForObject("SELECT id FROM company_data_update_guard WHERE id=1 FOR UPDATE", Integer.class);
             db.queryForObject("SELECT version FROM company_data_update_task WHERE id=? FOR UPDATE", Long.class, id);
             require(get(id).version() == version, "配置已被修改，请重新加载");
+            require(!claimed(get(id)),"目标表仍被占用，请先核查运行状态");
             require(!grouped(id),"请先将任务移出任务组");
             require(all().stream().noneMatch(task -> task.dependencies().contains(id)), "此任务被其他表依赖，请先移除依赖关系");
             require(db.queryForObject("SELECT COUNT(*) FROM company_data_update_run WHERE task_id=? AND status IN ('QUEUED','RUNNING')", Integer.class, id) == 0, "请先取消当前更新再删除配置");
             audit.run(); db.update("DELETE FROM company_data_update_task WHERE id=?", id);
+            db.update("UPDATE company_feishu_source SET managed_task_id=NULL,enabled=0,updated_at=? WHERE managed_task_id=?",System.currentTimeMillis(),id);
         });
     }
     public String skipped(UpdateDefinition task, String key, LocalDate date, String message) {
@@ -104,14 +140,14 @@ public class UpdateStore {
     public List<Run> history(String taskId, int limit) {
         return db.query("SELECT * FROM company_data_update_run WHERE task_id=? ORDER BY requested_at DESC,id DESC LIMIT ?", (rs,n) ->
                 new Run(rs.getString("id"), taskId, rs.getLong("task_version"), rs.getString("trigger_type"), rs.getString("business_date"),
-                        rs.getString("status"), rs.getString("requested_at"), rs.getString("started_at"), rs.getString("finished_at"), rs.getLong("row_count"), rs.getString("message")), taskId, Math.min(100, Math.max(1, limit)));
+                        rs.getString("status"), rs.getString("requested_at"), rs.getString("started_at"), rs.getString("finished_at"), rs.getLong("row_count"), rs.getString("message"), "RANGE".equals(rs.getString("trigger_type")) ? rs.getDate("business_date").toLocalDate().minusDays(definition(rs.getString("definition")).windowDays()).toString() : null, "RANGE".equals(rs.getString("trigger_type")) ? rs.getDate("business_date").toLocalDate().minusDays(1).toString() : null), taskId, Math.min(100, Math.max(1, limit)));
     }
     public Map<String, String> upstreamRuns(UpdateDefinition task, LocalDate date) {
         Map<String, String> result = new TreeMap<>();
         for (String upstream : task.dependencies()) {
             List<String> ids = db.query("""
                     SELECT r.id FROM company_data_update_run r JOIN company_data_update_task t ON t.id=r.task_id
-                    WHERE r.task_id=? AND r.business_date=? AND r.status='SUCCESS' AND r.task_version=t.version
+                    WHERE r.task_id=? AND r.business_date=? AND r.status='SUCCESS' AND r.trigger_type NOT IN ('RANGE','INITIAL') AND r.task_version=t.version
                     ORDER BY r.finished_at DESC,r.id DESC LIMIT 1
                     """, (rs,n) -> rs.getString(1), upstream, date.toString());
             if (ids.isEmpty()) return null;
@@ -125,6 +161,7 @@ public class UpdateStore {
             db.queryForObject("SELECT id FROM company_data_update_guard WHERE id=1 FOR UPDATE",Integer.class);
             db.queryForObject("SELECT version FROM company_data_update_task WHERE id=? FOR UPDATE", Long.class, task.id());
             require(!grouped(task.id()),"此任务由任务组执行，请运行整组");
+            require(!"INITIAL".equals(type) || latest(task.id()).get("lastSuccessAt").isBlank(),"任务已有成功同步，请使用历史补跑");
             require(!claimed(task),"目标表被任务批次或建表操作占用");
             require(get(task.id()).version() == task.version(), "配置已变化，请重新运行");
             String triggerKey = hash(key);
@@ -146,10 +183,10 @@ public class UpdateStore {
         return db.query("""
                 SELECT DISTINCT r.business_date FROM company_data_update_run r
                 JOIN company_data_update_task t ON t.id=?
-                WHERE r.task_id IN (%s) AND r.status='SUCCESS' AND r.finished_at>=t.updated_at
+                WHERE r.task_id IN (%s) AND r.status='SUCCESS' AND r.trigger_type NOT IN ('RANGE','INITIAL') AND r.finished_at>=t.updated_at
                 AND NOT EXISTS (SELECT 1 FROM company_data_update_run consumed
                     WHERE consumed.task_id=? AND consumed.task_version=? AND consumed.business_date=r.business_date
-                    AND consumed.requested_at>=r.finished_at)
+                    AND consumed.trigger_type NOT IN ('RANGE','INITIAL') AND consumed.requested_at>=r.finished_at)
                 ORDER BY r.business_date DESC LIMIT 100
                 """.formatted(String.join(",", Collections.nCopies(task.dependencies().size(), "?"))),
                 (rs,n) -> rs.getDate(1).toLocalDate(), args.toArray());

@@ -14,6 +14,9 @@ $taskSources += Get-ChildItem (Join-Path $taskRoot 'core/core-backend/src/test/j
 $taskSources += Get-ChildItem (Join-Path $taskRoot 'core/core-backend/src/main/java/io/dataease/company/bi/etl') -Filter '*.java' | ForEach-Object FullName
 $taskSources += Join-Path $taskRoot 'core/core-backend/src/main/java/io/dataease/company/bi/audit/CompanyAuditActionType.java'
 $taskSources += Join-Path $taskRoot 'core/core-backend/src/main/java/io/dataease/company/bi/auth/CompanyBiSchemaInitializer.java'
+$taskSources += Join-Path $taskRoot 'core/core-backend/src/main/java/io/dataease/company/bi/feishu/CompanyFeishuWorker.java'
+$taskSources += Join-Path $taskRoot 'core/core-backend/src/main/java/io/dataease/company/bi/feishu/CompanyFeishuConnectionService.java'
+$taskSources += Get-ChildItem (Join-Path $taskRoot 'core/core-backend/src/main/java/io/dataease/company/bi/integration') -Filter '*.java' | ForEach-Object FullName
 $taskArgs = @('-encoding','UTF-8','-parameters','-proc:none','-cp',('"'+$taskClasspath.Replace('\','/')+'"'),'-d',('"'+$taskBuild.Replace('\','/')+'"'))
 $taskArgs += $taskSources | ForEach-Object { '"'+$_.Replace('\','/')+'"' }
 [IO.File]::WriteAllLines((Join-Path $taskBuild 'javac.args'),$taskArgs,[Text.UTF8Encoding]::new($false))

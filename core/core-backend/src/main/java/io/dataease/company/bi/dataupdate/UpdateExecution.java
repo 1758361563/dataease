@@ -10,6 +10,12 @@ public final class UpdateExecution {
     private final Set<Statement> active = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean stopped = new AtomicBoolean();
     private volatile String reason = "运行已取消";
+    private volatile boolean publicationStarted;
+    private String resultMessage="更新完成";
+    public void resultMessage(String message) { resultMessage=message; }
+    public String resultMessage() { return resultMessage; }
+    public void publicationStarted() { publicationStarted=true; }
+    public boolean publicationAttempted() { return publicationStarted; }
     private final long deadline;
     private java.util.function.BooleanSupplier commitAllowed = () -> true;
     public UpdateExecution(int timeoutSeconds) { deadline = System.nanoTime() + timeoutSeconds * 1_000_000_000L; }

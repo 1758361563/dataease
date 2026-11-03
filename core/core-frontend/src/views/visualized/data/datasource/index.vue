@@ -2,6 +2,26 @@
 import icon_down_outlined1 from '@/assets/svg/icon_down_outlined-1.svg'
 import DataUpdateDrawer from './DataUpdateDrawer.vue'
 import DataUpdateWorkspace from './DataUpdateWorkspace.vue'
+import FeishuSheetWizard from './FeishuSheetWizard.vue'
+import { fetchDataUpdates } from '@/api/company/dataUpdate'
+const sheetTables = ref<Record<string, string>>({})
+async function loadSheetBadges() {
+  const id = String(nodeInfo.id)
+  sheetTables.value = {}
+  if (nodeInfo.type !== 'mysql' || !dataUpdatePermission.hasCapability('ETL_ACCESS')) return
+  try {
+    const result = await fetchDataUpdates()
+    if (id === String(nodeInfo.id))
+      sheetTables.value = Object.fromEntries(
+        result.tasks
+          .filter(t => t.definition.datasourceId === id && t.definition.mode === 'FEISHU')
+          .map(t => [t.definition.table, t.definition.sheet?.name || '飞书电子表格'])
+      )
+  } catch {
+    /* Shared HTTP handling displays the failure; table browsing remains available. */
+  }
+}
+const sheetWizard = ref<InstanceType<typeof FeishuSheetWizard>>()
 import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
 import icon_down_outlined from '@/assets/svg/icon_down_outlined.svg'
 import icon_copy_filled from '@/assets/svg/icon_copy_filled.svg'
@@ -970,6 +990,7 @@ const operation = (cmd: string, data: Tree, nodeType: string) => {
 }
 
 const handleClick = (tabName: TabPaneName) => {
+  if (tabName === 'table') void loadSheetBadges()
   switch (tabName) {
     case 'config':
       tableData.value = []
@@ -1130,6 +1151,7 @@ const getMenuList = (val: boolean) => {
 <template>
   <div class="datasource-manage" v-loading="dsLoading">
     <DataUpdateDrawer ref="dataUpdateDrawer" />
+    <FeishuSheetWizard ref="sheetWizard" @saved="activeName = 'update'" />
     <ArrowSide
       :style="{ left: (sideTreeStatus ? width - 12 : 0) + 'px' }"
       @change-side-tree-status="changeSideTreeStatus"
@@ -1445,8 +1467,15 @@ const getMenuList = (val: boolean) => {
           :datasource-id="String(nodeInfo.id)"
           :type="nodeInfo.type"
         />
-        <div v-else-if="activeName === 'table'" class="datasource-table">
+        <div v-else-if="activeName === 'table'" class="datasource-table update-surface">
           <div class="search-operate">
+            <el-button
+              v-if="nodeInfo.type === 'mysql' && dataUpdatePermission.hasCapability('ETL_ACCESS')"
+              type="primary"
+              plain
+              @click="sheetWizard?.open(String(nodeInfo.id))"
+              >接入飞书表格</el-button
+            >
             <el-input
               ref="search"
               v-model="nickName"
@@ -1477,7 +1506,18 @@ const getMenuList = (val: boolean) => {
                 prop="tableName"
                 show-overflow-tooltip
                 :label="t('datasource.table_name')"
-              />
+                ><template #default="{ row }"
+                  ><span>{{ row.tableName }}</span
+                  ><el-tag
+                    v-if="sheetTables[row.tableName]"
+                    size="small"
+                    type="info"
+                    style="margin-left: 10px"
+                    :title="sheetTables[row.tableName]"
+                    >飞书来源</el-tag
+                  ></template
+                ></el-table-column
+              >
               <el-table-column
                 key="name"
                 prop="name"
@@ -2420,8 +2460,19 @@ const getMenuList = (val: boolean) => {
       height: calc(100vh - 200px);
 
       .search-operate {
-        width: 280px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
         margin-bottom: 16px;
+        > .ed-input {
+          order: -1;
+          max-width: min(240px, 55%);
+        }
+        > .ed-button {
+          margin-left: auto;
+          flex-shrink: 0;
+        }
       }
     }
 

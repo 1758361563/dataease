@@ -60,11 +60,11 @@ public class UpdateGroupRuntime implements ApplicationRunner {
                 try{
                     groups.node(id,task.id(),"RUNNING",0,"");
                     long rows=executor.execute(task,LocalDate.parse(pending.date()),current);
-                    groups.node(id,task.id(),"SUCCESS",rows,"更新完成");
+                    groups.node(id,task.id(),"SUCCESS",rows,current.resultMessage());
                 }catch(Exception e){
                     String message=current.stopped()?current.reason():UpdateRuntime.error(e);
                     groups.node(id,task.id(),current.stopped()?"CANCELLED":"FAILED",0,message);
-                    boolean held=lock.alive();groups.finish(id,held?(current.stopped()?"CANCELLED":"FAILED"):"NEEDS_REVIEW",message+"；后续节点已阻断，已成功的输出单独保留",held);return;
+                    boolean held=lock.alive() && !current.publicationAttempted();groups.finish(id,held?(current.stopped()?"CANCELLED":"FAILED"):"NEEDS_REVIEW",message+"；后续节点已阻断，已成功的输出单独保留",held);return;
                 }finally{watch.cancel(false);execution=null;}
             }
             groups.finish(id,"SUCCESS","本批全部完成",true);

@@ -87,4 +87,14 @@ public final class UpdateSql {
         require(!rendered.contains("{{") && !rendered.contains("}}"), "SQL 中存在未知参数");
         return rendered;
     }
+    public static String sourceQuery(UpdateDefinition task,LocalDate date,String target,UpdateConnections.Dialect dialect) {
+        String sql=requireQuery(render(task.sql(),date,task.windowDays(),target));
+        if(task.strategy()!=UpdateDefinition.Strategy.FULL && !task.windowColumn().isBlank()
+                && !task.sql().contains("{{window_start}}") && !task.sql().contains("{{window_end}}")) {
+            String field=dialect.quote(task.windowColumn());
+            sql="SELECT * FROM ("+sql+") range_source WHERE "+field+">='"+date.minusDays(task.windowDays())+
+                    " 00:00:00' AND "+field+"<'"+date+" 00:00:00'";
+        }
+        return sql;
+    }
 }

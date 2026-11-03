@@ -107,6 +107,22 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             }
             ensureFeishuExecutionMode(conn);
             ensureFeishuDeliveryLane(conn);
+            ensureSheetManagement(conn);
+        }
+    }
+
+    private void ensureSheetManagement(Connection conn) throws Exception {
+        String[][] columns={
+                {"data_end_row","INT NULL"}, {"managed_task_id","VARCHAR(36) NULL"},
+                {"target_datasource_id","VARCHAR(64) NULL"}, {"source_json","LONGTEXT NULL"}
+        };
+        for(String[] column:columns) {
+            try(PreparedStatement ps=conn.prepareStatement("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='company_feishu_source' AND COLUMN_NAME=?")) {
+                ps.setString(1,column[0]); try(ResultSet rs=ps.executeQuery()) {
+                    rs.next(); if(rs.getInt(1)>0) continue;
+                }
+            }
+            try(Statement stmt=conn.createStatement()) { stmt.execute("ALTER TABLE company_feishu_source ADD COLUMN "+column[0]+" "+column[1]); }
         }
     }
 

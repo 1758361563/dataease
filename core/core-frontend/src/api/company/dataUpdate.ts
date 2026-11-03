@@ -6,7 +6,8 @@ export interface DataUpdateDefinition {
   datasourceId: string
   schema: string
   table: string
-  mode: 'QUERY' | 'SCRIPT'
+  mode: 'QUERY' | 'SCRIPT' | 'FEISHU'
+  sheet?: import('./sheets').SheetSource | null
   sourceDatasourceId: string
   sql: string
   strategy: 'FULL' | 'WINDOW' | 'UPSERT'
@@ -30,6 +31,7 @@ export interface DataUpdateTask {
   nextFireTime: string
   effective: boolean
   grouped?: boolean
+  freshness?: 'GROUP' | 'MANUAL' | 'WAITING' | 'CURRENT' | 'OVERDUE' | 'UNKNOWN'
   latest?: { status: string; lastSuccessAt: string }
 }
 export interface DataUpdateState {
@@ -43,6 +45,8 @@ export interface DataUpdateRun {
   taskId: string
   version: number
   triggerType: string
+  rangeStart?: string
+  rangeEnd?: string
   businessDate: string
   status: string
   requestedAt: string
@@ -101,7 +105,21 @@ export const dataUpdateStatus: Record<string, string> = {
   SKIPPED: '本次跳过'
 }
 export const dataUpdateTrigger: Record<string, string> = {
+  INITIAL: '首次全量',
+  RANGE: '指定范围',
   MANUAL: '手动',
   CRON: '定时',
   DEPENDENCY: '上游依赖'
 }
+
+export const runDataUpdateRange = (
+  id: string,
+  data: {
+    version: number
+    start: string
+    end: string
+    column: string
+    all?: boolean
+    strategy: 'WINDOW' | 'UPSERT'
+  }
+) => request.post({ url: base + '/' + encodeURIComponent(id) + '/range', data })

@@ -32,6 +32,14 @@ import Icon from '@/components/icon-custom/src/Icon.vue'
 import { XpackComponent, PluginComponent } from '@/components/plugin'
 import { iconDatasourceMap } from '@/components/icon-group/datasource-list'
 import ExcelRemoteDetail from '@/views/visualized/data/datasource/form/ExcelRemoteDetail.vue'
+import FeishuSheetWizard from '../FeishuSheetWizard.vue'
+import { useCompanyPermissionStoreWithOut } from '@/store/modules/companyPermission'
+const sheetPermission = useCompanyPermissionStoreWithOut()
+const sheetWizard = ref<InstanceType<typeof FeishuSheetWizard>>()
+function connectSheet() {
+  visible.value = false
+  sheetWizard.value?.open()
+}
 
 interface Node {
   name: string
@@ -772,6 +780,7 @@ defineExpose({
 </script>
 
 <template>
+  <FeishuSheetWizard ref="sheetWizard" @saved="emits('refresh')" />
   <el-drawer
     :close-on-click-modal="false"
     size="calc(100% - 100px)"
@@ -874,6 +883,15 @@ defineExpose({
           {{ typeTitle }}
         </div>
         <div class="editor-content" :class="(activeStep === 0 || editDs) && 'type-title'">
+          <button
+            v-if="activeStep === 0 && sheetPermission.hasCapability('ETL_ACCESS')"
+            class="feishu-source-entry"
+            @click="connectSheet"
+          >
+            <span class="feishu-source-icon">飞</span
+            ><span><strong>飞书电子表格</strong><small>连接工作表，同步到已有数据库</small></span
+            ><span class="feishu-source-arrow">→</span>
+          </button>
           <ds-type-list
             v-show="activeStep === 0"
             :filter-text="filterText.toLocaleLowerCase()"
@@ -1201,6 +1219,51 @@ defineExpose({
       z-index: 10;
       background: #fff;
     }
+  }
+}
+.feishu-source-entry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  border: 1px solid #dfe7f5;
+  border-radius: 12px;
+  background: linear-gradient(110deg, #f3f7ff, #fafcff);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  &:hover {
+    border-color: #809bd8;
+    box-shadow: 0 4px 18px #375b9410;
+  }
+  strong {
+    display: block;
+    color: #314363;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  small {
+    display: block;
+    color: #8290a6;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .feishu-source-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    background: #e4edff;
+    color: #5c7bc0;
+    border-radius: 12px;
+    font-size: 21px;
+  }
+  .feishu-source-arrow {
+    margin-left: auto;
+    color: #6c86b8;
+    font-size: 20px;
   }
 }
 </style>

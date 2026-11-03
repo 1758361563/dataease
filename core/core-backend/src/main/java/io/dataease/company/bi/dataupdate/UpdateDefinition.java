@@ -11,7 +11,19 @@ public record UpdateDefinition(
         List<String> keys, String windowColumn, int windowDays, boolean allowEmpty,
         Trigger trigger, boolean enabled, String cron, String timezone,
         List<String> dependencies, int timeoutSeconds, long maxRows, String owner,
-        String structureFingerprint, long minimumRows) {
+        String structureFingerprint, long minimumRows, SheetSource sheet) {
+    public UpdateDefinition(String id, long version, String datasourceId, String schema, String table,
+            Mode mode, String sourceDatasourceId, String sql, Strategy strategy, List<String> keys,
+            String windowColumn, int windowDays, boolean allowEmpty, Trigger trigger, boolean enabled,
+            String cron, String timezone, List<String> dependencies, int timeoutSeconds, long maxRows, String owner,
+            String structureFingerprint, long minimumRows) {
+        this(id,version,datasourceId,schema,table,mode,sourceDatasourceId,sql,strategy,keys,windowColumn,
+                windowDays,allowEmpty,trigger,enabled,cron,timezone,dependencies,timeoutSeconds,maxRows,owner,structureFingerprint,minimumRows,null);
+    }
+    public UpdateDefinition withSheet(SheetSource value) {
+        return new UpdateDefinition(id,version,datasourceId,schema,table,mode,sourceDatasourceId,sql,strategy,keys,windowColumn,
+                windowDays,allowEmpty,trigger,enabled,cron,timezone,dependencies,timeoutSeconds,maxRows,owner,structureFingerprint,minimumRows,value);
+    }
     public UpdateDefinition(String id, long version, String datasourceId, String schema, String table,
             Mode mode, String sourceDatasourceId, String sql, Strategy strategy, List<String> keys,
             String windowColumn, int windowDays, boolean allowEmpty, Trigger trigger, boolean enabled,
@@ -19,13 +31,13 @@ public record UpdateDefinition(
         this(id,version,datasourceId,schema,table,mode,sourceDatasourceId,sql,strategy,keys,windowColumn,
                 windowDays,allowEmpty,trigger,enabled,cron,timezone,dependencies,timeoutSeconds,maxRows,owner,"",0);
     }
-    public enum Mode { SCRIPT, QUERY }
+    public enum Mode { SCRIPT, QUERY, FEISHU }
     public enum Strategy { FULL, WINDOW, UPSERT }
     public enum Trigger { MANUAL, CRON, DEPENDENCY }
 
     public UpdateDefinition withSchema(String value) {
         return new UpdateDefinition(id, version, datasourceId, value, table, mode, sourceDatasourceId, sql, strategy,
-                keys, windowColumn, windowDays, allowEmpty, trigger, enabled, cron, timezone, dependencies, timeoutSeconds, maxRows, owner,structureFingerprint,minimumRows);
+                keys, windowColumn, windowDays, allowEmpty, trigger, enabled, cron, timezone, dependencies, timeoutSeconds, maxRows, owner,structureFingerprint,minimumRows,sheet);
     }
 
     public UpdateDefinition normalized(String taskId, long revision, String instance) {
@@ -33,14 +45,14 @@ public record UpdateDefinition(
                 mode == Mode.QUERY ? sourceDatasourceId : datasourceId, clean(sql), strategy,
                 keys == null ? List.of() : keys.stream().map(String::strip).toList(), clean(windowColumn),
                 windowDays, allowEmpty, trigger, enabled, clean(cron), clean(timezone),
-                dependencies == null ? List.of() : List.copyOf(dependencies), timeoutSeconds, maxRows, instance,clean(structureFingerprint),minimumRows);
+                dependencies == null ? List.of() : List.copyOf(dependencies), timeoutSeconds, maxRows, instance,clean(structureFingerprint),minimumRows,sheet);
     }
 
     public void validate() {
         require(datasourceId != null && datasourceId.matches("[0-9]+"), "请选择目标数据源");
         identifier(table); if (!schema.isEmpty()) identifier(schema);
         require(mode != null && strategy != null && trigger != null, "请选择执行方式、更新策略和触发方式");
-        require(!sql.isBlank() && sql.length() <= 2_000_000, "SQL 不能为空且不能超过 200 万字符");
+        if (mode != Mode.FEISHU) require(!sql.isBlank() && sql.length() <= 2_000_000, "SQL 不能为空且不能超过 200 万字符");
         require(windowDays >= 1 && windowDays <= 3660, "更新窗口须为 1–3660 天");
         require(timeoutSeconds >= 1 && timeoutSeconds <= 86400, "执行超时须为 1–86400 秒");
         require(maxRows >= 1 && maxRows <= 100_000_000, "抽取行数上限须为 1–100000000");
@@ -59,7 +71,12 @@ public record UpdateDefinition(
             } catch (java.text.ParseException e) { throw new IllegalArgumentException("Quartz Cron 表达式无效"); }
         }
         if (trigger == Trigger.DEPENDENCY) require(!dependencies.isEmpty(), "请选择上游任务");
-        if (mode == Mode.QUERY) {
+        if (mode == Mode.FEISHU) {
+            require(sheet!=null,"缺少飞书来源配置"); sheet.validate(true);
+            require(strategy==Strategy.FULL,"飞书电子表格使用全量快照更新");
+            require(maxRows<=1_000_000,"飞书读取行数上限为 100 万");
+            require(!clean(structureFingerprint).isEmpty(),"请先检查目标结构并预览");
+        } else if (mode == Mode.QUERY) {
             require(sourceDatasourceId != null && sourceDatasourceId.matches("[0-9]+"), "请选择查询数据源");
             if (strategy == Strategy.UPSERT) require(!keys.isEmpty(), "按主键更新需要配置主键");
             if (strategy == Strategy.WINDOW) identifier(windowColumn);

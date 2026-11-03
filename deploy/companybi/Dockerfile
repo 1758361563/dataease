@@ -80,7 +80,8 @@ COPY feishu-integration/src/capture.mjs feishu-integration/src/config.mjs \
      feishu-integration/src/run-subscription.mjs feishu-integration/src/schedule.mjs \
      feishu-integration/src/scheduler.mjs feishu-integration/src/service-log.mjs \
      feishu-integration/src/session.mjs feishu-integration/src/store.mjs \
-     feishu-integration/src/managed-connection.mjs feishu-integration/src/embedded-worker.mjs ./src/
+     feishu-integration/src/managed-connection.mjs feishu-integration/src/managed-sheets.mjs \
+     feishu-integration/src/embedded-worker.mjs ./src/
 
 # --------------------------------------------------------------------------
 # Stage 4: runtime (Java owns the internal executor lifecycle)

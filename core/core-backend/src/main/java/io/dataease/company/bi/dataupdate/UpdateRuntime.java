@@ -40,7 +40,7 @@ public class UpdateRuntime {
         require(ready, "数据更新服务尚未就绪");
         require(!disabled(), "运维已关闭数据更新执行");
         require(owner() != null, "请配置 COMPANY_BI_INSTANCE_ID 后执行数据更新");
-        if (!"MANUAL".equals(type)) require(task.enabled() && owns(task), "自动更新未在当前实例启用");
+        if (!"MANUAL".equals(type) && !"RANGE".equals(type) && !"INITIAL".equals(type)) require(task.enabled() && owns(task), "自动更新未在当前实例启用");
         Map<String,String> upstream = store.upstreamRuns(task, date);
         String key = switch (type) {
             case "CRON" -> "cron:" + task.version() + ":" + planned;
@@ -70,7 +70,10 @@ public class UpdateRuntime {
             for (UpdateStore.Pending running : store.running()) {
                 if (dispatched.contains(running.id())) continue;
                 try (UpdateLock lock = UpdateLock.acquire(metadata, UpdateStore.targetKey(running.definition()))) {
-                    if (lock != null) store.interruptOrphans(running.definition().id());
+                    if (lock != null) {
+                        if(running.definition().mode()==UpdateDefinition.Mode.FEISHU)store.finishSheet(running.id(),"NEEDS_REVIEW",0,"执行进程中断，请核查目标快照后解除占用",false);
+                        else store.interruptOrphans(running.definition().id());
+                    }
                 }
             }
             for (UpdateDefinition task : store.all()) {
@@ -94,7 +97,8 @@ public class UpdateRuntime {
                 store.finish(pending.id(),"SKIPPED",0,"目标表已由任务组或建表操作接管");return;
             }
             store.interruptOrphans(pending.definition().id());
-            if (!store.start(pending.id())) return;
+            boolean sheet=pending.definition().mode()==UpdateDefinition.Mode.FEISHU;
+            if (!(sheet?store.startSheet(pending.id(),pending.definition()):store.start(pending.id()))) return;
             execution.commitGuard(() -> lock.alive() && !disabled() && !store.cancelled(pending.id()));
             active.put(pending.id(), execution);
             ScheduledFuture<?> watchdog = monitor.scheduleWithFixedDelay(() -> {
@@ -107,11 +111,16 @@ public class UpdateRuntime {
             }, 0, 1, TimeUnit.SECONDS);
             try {
                 long rows = executor.execute(pending.definition(), pending.date(), execution);
-                store.finish(pending.id(), "SUCCESS", rows, "更新完成");
+                if(sheet)store.finishSheet(pending.id(),"SUCCESS",rows,execution.resultMessage(),true);
+                else store.finish(pending.id(), "SUCCESS", rows, "更新完成");
             } catch (Exception e) {
                 String message = execution.stopped() ? execution.reason() : error(e);
                 if (pending.definition().mode() == UpdateDefinition.Mode.SCRIPT) message += "；脚本中已提交的 DDL 或外部副作用需检查后重跑";
-                store.finish(pending.id(), execution.stopped() ? "CANCELLED" : "FAILED", 0, message);
+                if(sheet) {
+                    boolean review=execution.publicationAttempted() || !lock.alive();
+                    store.finishSheet(pending.id(),review?"NEEDS_REVIEW":execution.stopped()?"CANCELLED":"FAILED",0,
+                            review?"发布结果或执行状态需核查；"+message:message,!review);
+                } else store.finish(pending.id(), execution.stopped() ? "CANCELLED" : "FAILED", 0, message);
             } finally { watchdog.cancel(false); active.remove(pending.id()); }
         } catch (Exception e) { LOG.warn("Data update worker failed for run {} ({})", pending.id(), e.getClass().getSimpleName()); }
         finally { dispatched.remove(pending.id()); }
