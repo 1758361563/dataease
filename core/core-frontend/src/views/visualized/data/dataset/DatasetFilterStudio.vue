@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fieldHelp } from './fieldNaming'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { cloneDeep } from 'lodash-es'
 import { ElMessage } from 'element-plus-secondary'
@@ -34,7 +35,8 @@ const estimating = ref(false)
 let valueSerial = 0
 let countSerial = 0
 let searchTimer: ReturnType<typeof setTimeout>
-let countTimer: ReturnType<typeof setTimeout>
+let valueController: AbortController | undefined
+let countController: AbortController | undefined
 const field = computed(() => props.fields.find(f => String(f.id) === activeId.value))
 const shownFields = computed(() => props.fields.filter(f => matchesField(f, fieldSearch.value)))
 const current = computed(() => draft.value.find(r => r.fieldId === activeId.value))
@@ -93,6 +95,9 @@ const loadValues = async (reset = true) => {
   clearTimeout(searchTimer)
   if (!activeId.value || !props.modelValue) return
   const ticket = ++valueSerial
+  valueController?.abort()
+  const controller = new AbortController()
+  valueController = controller
   if (reset) {
     candidatePage.value = 1
     options.value = []
@@ -110,7 +115,8 @@ const loadValues = async (reset = true) => {
         page: candidatePage.value,
         size: 100
       },
-      'previewValues'
+      'previewValues',
+      controller.signal
     )
     if (ticket !== valueSerial) return
     const resultField = result.data.fields?.[0]
@@ -124,7 +130,7 @@ const loadValues = async (reset = true) => {
           .map(String)
       ])
     ]
-    more.value = data.length === 100
+    more.value = !!result.hasMore
   } catch {
     if (ticket === valueSerial) candidateError.value = '候选值加载失败，请重试'
   } finally {
@@ -137,6 +143,7 @@ const loadMore = () => {
 }
 const activate = (id: string) => {
   ++valueSerial
+  valueController?.abort()
   activeId.value = id
   valueSearch.value = ''
   pasted.value = ''
@@ -193,6 +200,9 @@ const addPasted = () => {
 }
 const count = async () => {
   const ticket = ++countSerial
+  countController?.abort()
+  const controller = new AbortController()
+  countController = controller
   if (!props.modelValue || validateRules(configured.value, props.fields)) {
     estimate.value = null
     estimating.value = false
@@ -208,7 +218,8 @@ const count = async () => {
         columnIds: undefined,
         page: 1
       },
-      'previewCount'
+      'previewCount',
+      controller.signal
     )
     if (ticket === countSerial) estimate.value = Number(result.total)
   } catch {
@@ -262,17 +273,17 @@ watch(
           ? props.initialField
           : draft.value[0]?.fieldId || String(props.fields[0]?.id || '')
       activate(id)
-      clearTimeout(countTimer)
-      countTimer = setTimeout(count, 100)
     } else {
+      valueController?.abort()
       ++valueSerial
       ++countSerial
       clearTimeout(searchTimer)
-      clearTimeout(countTimer)
+      countController?.abort()
     }
   }
 )
 watch(valueSearch, () => {
+  valueController?.abort()
   ++valueSerial
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => loadValues(), 300)
@@ -283,16 +294,16 @@ watch(
     ++countSerial
     estimate.value = null
     estimating.value = false
-    clearTimeout(countTimer)
-    if (props.modelValue) countTimer = setTimeout(count, 600)
+    countController?.abort()
   },
   { deep: true }
 )
 onBeforeUnmount(() => {
+  valueController?.abort()
   ++valueSerial
   ++countSerial
   clearTimeout(searchTimer)
-  clearTimeout(countTimer)
+  countController?.abort()
 })
 </script>
 
@@ -329,7 +340,7 @@ onBeforeUnmount(() => {
             :key="item.id"
             class="studio-field"
             :class="{ active: activeId === String(item.id) }"
-            :title="[item.name, fieldOriginalName(item)].filter(Boolean).join(' · ')"
+            :title="fieldHelp(item)"
             @click="activate(String(item.id))"
           >
             <span class="studio-type" :class="{ numeric: [2, 3, 4].includes(item.deType) }">{{
@@ -353,9 +364,10 @@ onBeforeUnmount(() => {
                 value="or"
             /></el-select>
           </div>
-          <span class="studio-inline-count"
-            >{{ estimating ? '…' : estimate ?? '—' }}/{{ total ?? '—' }}</span
-          >
+          <span class="studio-inline-count">{{
+            estimating ? '统计中' : estimate === null ? '未统计' : estimate + ' 条'
+          }}</span>
+          <el-button text :loading="estimating" @click="count">统计匹配数量</el-button>
         </div>
         <details v-if="configured.length" class="studio-rule-details">
           <summary>已选规则 {{ configured.length }}</summary>
@@ -389,7 +401,7 @@ onBeforeUnmount(() => {
         </details>
         <template v-if="field">
           <div class="studio-current">
-            <strong>{{ field.name }}</strong
+            <strong :title="fieldHelp(field)">{{ field.name }}</strong
             ><code v-if="fieldOriginalName(field)" :title="fieldOriginalName(field)">{{
               fieldOriginalName(field)
             }}</code

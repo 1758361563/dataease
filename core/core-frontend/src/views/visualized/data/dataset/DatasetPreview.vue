@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fieldHelp } from './fieldNaming'
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { cloneDeep } from 'lodash-es'
 import { ElMessage } from 'element-plus-secondary'
@@ -43,11 +44,58 @@ const counting = ref(false)
 const loading = ref(false)
 const error = ref('')
 const exporting = ref(false)
+const hasMore = ref(false)
+const orderConfigured = ref(false)
+const countError = ref('')
+const countedAt = ref('')
+let dataController: AbortController | undefined
+let fieldsController: AbortController | undefined
+let countController: AbortController | undefined
+let countKey = ''
+const cancelQueries = () => {
+  dataController?.abort()
+  fieldsController?.abort()
+  countController?.abort()
+}
+const cancelPreview = () => {
+  ++serial
+  cancelQueries()
+  loading.value = false
+  counting.value = false
+  error.value = '查询已取消，可调整筛选后重新查询'
+}
+const countSignature = () =>
+  JSON.stringify({ ...input(), page: undefined, size: undefined, columnIds: undefined })
+const countRows = async () => {
+  if (!available.value.length || invalid()) {
+    countError.value = '请先加载字段并检查筛选条件'
+    return
+  }
+  countController?.abort()
+  const controller = new AbortController()
+  countController = controller
+  counting.value = true
+  countError.value = ''
+  try {
+    const key = countSignature()
+    const result = await queryDatasetPreview(input(), 'previewCount', controller.signal)
+    if (!controller.signal.aborted && key === countSignature()) {
+      total.value = Number(result.total)
+      countKey = key
+      countedAt.value = new Date().toLocaleTimeString()
+    }
+  } catch {
+    if (!controller.signal.aborted) countError.value = '总数暂不可用'
+  } finally {
+    if (countController === controller) counting.value = false
+  }
+}
 let serial = 0
 let requested = false
 let refreshTimer: ReturnType<typeof setTimeout>
 onBeforeUnmount(() => {
   ++serial
+  cancelQueries()
   clearTimeout(refreshTimer)
 })
 const filterOpen = ref(false)
@@ -74,6 +122,8 @@ const input = (): PreviewQuery => ({
 const invalid = () => validateRules(rules.value, available.value)
 const refresh = async () => {
   requested = true
+  dataController?.abort()
+  fieldsController?.abort()
   clearTimeout(refreshTimer)
   const ticket = ++serial
   const problem = invalid()
@@ -87,9 +137,7 @@ const refresh = async () => {
     return
   }
   loading.value = true
-  counting.value = true
-  total.value = null
-  unfilteredTotal.value = null
+  hasMore.value = false
   rows.value = []
   let query: PreviewQuery
   try {
@@ -100,29 +148,40 @@ const refresh = async () => {
     counting.value = false
     return
   }
-  const countJob = Promise.allSettled([
-    queryDatasetPreview(query, 'previewCount').then(result => {
-      if (ticket !== serial) return
-      total.value = Number(result.total)
-      if (!query.rules?.length) unfilteredTotal.value = total.value
-    }),
-    ...(query.rules?.length
-      ? [
-          queryDatasetPreview({ ...query, rules: [], columnIds: undefined }, 'previewCount').then(
-            result => {
-              if (ticket === serial) unfilteredTotal.value = Number(result.total)
-            }
-          )
-        ]
-      : [])
-  ]).finally(() => {
-    if (ticket === serial) counting.value = false
-  })
+  if (
+    countKey !==
+    JSON.stringify({ ...query, page: undefined, size: undefined, columnIds: undefined })
+  ) {
+    countController?.abort()
+    counting.value = false
+    countError.value = ''
+    total.value = null
+  }
+  const controller = new AbortController()
+  dataController = controller
+  if (!available.value.length) {
+    const metadata = new AbortController()
+    fieldsController = metadata
+    queryDatasetPreview(query, 'previewFields', metadata.signal)
+      .then(fields => {
+        if (ticket !== serial || metadata.signal.aborted) return
+        available.value = fields || []
+        if (!columns.value.length) columns.value = available.value
+        emit('fields', available.value)
+      })
+      .catch(() => {
+        /* The detail response can also supply fields; refresh retries metadata independently. */
+      })
+  }
   try {
-    const result = await queryDatasetPreview(query)
+    const result = await queryDatasetPreview(query, 'previewQuery', controller.signal)
     if (ticket !== serial) return
     columns.value = result.data.fields || []
     rows.value = result.data.data || []
+    if (result.hasMore && page.value * size.value >= 10000)
+      error.value = '已预览一万行，请按日期或编码筛选定位；完整数据可导出'
+    orderConfigured.value = !!result.orderConfigured
+    hasMore.value = !!result.hasMore && page.value * size.value < 10000
     if (!selected.value) {
       available.value = result.data.fields || []
       emit('fields', available.value)
@@ -132,9 +191,10 @@ const refresh = async () => {
   } finally {
     if (ticket === serial) loading.value = false
   }
-  await countJob
 }
 const invalidate = () => {
+  cancelQueries()
+  countKey = ''
   clearTimeout(refreshTimer)
   ++serial
   loading.value = false
@@ -153,6 +213,8 @@ watch(
   () => props.datasetId,
   () => {
     ++serial
+    cancelQueries()
+    countKey = ''
     rules.value = []
     selected.value = undefined
     available.value = []
@@ -170,7 +232,7 @@ watch(
   () => props.fields,
   fields => {
     const next = JSON.stringify(fields.map(f => [String(f.id), f.deType, f.name, f.originName]))
-    if (fieldSignature.value && fieldSignature.value !== next) invalidate()
+    if (props.draft && fieldSignature.value && fieldSignature.value !== next) invalidate()
     fieldSignature.value = next
     if (props.draft) available.value = fields
   },
@@ -184,7 +246,9 @@ watch(
 )
 watch(
   () => props.active,
-  active => {
+  (active, previous) => {
+    if (active && previous === false && !props.draft && props.datasetId) refresh()
+    if (!active) cancelPreview()
     if (active && props.draft && props.fields.length) refresh()
   },
   { flush: 'post', immediate: true }
@@ -274,8 +338,8 @@ const applyColumns = () => {
   refresh()
 }
 const exportData = async (format: string) => {
-  if (error.value || loading.value) {
-    ElMessage.error('请先刷新并确认预览结果')
+  if (invalid()) {
+    ElMessage.error(invalid())
     return
   }
   exporting.value = true
@@ -329,19 +393,34 @@ defineExpose({ refresh, invalidate, openFilter, openColumns, exportData, focusFi
   <div class="dataset-preview-workspace">
     <div class="preview-toolbar">
       <div class="preview-toolbar-leading">
-        <slot name="leading" /><span
+        <slot name="leading" />
+        <span class="preview-count"
+          >本页 {{ rows.length }} 条<span v-if="total !== null"> · 共 {{ total }} 条</span></span
+        >
+        <el-button
+          text
+          :loading="counting"
+          :title="countError || (countedAt ? '上次统计于 ' + countedAt : '按当前筛选统计总数')"
+          @click="countRows"
+          >{{ countError || '统计总数' }}</el-button
+        >
+        <span
           class="preview-count"
-          title="匹配行数 / 总行数"
-          aria-label="匹配行数 / 总行数"
-          >{{ counting ? '…' : total ?? '—' }}/{{ counting ? '…' : unfilteredTotal ?? '—' }}</span
+          :title="
+            orderConfigured
+              ? '按数据集配置排序'
+              : '快速预览未配置排序，页间顺序不保证固定；精确定位请使用筛选'
+          "
+          >第 {{ page }} 页{{ orderConfigured ? '' : ' · 快速预览' }}</span
         >
         <div class="preview-pagination">
           <el-pagination
             v-model:current-page="page"
             v-model:page-size="size"
-            :total="total ?? (page - 1) * size + rows.length + (rows.length === size ? 1 : 0)"
-            :page-sizes="[50, 100, 200, 500]"
-            layout="sizes, prev, pager, next"
+            :total="Math.max(page * size, (page - 1) * size + rows.length + (hasMore ? 1 : 0))"
+            :page-sizes="[50, 100, 200]"
+            :disabled="loading"
+            layout="sizes, prev, next"
             :pager-count="5"
             small
             @size-change="
@@ -364,6 +443,7 @@ defineExpose({ refresh, invalidate, openFilter, openColumns, exportData, focusFi
             >{{ columns.length }}/{{ available.length }}</small
           ></el-button
         >
+        <el-button v-if="loading" text @click="cancelPreview">取消查询</el-button>
         <el-button text :loading="loading" title="刷新数据" aria-label="刷新数据" @click="refresh"
           ><DatasetIcon v-if="!loading" name="refresh"
         /></el-button>
@@ -422,7 +502,7 @@ defineExpose({ refresh, invalidate, openFilter, openColumns, exportData, focusFi
                 <span
                   class="preview-column-name"
                   :data-field-id="String(field.id)"
-                  :title="field.name"
+                  :title="fieldHelp(field)"
                   >{{ field.name }}</span
                 ><button
                   class="preview-column-filter"
@@ -476,7 +556,7 @@ defineExpose({ refresh, invalidate, openFilter, openColumns, exportData, focusFi
       </div>
       <el-checkbox-group v-model="pendingColumns" class="column-options"
         ><el-checkbox v-for="field in visibleFields" :key="field.id" :label="String(field.id)"
-          ><span :title="field.originName"
+          ><span :title="fieldHelp(field)"
             >{{ field.name
             }}<small v-if="fieldOriginalName(field)" class="column-original-name">{{
               fieldOriginalName(field)
@@ -858,45 +938,5 @@ defineExpose({ refresh, invalidate, openFilter, openColumns, exportData, focusFi
   .preview-count {
     font-size: 10px;
   }
-}
-</style>
-
-<style scoped lang="less">
-.preview-toolbar-leading {
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.preview-pagination {
-  min-height: 0;
-  border: 0;
-  padding: 0;
-  gap: 0;
-  :deep(.ed-pagination) {
-    gap: 3px;
-  }
-  :deep(.ed-select) {
-    width: 100px;
-  }
-  :deep(.ed-input__wrapper) {
-    box-shadow: none;
-    background: #f3f5f9;
-    border-radius: 6px;
-  }
-  :deep(.ed-pager li),
-  :deep(button) {
-    min-width: 26px;
-    height: 28px;
-    border-radius: 6px;
-  }
-  :deep(.ed-pager li.is-active) {
-    background: #eaf0fa;
-    color: #5b70a8;
-  }
-}
-.preview-toolbar {
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-top: 8px;
-  padding-bottom: 8px;
 }
 </style>

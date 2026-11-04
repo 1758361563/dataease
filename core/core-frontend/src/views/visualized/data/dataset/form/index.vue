@@ -34,6 +34,7 @@ import { ElIcon, ElMessageBox, ElMessage } from 'element-plus-secondary'
 import FixedSizeList from 'element-plus-secondary/es/components/virtual-list/src/components/fixed-size-list.mjs'
 import type { Action } from 'element-plus-secondary'
 import DatasetFieldList from '../DatasetFieldList.vue'
+import RestoreFieldNames from '../RestoreFieldNames.vue'
 import DatasetFieldActions from '../DatasetFieldActions.vue'
 import DatasetIcon from '../DatasetIcon.vue'
 import { Icon } from '@/components/icon-custom'
@@ -590,17 +591,30 @@ const addCalcField = groupType => {
   })
 }
 
+const restoreNamesOpen = ref(false)
+const applyRestoredNames = (changes: { id: string; after: string }[]) => {
+  const names = new Map(changes.map(change => [change.id, change.after]))
+  allfields.value.forEach(field => {
+    const name = names.get(String(field.id))
+    if (name !== undefined) field.name = name
+  })
+  changeUpdate()
+}
 const editNormalField = ref(false)
 const currentNormalField = ref({
   id: '',
-  name: ''
+  name: '',
+  originName: '',
+  description: ''
 })
 
 const renameField = item => {
-  const { id, name } = item
+  const { id, name, originName, description } = item
   currentNormalField.value = {
     id,
-    name
+    name,
+    originName: originName || '',
+    description: description || ''
   }
   editNormalField.value = true
 }
@@ -1913,8 +1927,9 @@ const getDsIconName = data => {
           </div>
           <div v-show="tabActive !== 'preview' && !!allfields.length" class="batch-area">
             <div class="field-management-toolbar">
-              <span>{{ allfields.length }} 个字段</span
-              ><DatasetFieldActions :disabled="!allfields.length" @create="createField" />
+              <span>{{ allfields.length }} 个字段</span>
+              <el-button text @click="restoreNamesOpen = true">恢复原字段名</el-button>
+              <DatasetFieldActions :disabled="!allfields.length" @create="createField" />
             </div>
             <div class="manage-container">
               <el-collapse v-model="state.fieldCollapse" class="style-collapse">
@@ -1931,7 +1946,7 @@ const getDsIconName = data => {
                     style="width: 100%"
                   >
                     <el-table-column :selectable="selectable" type="selection" width="40" />
-                    <el-table-column prop="name" :label="t('dataset.field_name')" width="264">
+                    <el-table-column prop="name" label="显示名称" width="264">
                       <template #default="scope">
                         <div class="column-style">
                           <el-input
@@ -2142,7 +2157,7 @@ const getDsIconName = data => {
                     style="width: 100%"
                   >
                     <el-table-column type="selection" width="40" />
-                    <el-table-column prop="name" :label="t('dataset.field_name')" width="264">
+                    <el-table-column prop="name" label="显示名称" width="264">
                       <template #default="scope">
                         <div class="column-style">
                           <el-input
@@ -2458,12 +2473,7 @@ const getDsIconName = data => {
       <el-button type="primary" @click="confirmCustomTime()">{{ t('dataset.confirm') }} </el-button>
     </template>
   </el-dialog>
-  <el-dialog
-    class="create-dialog"
-    :title="t('datasource.field_rename')"
-    v-model="editNormalField"
-    width="420px"
-  >
+  <el-dialog class="create-dialog" title="修改显示名称" v-model="editNormalField" width="420px">
     <el-form
       ref="ruleFormFieldRef"
       :rules="fieldRules"
@@ -2472,8 +2482,14 @@ const getDsIconName = data => {
       label-position="top"
       label-width="120px"
     >
-      <el-form-item prop="name" :label="t('dataset.field_name')">
+      <el-form-item prop="name" label="显示名称">
         <el-input maxlength="100" v-model="currentNormalField.name" />
+      </el-form-item>
+      <el-form-item v-if="currentNormalField.originName" label="原字段名">
+        <span>{{ currentNormalField.originName }}</span>
+      </el-form-item>
+      <el-form-item v-if="currentNormalField.description" label="备注">
+        <span>{{ currentNormalField.description }}</span>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -2710,6 +2726,7 @@ const getDsIconName = data => {
     @back="pushDataset"
     jsname="L2NvbXBvbmVudC9kYXRhc2V0L2luZGV4"
   />
+  <RestoreFieldNames v-model="restoreNamesOpen" :fields="allfields" @apply="applyRestoredNames" />
 </template>
 
 <style lang="less" scoped>

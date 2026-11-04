@@ -49,6 +49,7 @@ core/core-frontend/src/assets/fsSvg.html
 !/core/core-backend/src/main/
 /core/core-backend/src/main/**
 !/core/core-backend/src/main/**/
+!/core/core-backend/src/main/java/io/dataease/dataset/manage/PreviewExecution.java
 !/core/core-backend/src/test/
 /core/core-backend/src/test/*
 !/core/core-backend/src/test/java/

@@ -97,7 +97,7 @@ const options = computed(() => {
       icon: icon_edit_outlined
     },
     {
-      label: t('data_set.rename'),
+      label: '修改显示名称',
       value: 'rename',
       icon: dvRename
     },

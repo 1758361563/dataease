@@ -1,5 +1,7 @@
 package io.dataease.datasource.provider;
 
+import io.dataease.dataset.manage.PreviewExecution;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.jcraft.jsch.*;
 import io.dataease.constant.SQLConstants;
@@ -184,21 +186,23 @@ public class CalciteProvider extends Provider {
         try {
             CalciteConnection calciteConnection = connection.unwrap(CalciteConnection.class);
             statement = calciteConnection.prepareStatement(datasourceRequest.getQuery());
-            resultSet = statement.executeQuery();
-            ResultSetMetaData metaData = resultSet.getMetaData();
-            int columnCount = metaData.getColumnCount();
-            for (int i = 1; i <= columnCount; i++) {
-                TableField tableField = new TableField();
-                tableField.setOriginName(metaData.getColumnLabel(i));
-                tableField.setType(metaData.getColumnTypeName(i));
-                tableField.setPrecision(metaData.getPrecision(i));
-                int deType = FieldUtils.transType2DeType(tableField.getType());
-                tableField.setDeExtractType(deType);
-                tableField.setDeType(deType);
-                tableField.setScale(metaData.getScale(i));
-                datasetTableFields.add(tableField);
+            try (AutoCloseable previewScope = PreviewExecution.bind(statement)) {
+                resultSet = statement.executeQuery();
+                ResultSetMetaData metaData = resultSet.getMetaData();
+                int columnCount = metaData.getColumnCount();
+                for (int i = 1; i <= columnCount; i++) {
+                    TableField tableField = new TableField();
+                    tableField.setOriginName(metaData.getColumnLabel(i));
+                    tableField.setType(metaData.getColumnTypeName(i));
+                    tableField.setPrecision(metaData.getPrecision(i));
+                    int deType = FieldUtils.transType2DeType(tableField.getType());
+                    tableField.setDeExtractType(deType);
+                    tableField.setDeType(deType);
+                    tableField.setScale(metaData.getScale(i));
+                    datasetTableFields.add(tableField);
+                }
+                list = getDataResult(resultSet);
             }
-            list = getDataResult(resultSet);
         } catch (Exception | AssertionError e) {
             String msg;
             if (e.getCause() != null && e.getCause().getCause() != null) {
@@ -547,39 +551,41 @@ public class CalciteProvider extends Provider {
 
         try (Connection con = getConnectionFromPool(datasourceRequest.getDatasource().getId())) {
 
-            Statement statement = getStatement(value, con, datasourceRequest, datasourceConfiguration, null);
+            try (Statement statement = getStatement(value, con, datasourceRequest, datasourceConfiguration, null);
+                 AutoCloseable previewScope = PreviewExecution.bind(statement)) {
 
-            if (CollectionUtils.isNotEmpty(datasourceRequest.getTableFieldWithValues())) {
-                LogUtil.info("execWithPreparedStatement sql: " + datasourceRequest.getQuery());
-                for (int i = 0; i < datasourceRequest.getTableFieldWithValues().size(); i++) {
-                    try {
-                        Object valueObject = datasourceRequest.getTableFieldWithValues().get(i).getValue();
+                if (CollectionUtils.isNotEmpty(datasourceRequest.getTableFieldWithValues())) {
+                    LogUtil.info("execWithPreparedStatement sql: " + datasourceRequest.getQuery());
+                    for (int i = 0; i < datasourceRequest.getTableFieldWithValues().size(); i++) {
+                        try {
+                            Object valueObject = datasourceRequest.getTableFieldWithValues().get(i).getValue();
 
-                        if (valueObject instanceof String && DatasourceConfiguration.DatasourceType.valueOf(value.getType()) == DatasourceConfiguration.DatasourceType.oracle) {
-                            if (StringUtils.isNotEmpty(oracleCharset) && StringUtils.isNotEmpty(oracleTargetCharset)) {
-                                //转换为数据库的字符集
-                                valueObject = convertOracleText((String) valueObject, oracleTargetCharset, oracleCharset);
-                            }
-                            if (datasourceRequest.getTableFieldWithValues().get(i).getType().equals(Types.CLOB)) {
-                                Reader reader = new StringReader((String) valueObject);
-                                ((PreparedStatement) statement).setCharacterStream(i + 1, reader, ((String) valueObject).length());
+                            if (valueObject instanceof String && DatasourceConfiguration.DatasourceType.valueOf(value.getType()) == DatasourceConfiguration.DatasourceType.oracle) {
+                                if (StringUtils.isNotEmpty(oracleCharset) && StringUtils.isNotEmpty(oracleTargetCharset)) {
+                                    //转换为数据库的字符集
+                                    valueObject = convertOracleText((String) valueObject, oracleTargetCharset, oracleCharset);
+                                }
+                                if (datasourceRequest.getTableFieldWithValues().get(i).getType().equals(Types.CLOB)) {
+                                    Reader reader = new StringReader((String) valueObject);
+                                    ((PreparedStatement) statement).setCharacterStream(i + 1, reader, ((String) valueObject).length());
+                                } else {
+                                    ((PreparedStatement) statement).setObject(i + 1, valueObject, datasourceRequest.getTableFieldWithValues().get(i).getType());
+                                }
                             } else {
                                 ((PreparedStatement) statement).setObject(i + 1, valueObject, datasourceRequest.getTableFieldWithValues().get(i).getType());
                             }
-                        } else {
-                            ((PreparedStatement) statement).setObject(i + 1, valueObject, datasourceRequest.getTableFieldWithValues().get(i).getType());
+                            LogUtil.info("execWithPreparedStatement param[" + (i + 1) + "](" + datasourceRequest.getTableFieldWithValues().get(i).getColumnTypeName() + "): " + datasourceRequest.getTableFieldWithValues().get(i).getValue());
+                        } catch (SQLException e) {
+                            throw new SQLException(e.getMessage() + ". VALUE: " + datasourceRequest.getTableFieldWithValues().get(i).getValue().toString() + " , TARGET TYPE: " + datasourceRequest.getTableFieldWithValues().get(i).getColumnTypeName());
                         }
-                        LogUtil.info("execWithPreparedStatement param[" + (i + 1) + "](" + datasourceRequest.getTableFieldWithValues().get(i).getColumnTypeName() + "): " + datasourceRequest.getTableFieldWithValues().get(i).getValue());
-                    } catch (SQLException e) {
-                        throw new SQLException(e.getMessage() + ". VALUE: " + datasourceRequest.getTableFieldWithValues().get(i).getValue().toString() + " , TARGET TYPE: " + datasourceRequest.getTableFieldWithValues().get(i).getColumnTypeName());
                     }
+                    resultSet = ((PreparedStatement) statement).executeQuery();
+                } else {
+                    resultSet = statement.executeQuery(datasourceRequest.getQuery());
                 }
-                resultSet = ((PreparedStatement) statement).executeQuery();
-            } else {
-                resultSet = statement.executeQuery(datasourceRequest.getQuery());
+                fieldList = getField(resultSet, datasourceRequest);
+                dataList = getData(resultSet, datasourceRequest);
             }
-            fieldList = getField(resultSet, datasourceRequest);
-            dataList = getData(resultSet, datasourceRequest);
         } catch (SQLException e) {
             DEException.throwException("SQL ERROR: " + e.getMessage());
         } catch (Exception e) {
@@ -829,6 +835,7 @@ public class CalciteProvider extends Provider {
                         break;
                 }
             }
+            PreviewExecution.acceptRow(row);
             list.add(row);
         }
         return list;
@@ -1260,6 +1267,7 @@ public class CalciteProvider extends Provider {
                             break;
                     }
                 }
+                PreviewExecution.acceptRow(row);
                 list.add(row);
             }
         } catch (Exception e) {

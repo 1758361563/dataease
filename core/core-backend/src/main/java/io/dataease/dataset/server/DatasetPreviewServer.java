@@ -10,6 +10,14 @@ import java.util.Map;
 @RequestMapping("datasetData")
 public class DatasetPreviewServer {
     @Resource private DatasetPreviewManage preview;
+    @PostMapping("previewFields")
+    public Object fields(@RequestBody DatasetPreviewRequest request) throws Exception {
+        return preview.fields(request);
+    }
+    @PostMapping("previewCancel")
+    public void cancel(@RequestBody Map<String,String> request) {
+        preview.cancel(request.get("queryId"));
+    }
     @PostMapping("previewQuery")
     public Map<String, Object> query(@RequestBody DatasetPreviewRequest request) throws Exception {
         return preview.query(request, false, false);

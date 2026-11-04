@@ -8,9 +8,41 @@ import io.dataease.engine.sql.SQLProvider;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class DatasetPreviewRequestTest {
-    @Test void detailPaginationOrdersProjectedAliasesRatherThanAggregateExpressions() {
+    @Test void newFieldsUseSourceNamesAndKeepDatabaseCommentsSeparate() {
+        var column = new io.dataease.extensions.datasource.dto.TableField();
+        column.setOriginName("财务渠道");
+        column.setName("财务渠道。本文件非空最长5个字符，预留到32");
+        column.setType("VARCHAR");
+        var data = new DatasetDataManage();
+        var field = data.transFields(List.of(column), true).getFirst();
+        assertEquals("财务渠道", field.getName());
+        assertEquals("财务渠道", field.getOriginName());
+        assertEquals(column.getName(), field.getDescription());
+        column.setName("财务渠道");
+        assertNull(data.transFields(List.of(column), true).getFirst().getDescription());
+        column.setName(null);
+        assertEquals("财务渠道", data.transFields(List.of(column), true).getFirst().getName());
+    }
+    @Test void metadataUsesColumnPermissionsWithoutBuildingOrRunningTheDataQuery() {
+        var data = new DatasetDataManage();
+        var permissions = mock(PermissionManage.class);
+        var sql = mock(DatasetSQLManage.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(data, "permissionManage", permissions);
+        org.springframework.test.util.ReflectionTestUtils.setField(data, "datasetSQLManage", sql);
+        var dto = new io.dataease.api.dataset.union.DatasetGroupInfoDTO();
+        dto.setId(1L);
+        var visible = field(0);
+        var hidden = field(2);
+        dto.setAllFields(List.of(visible, hidden));
+        when(permissions.filterColumnPermissions(eq(dto.getAllFields()), anyMap(), eq(1L), isNull()))
+                .thenReturn(List.of(visible));
+        assertEquals(List.of(visible), data.previewFields(dto));
+        verifyNoInteractions(sql);
+    }
+    @Test void detailPaginationDoesNotSortEveryProjectedColumn() {
         SQLMeta meta = new SQLMeta();
         meta.setTable(SQLObj.builder().tableName("fixture").tableAlias("t").build());
         meta.setXFields(List.of(
@@ -19,14 +51,15 @@ class DatasetPreviewRequestTest {
                 SQLObj.builder().id(2L).fieldName("NULL").fieldAlias("c1").build()));
         DatasetDataManage.applyPreviewOrder(meta, null, false);
         String sql = SQLProvider.createQuerySQLWithLimit(meta, false, false, false, 100, 100);
-        assertTrue(sql.contains("ORDER BY"));
+        assertFalse(sql.contains("ORDER BY"));
         assertTrue(sql.contains("c0"));
         assertFalse(sql.contains("SUM("));
-        assertEquals(2, meta.getXOrders().size());
-        assertTrue(meta.getXOrders().get(1).getOrderField().contains("c1"));
+        assertTrue(meta.getXOrders().isEmpty());
         DatasetDataManage.applyPreviewOrder(meta, null, true);
         assertTrue(meta.getXOrders().isEmpty());
         assertFalse(SQLProvider.createQuerySQL(meta, false, false, false).contains("ORDER BY"));
+        DatasetDataManage.applyPreviewOrder(meta, null, false, true);
+        assertEquals(2, meta.getXOrders().size(), "Export retains its previous deterministic sort");
     }
 
     @Test void configuredPreviewSortsStayOnProjectedColumnsAndUseSafeDirections() {

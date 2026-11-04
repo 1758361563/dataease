@@ -234,11 +234,45 @@ export const encodePreviewQuery = (query: PreviewQuery): PreviewQuery => {
 
 export const queryDatasetPreview = async (
   query: PreviewQuery,
-  mode: 'previewQuery' | 'previewCount' | 'previewValues' = 'previewQuery'
+  mode: 'previewQuery' | 'previewCount' | 'previewValues' | 'previewFields' = 'previewQuery',
+  signal?: AbortSignal
 ) => {
-  const res = await request.post({ url: `/datasetData/${mode}`, data: encodePreviewQuery(query) })
-  if (!res || res.code !== 0) throw new Error(res?.msg || '数据预览请求失败')
-  return res.data
+  // getRandomValues also works on the intranet's HTTP origin.
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 15) | 64
+  bytes[8] = (bytes[8] & 63) | 128
+  const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+  const queryId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(
+    16,
+    20
+  )}-${hex.slice(20)}`
+  const cancel = () => {
+    request
+      .post({ url: '/datasetData/previewCancel', data: { queryId }, timeout: 5000 })
+      .catch(() => {
+        /* JDBC query timeout remains the fallback if cancellation cannot reach the server. */
+      })
+  }
+  if (signal?.aborted) throw new Error('查询已取消')
+  signal?.addEventListener('abort', cancel, { once: true })
+  try {
+    const res = await request.post({
+      url: `/datasetData/${mode}`,
+      data: { ...encodePreviewQuery(query), queryId },
+      signal,
+      timeout: 20000
+    })
+    if (!res || res.code !== 0) throw new Error(res?.msg || '数据预览请求失败')
+    return res.data
+  } catch (e) {
+    cancel()
+    const message = typeof e === 'string' ? e : e instanceof Error ? e.message : '预览查询失败'
+    if (/timeout|timed out|超时/i.test(message))
+      throw new Error('查询超时，请缩小筛选范围或减少显示列')
+    throw new Error(message)
+  } finally {
+    signal?.removeEventListener('abort', cancel)
+  }
 }
 
 export const getDatasetPreview = async (id): Promise<FieldData> => {

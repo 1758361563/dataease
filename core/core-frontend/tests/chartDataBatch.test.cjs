@@ -12,12 +12,17 @@ function load(file, imports) {
 }
 const runtime = load('utils/dashboardParameterRuntime.ts', {})
 const pending = []
+const requests = []
+const editor = { dvInfo: {}, canvasViewInfo: {} }
 const api = load('api/chart.ts', {
   '@/utils/dashboardParameterRuntime': runtime,
-  '@/config/axios': { default: { post: () => new Promise(resolve => pending.push(resolve)) } },
+  '@/config/axios': { default: { post: request => {
+    requests.push(request)
+    return new Promise(resolve => pending.push(resolve))
+  } } },
   '@/utils/CalculateFields': { originNameHandleWithArr() {}, originNameHandleBackWithArr() {} },
   'lodash-es': { cloneDeep: value => JSON.parse(JSON.stringify(value)) },
-  '@/store/modules/data-visualization/dvMain': { dvMainStoreWithOut: () => ({ dvInfo: {}, canvasViewInfo: {} }) },
+  '@/store/modules/data-visualization/dvMain': { dvMainStoreWithOut: () => editor },
   '@/views/chart/components/js/chartFieldInstance': { ensurePivotDimensionInstances() {} }
 })
 const chart = { id: 'card', sceneId: 'dashboard', chartExtRequest: {} }
@@ -50,6 +55,28 @@ async function main() {
   const parameterRejected = assert.rejects(parameterRequest, { name: 'AbortError' })
   runtime.dashboardParameterRuntime.applied = { changed: '2026-11-01' }
   reply(7); await parameterRejected; parameterBatch.finish()
+  editor.dvInfo = { id: 'dashboard', resourceTable: 'snapshot', calculationConfig: '{"parameters":[]}' }
+  editor.canvasViewInfo = { card: chart }
+  for (const method of ['getFieldData', 'getDrillFieldData']) {
+    const input = { ...chart, resourceTable: 'core', data: { rows: ['keep'] } }
+    const before = JSON.stringify(input)
+    const index = pending.length
+    const result = api[method]({ fieldId: 'category', fieldType: 'xAxisExt', data: input })
+    assert.equal(requests[index].data.resourceTable, 'snapshot')
+    assert.equal(requests[index].data.sceneId, 'dashboard')
+    assert.equal(requests[index].data.calculationConfig, editor.dvInfo.calculationConfig)
+    assert.equal(requests[index].data.data, undefined)
+    assert.equal(JSON.stringify(input), before, 'candidate queries must not mutate the watched chart')
+    pending[index]({ code: 0, data: ['香水', '洗护发'] })
+    assert.deepEqual((await result).data, ['香水', '洗护发'])
+  }
+  // A chart outside the active editor must retain its published context.
+  const index = pending.length
+  const published = api.getFieldData({ fieldId: 'category', fieldType: 'xAxisExt', data: { id: 'other', resourceTable: 'core' } })
+  assert.equal(requests[index].data.resourceTable, 'core')
+  assert.equal(requests[index].data.calculationConfig, undefined)
+  pending[index]({ code: 0, data: [] }); await published
+  console.log('PASS sort and drill candidates carry editor context, preserve chart state and isolate published charts')
   console.log('PASS parallel period queries, stale batches, cleanup isolation, ordinary requests and parameter changes')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

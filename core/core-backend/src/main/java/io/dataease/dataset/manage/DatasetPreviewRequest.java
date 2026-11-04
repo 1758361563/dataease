@@ -12,6 +12,7 @@ import java.util.*;
 @Data
 public class DatasetPreviewRequest {
     private Long id;
+    private String queryId;
     private DatasetGroupInfoDTO draft;
     private List<Rule> rules = new ArrayList<>();
     private String logic = "and";

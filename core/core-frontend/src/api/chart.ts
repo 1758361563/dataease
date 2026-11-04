@@ -158,10 +158,9 @@ export const saveChart = async (data): Promise<IResponse> => {
 
 // 获取单个字段枚举值
 export const getFieldData = async ({ fieldId, fieldType, data }): Promise<IResponse> => {
-  delete data.data
-  attachDashboardParameters(data)
+  const chart = prepareFieldDataRequest(data)
   return request
-    .post({ url: `/chartData/getFieldData/${fieldId}/${fieldType}`, data })
+    .post({ url: `/chartData/getFieldData/${fieldId}/${fieldType}`, data: chart })
     .then(res => {
       return res
     })
@@ -169,11 +168,19 @@ export const getFieldData = async ({ fieldId, fieldType, data }): Promise<IRespo
 
 // 获取下钻字段枚举值
 export const getDrillFieldData = async ({ fieldId, data }): Promise<IResponse> => {
-  delete data.data
-  attachDashboardParameters(data)
-  return request.post({ url: `/chartData/getDrillFieldData/${fieldId}`, data }).then(res => {
+  const chart = prepareFieldDataRequest(data)
+  return request.post({ url: `/chartData/getDrillFieldData/${fieldId}`, data: chart }).then(res => {
     return res
   })
+}
+
+const prepareFieldDataRequest = data => {
+  const chart = cloneDeep(data)
+  delete chart.data
+  attachDashboardParameters(chart)
+  const editor = dvMainStoreWithOut()
+  attachDashboardEditorContext(chart, editor.dvInfo, editor.canvasViewInfo)
+  return chart
 }
 
 export const getChartDetail = async (id: string): Promise<IResponse> => {

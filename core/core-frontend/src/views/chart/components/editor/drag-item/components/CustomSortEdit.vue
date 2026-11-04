@@ -4,6 +4,7 @@ import draggable from 'vuedraggable'
 import { getFieldData, getDrillFieldData } from '@/api/chart'
 import { reactive, watch, ref } from 'vue'
 import { useCache } from '@/hooks/web/useCache'
+import { cloneDeep } from 'lodash-es'
 
 const { wsCache } = useCache()
 const loading = ref(false)
@@ -44,7 +45,7 @@ watch(
 
 const init = () => {
   loading.value = true
-  const chart = props.chart
+  const chart = cloneDeep(props.chart)
   if (!chart.chartExtRequest) {
     chart.chartExtRequest = {
       user: wsCache.get('user.uid')

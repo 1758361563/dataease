@@ -43,10 +43,46 @@ public class DatasetPreviewManage {
         if (!permissions.checkAuth(new BusiPerCheckDTO(id, auth))) DEException.throwException("没有数据集访问权限");
     }
 
+    public Object fields(DatasetPreviewRequest request) throws Exception {
+        return data.previewFields(resolve(request, false));
+    }
+    public void cancel(String queryId) {
+        PreviewExecution.cancel(queryId, io.dataease.utils.AuthUtils.getUser().getUserId());
+    }
     public Map<String, Object> query(DatasetPreviewRequest request, boolean countOnly, boolean values) throws Exception {
-        if (request.getPage() < 1 || request.getSize() < 1 || request.getSize() > 1000
+        long started = System.nanoTime();
+        try (PreviewExecution run = PreviewExecution.open(request.getQueryId(), io.dataease.utils.AuthUtils.getUser().getUserId(), countOnly, Math.min(201, request.getSize() + 1))) {
+            run.check();
+            Map<String,Object> result;
+            try {
+                result = execute(request, countOnly, values);
+            } catch (Exception e) {
+                run.check();
+                String message = Objects.toString(e.getMessage(), "").toLowerCase(Locale.ROOT);
+                if (message.contains("timeout") || message.contains("timed out")) {
+                    DEException.throwException("查询超时，请缩小筛选范围或减少显示列");
+                }
+                throw e;
+            }
+            run.check();
+            return result;
+        } catch (IllegalArgumentException e) {
+            DEException.throwException(e.getMessage());
+            return null;
+        } finally {
+            long elapsed = (System.nanoTime() - started) / 1_000_000;
+            if (elapsed >= 1000) org.slf4j.LoggerFactory.getLogger(getClass()).info(
+                    "Dataset preview finished: dataset={}, query={}, kind={}, elapsedMs={}",
+                    request.getId(), request.getQueryId(), countOnly ? "count" : values ? "values" : "rows", elapsed);
+        }
+    }
+    private Map<String, Object> execute(DatasetPreviewRequest request, boolean countOnly, boolean values) throws Exception {
+        if (request.getPage() < 1 || request.getSize() < 1 || request.getSize() > 200
                 || (long) request.getPage() * request.getSize() > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("分页参数无效，每页最多1000行");
+            throw new IllegalArgumentException("分页参数无效，每页最多200行");
+        }
+        if (!countOnly && (long)(request.getPage() - 1) * request.getSize() >= 10000) {
+            throw new IllegalArgumentException("预览已超过一万行，请按日期或编码筛选定位；完整数据可使用导出");
         }
         DatasetGroupInfoDTO dto = resolve(request, false);
         if (values) {
@@ -64,8 +100,18 @@ public class DatasetPreviewManage {
         }
         boolean checkPermissions = dto.getId() != null && dto.getId() > 0;
         Map<String, Object> result = data.previewDataWithLimit(dto, (request.getPage() - 1) * request.getSize(),
-                request.getSize(), checkPermissions, false, request, countOnly, values);
+                request.getSize() + (countOnly ? 0 : 1), checkPermissions, false, request, countOnly, values);
+        if (!countOnly) {
+            Map<String,Object> page = (Map<String,Object>) result.get("data");
+            List<?> rows = (List<?>) page.get("data");
+            boolean hasMore = rows.size() > request.getSize();
+            result.put("hasMore", hasMore);
+            result.put("orderConfigured", values || (dto.getSortFields() != null && dto.getSortFields().stream()
+                    .anyMatch(sort -> request.getColumnIds() == null || request.getColumnIds().contains(String.valueOf(sort.getId())))));
+            if (hasMore) page.put("data", new ArrayList<>(rows.subList(0, request.getSize())));
+        }
         result.remove("sql");
+        result.remove("allFields");
         return result;
     }
 

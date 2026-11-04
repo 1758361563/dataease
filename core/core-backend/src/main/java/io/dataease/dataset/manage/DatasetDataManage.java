@@ -207,7 +207,9 @@ public class DatasetDataManage {
     public List<DatasetTableFieldDTO> transFields(List<TableField> tableFields, boolean defaultStatus) {
         return tableFields.stream().map(ele -> {
             DatasetTableFieldDTO dto = new DatasetTableFieldDTO();
-            dto.setName(StringUtils.isNotEmpty(ele.getName()) ? ele.getName() : ele.getOriginName());
+            // Physical column names (or SQL output aliases) are the default display name.
+            // Providers put database comments in TableField.name; those belong in description.
+            dto.setName(StringUtils.isNotEmpty(ele.getOriginName()) ? ele.getOriginName() : ele.getName());
             dto.setOriginName(ele.getOriginName());
             dto.setChecked(defaultStatus);
             dto.setType(ele.getType());
@@ -216,7 +218,7 @@ public class DatasetDataManage {
             dto.setDeType(ObjectUtils.isEmpty(ele.getDeType()) ? deType : ele.getDeType());
             dto.setGroupType(FieldUtils.transDeType2DQ(dto.getDeType()));
             dto.setExtField(0);
-            dto.setDescription(StringUtils.isNotEmpty(ele.getName()) ? ele.getName() : null);
+            dto.setDescription(StringUtils.isNotEmpty(ele.getName()) && !Objects.equals(ele.getName(), ele.getOriginName()) ? ele.getName() : null);
             return dto;
         }).collect(Collectors.toList());
     }
@@ -307,7 +309,10 @@ public class DatasetDataManage {
         if (preview == null) {
             Order2SQLObj.getOrders(sqlMeta, datasetGroupInfoDTO.getSortFields(), fields, crossDs, dsMap, Utils.getParams(fields), null, pluginManage);
         } else {
-            applyPreviewOrder(sqlMeta, datasetGroupInfoDTO.getSortFields(), countOnly);
+            applyPreviewOrder(sqlMeta, datasetGroupInfoDTO.getSortFields(), countOnly, !PreviewExecution.active());
+            if (distinct && !countOnly && sqlMeta.getXFields() != null) {
+                sqlMeta.setXOrders(sqlMeta.getXFields().stream().map(column -> previewOrder(column, "asc")).toList());
+            }
         }
         if (countOnly) {
             String fullSql = provider.rebuildSQL(SQLProvider.createQuerySQL(sqlMeta, false, false, distinct), sqlMeta, crossDs, dsMap);
@@ -348,13 +353,26 @@ public class DatasetDataManage {
         return map;
     }
 
+    public List<DatasetTableFieldDTO> previewFields(DatasetGroupInfoDTO dto) {
+        List<DatasetTableFieldDTO> fields = dto.getAllFields();
+        if (dto.getId() != null && dto.getId() > 0) {
+            fields = permissionManage.filterColumnPermissions(fields, new HashMap<>(), dto.getId(), null);
+        }
+        return fields;
+    }
+
     /** Sort the actual projected values, never re-expand calculation expressions for a detail query. */
     static void applyPreviewOrder(SQLMeta meta, List<DeSortField> configured, boolean countOnly) {
+        applyPreviewOrder(meta, configured, countOnly, false);
+    }
+
+    static void applyPreviewOrder(SQLMeta meta, List<DeSortField> configured, boolean countOnly, boolean exportFallback) {
         List<SQLObj> orders = new ArrayList<>();
         if (!countOnly && meta.getXFields() != null) {
             List<SQLObj> columns = meta.getXFields();
             if (configured == null || configured.isEmpty()) {
-                for (SQLObj column : columns) orders.add(previewOrder(column, "asc"));
+                // No implicit all-column sort: it can scan/sort the entire wide table.
+                if (exportFallback) for (SQLObj column : columns) orders.add(previewOrder(column, "asc"));
             } else {
                 for (DeSortField sort : configured) {
                     columns.stream().filter(column -> Objects.equals(column.getId(), sort.getId())).findFirst()

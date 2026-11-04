@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fieldHelp } from './fieldNaming'
 import { computed, ref } from 'vue'
 import FieldMore from './form/FieldMore.vue'
 import DatasetIcon from './DatasetIcon.vue'
@@ -70,11 +71,7 @@ const toggle = (key: string) => {
         </button>
         <div v-show="!collapsed.includes(group.key) || !!search">
           <div v-for="field in group.fields" :key="field.id" class="library-row">
-            <button
-              class="library-field"
-              :title="[field.name, fieldOriginalName(field)].filter(Boolean).join(' · ')"
-              @click="emit('focus', field)"
-            >
+            <button class="library-field" :title="fieldHelp(field)" @click="emit('focus', field)">
               <span class="field-badge" :class="{ metric: group.key === 'q' }">{{
                 field.extField === 2
                   ? 'ƒ'
