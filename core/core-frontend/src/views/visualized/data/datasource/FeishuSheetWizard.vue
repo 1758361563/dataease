@@ -29,10 +29,9 @@ import {
   sheetSample,
   sheetPreview,
   saveSheet,
-  legacySheets,
   reconcileSheetRun
 } from '@/api/company/sheets'
-import type { SheetSource, Worksheet, SheetPreview, LegacySheet } from '@/api/company/sheets'
+import type { SheetSource, Worksheet, SheetPreview } from '@/api/company/sheets'
 
 const emit = defineEmits<{ (e: 'saved', task: DataUpdateDefinition): void }>()
 const visible = ref(false)
@@ -49,14 +48,11 @@ const state = ref<DataUpdateState>({
 })
 const connections = ref<Awaited<ReturnType<typeof sheetConnections>>>([])
 const worksheets = ref<Worksheet[]>([])
-const legacy = ref<LegacySheet[]>([])
-const takeover = ref(false)
 const headers = ref<string[]>([])
 const structure = ref<Structure | null>(null)
 const structureLoading = ref(false)
 const structureError = ref(false)
 let structureRequest = 0
-let structureTimer: ReturnType<typeof setTimeout> | undefined
 const targetKey = () => JSON.stringify([task.value.datasourceId, task.value.table])
 async function loadTargetStructure() {
   if (!visible.value || !task.value.datasourceId || !task.value.table.trim() || createTarget.value)
@@ -201,19 +197,13 @@ async function open(datasourceId = '', table = '', existing?: DataUpdateDefiniti
   ddl.value = ''
   ddlOperation.value = null
   ddlChecked.value = ''
-  takeover.value = false
   const match = /^0 (\d+) (\d+) \* \* \?$/.exec(task.value.cron)
   dailyAt.value = match ? `${match[2].padStart(2, '0')}:${match[1].padStart(2, '0')}` : '01:00'
   try {
-    const [next, apps, old] = await Promise.all([
-      fetchDataUpdates(),
-      sheetConnections(),
-      legacySheets()
-    ])
+    const [next, apps] = await Promise.all([fetchDataUpdates(), sheetConnections()])
     if (version !== epoch) return
     state.value = next
     connections.value = apps
-    legacy.value = old
     if (!source.value.connectionKey)
       source.value.connectionKey = apps.find(a => a.enabled)?.key || ''
     if (existing)
@@ -233,27 +223,6 @@ async function open(datasourceId = '', table = '', existing?: DataUpdateDefiniti
   } finally {
     if (version === epoch) busy.value = false
   }
-}
-function adopt(id: string) {
-  const item = legacy.value.find(s => s.id === id)
-  if (!item) return
-  source.value = {
-    ...newSheetSource(),
-    sourceId: item.id,
-    name: item.source_name,
-    connectionKey: source.value.connectionKey,
-    url: item.spreadsheet_url,
-    sheetId: item.sheet_id || '',
-    sheetName: item.sheet_name,
-    headerRow: item.header_row,
-    dataStartRow: item.data_start_row,
-    dataEndRow: item.data_end_row,
-    columnRange: item.column_range || ''
-  }
-  task.value.table = item.target_table
-  // A schema name is not a unique datasource identity; let the user select the connection explicitly.
-  takeover.value = false
-  worksheets.value = []
 }
 async function loadWorksheets() {
   await work(async () => {
@@ -346,7 +315,7 @@ async function save() {
       ElMessage.warning('请先预览并校验当前配置')
       return
     }
-    const result = await saveSheet(payload(), preview.value.token, takeover.value)
+    const result = await saveSheet(payload(), preview.value.token)
     task.value = result
     source.value = cloneDeep(result.sheet || source.value)
     saved.value = JSON.stringify(payload())
@@ -379,7 +348,7 @@ async function remove() {
   // Physical tables are retained when removing an update task.
   try {
     await ElMessageBox.confirm(
-      '删除同步任务后保留目标表数据。有关联下游或任务组时，请先调整依赖。',
+      '删除飞书同步任务及其连接配置，保留目标表数据。有关联下游或任务组时，请先调整依赖。',
       '删除同步任务',
       { type: 'warning' }
     )
@@ -440,18 +409,20 @@ watch(
   { flush: 'sync' }
 )
 watch(
-  () => [visible.value, step.value, task.value.datasourceId, task.value.table, createTarget.value],
+  () => [visible.value, step.value, createTarget.value],
   () => {
-    if (structureTimer) clearTimeout(structureTimer)
-    if (visible.value && step.value === 1 && !createTarget.value && !structure.value) {
-      structureTimer = setTimeout(() => {
-        void loadTargetStructure()
-      }, 350)
+    if (
+      visible.value &&
+      step.value === 1 &&
+      task.value.id &&
+      !createTarget.value &&
+      !structure.value
+    ) {
+      void loadTargetStructure()
     }
   }
 )
 onBeforeUnmount(() => {
-  if (structureTimer) clearTimeout(structureTimer)
   ++structureRequest
   ++epoch
   stop()
@@ -523,26 +494,8 @@ defineExpose({ open })
         <main class="step-content">
           <section v-show="step === 0">
             <el-form label-position="top" :disabled="busy">
-              <el-form-item v-if="!task.id && legacy.length" label="接管已有来源（可选）">
-                <el-select
-                  placeholder="新接入，或选择历史来源"
-                  :model-value="source.sourceId"
-                  @change="adopt"
-                  filterable
-                >
-                  <el-option
-                    v-for="item in legacy"
-                    :key="item.id"
-                    :label="`${item.source_name} · ${item.target_database}.${item.target_table}`"
-                    :value="item.id"
-                  />
-                </el-select>
-                <p class="field-note" v-if="source.sourceId">
-                  接管前先停用旧调度并等待在途执行结束。目标库表保留，计划在这里重新设置。
-                </p>
-              </el-form-item>
               <div class="form-grid">
-                <el-form-item label="来源名称" required
+                <el-form-item label="任务名称" required
                   ><el-input
                     v-model="source.name"
                     maxlength="128"
@@ -635,8 +588,9 @@ defineExpose({ open })
                 <el-form-item label="目标表" required
                   ><el-input
                     v-model="task.table"
+                    @change="loadTargetStructure"
                     :disabled="!!task.id || !!source.sourceId"
-                    placeholder="目标表名称"
+                    placeholder="数据库中的完整表名，区分大小写"
                 /></el-form-item>
               </div>
               <div class="inline-actions">
@@ -916,9 +870,6 @@ defineExpose({ open })
                   ></el-form-item
                 >
               </div>
-              <el-checkbox v-if="source.sourceId && !task.id" v-model="takeover"
-                >已停用旧调度，并确认原同步执行已结束</el-checkbox
-              >
             </el-form>
           </section>
         </main>

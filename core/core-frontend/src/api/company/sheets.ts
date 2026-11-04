@@ -39,23 +39,6 @@ export interface SheetPreview {
   errors: string[]
   token: string
 }
-export interface LegacySheet {
-  id: string
-  source_name: string
-  spreadsheet_url: string
-  sheet_id: string
-  sheet_name: string
-  header_row: number
-  data_start_row: number
-  data_end_row: number | null
-  column_range: string | null
-  target_database: string
-  target_table: string
-  enabled: number
-  schema_json: string
-  schedule_json: string | null
-  latest_success_at: number | null
-}
 const base = '/company/etl/data-update/sheets'
 export const reconcileSheetRun = (id: string) =>
   request.post({ url: `${base}/runs/${encodeURIComponent(id)}/reconcile` })
@@ -75,12 +58,9 @@ export const sheetPreview = async (data: DataUpdateDefinition): Promise<SheetPre
   (await request.post({ url: `${base}/preview`, data })).data
 export const saveSheet = async (
   definition: DataUpdateDefinition,
-  previewToken: string,
-  takeoverConfirmed: boolean
+  previewToken: string
 ): Promise<DataUpdateDefinition> =>
-  (await request.post({ url: base, data: { definition, previewToken, takeoverConfirmed } })).data
-export const legacySheets = async (): Promise<LegacySheet[]> =>
-  (await request.get({ url: `${base}/legacy` })).data
+  (await request.post({ url: base, data: { definition, previewToken } })).data
 export const newSheetSource = (): SheetSource => ({
   sourceId: null,
   name: '',

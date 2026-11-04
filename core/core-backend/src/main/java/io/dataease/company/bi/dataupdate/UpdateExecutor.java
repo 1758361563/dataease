@@ -91,6 +91,8 @@ public class UpdateExecutor {
                         require(columns.containsAll(task.keys()), "查询结果缺少配置的主键字段");
                         if (task.strategy() == UpdateDefinition.Strategy.WINDOW) require(columns.contains(task.windowColumn()), "查询结果缺少窗口字段");
                         String names = join(columns, dialect);
+                        Map<String,UpdateInspection.Column> destinationFields=new HashMap<>();
+                        targetShape.fields().forEach(field->destinationFields.put(field.name(),field));
                         String stageColumns = dialect == Dialect.SQLSERVER
                                 ? columns.stream().map(column -> "t." + dialect.quote(column)).collect(Collectors.joining(",")) : names;
                         command(target, dialect.createStage(stage, table, stageColumns), execution);
@@ -100,6 +102,7 @@ public class UpdateExecutor {
                                 execution.check(); require(++count <= task.maxRows(), "查询结果超过抽取行数上限");
                                 for (int i = 1; i <= columns.size(); i++) {
                                     Object value = rs.getObject(i);
+                                    UpdateInspection.validateDecimalValue(value,destinationFields.get(columns.get(i-1)),count);
                                     // LOB handles belong to the source connection; materialize before batching.
                                     if (value instanceof Clob clob) { require(clob.length() <= 16_777_216, "单字段超过 16 MB"); value = clob.getSubString(1, (int)clob.length()); clob.free(); }
                                     if (value instanceof Blob blob) { require(blob.length() <= 16_777_216, "单字段超过 16 MB"); value = blob.getBytes(1, (int)blob.length()); blob.free(); }

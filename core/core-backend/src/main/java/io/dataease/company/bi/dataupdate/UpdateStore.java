@@ -19,10 +19,9 @@ public class UpdateStore {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final JdbcTemplate db;
     private final TransactionTemplate tx;
-    public UpdateStore(DataSource source) {
-        db = new JdbcTemplate(source);
-        tx = new TransactionTemplate(new DataSourceTransactionManager(source));
-    }
+    @org.springframework.beans.factory.annotation.Autowired
+    public UpdateStore(DataSource source) { this(new JdbcTemplate(source),new TransactionTemplate(new DataSourceTransactionManager(source))); }
+    UpdateStore(JdbcTemplate db,TransactionTemplate tx) { this.db=db;this.tx=tx; }
     public static String json(Object value) {
         try { return JSON.writeValueAsString(value); } catch (Exception e) { throw new IllegalArgumentException("配置序列化失败", e); }
     }
@@ -126,7 +125,7 @@ public class UpdateStore {
             require(all().stream().noneMatch(task -> task.dependencies().contains(id)), "此任务被其他表依赖，请先移除依赖关系");
             require(db.queryForObject("SELECT COUNT(*) FROM company_data_update_run WHERE task_id=? AND status IN ('QUEUED','RUNNING')", Integer.class, id) == 0, "请先取消当前更新再删除配置");
             audit.run(); db.update("DELETE FROM company_data_update_task WHERE id=?", id);
-            db.update("UPDATE company_feishu_source SET managed_task_id=NULL,enabled=0,updated_at=? WHERE managed_task_id=?",System.currentTimeMillis(),id);
+            db.update("DELETE FROM company_feishu_source WHERE managed_task_id=?",id);
         });
     }
     public String skipped(UpdateDefinition task, String key, LocalDate date, String message) {

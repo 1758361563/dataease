@@ -100,7 +100,7 @@ public class SheetController {
         }
         return Map.of("headers",headers,"rows",bounded(converted),"target",target,"errors",errors,"token",token,"sampled",true,"sheetRows",page.sheetRows());
     }
-    public record Save(UpdateDefinition definition,String previewToken,boolean takeoverConfirmed) { }
+    public record Save(UpdateDefinition definition,String previewToken) { }
     @PostMapping public UpdateDefinition save(@RequestBody Save body,HttpServletRequest request)throws Exception {
         long user=admin();var task=normalize(body.definition());task.validate();
         require(!task.enabled() || runtime.owner()!=null,"启用调度前请配置实例标识");
@@ -115,18 +115,17 @@ public class SheetController {
                 var previous=store.get(task.id());
                 require(previous.mode()==UpdateDefinition.Mode.FEISHU && previous.sheet()!=null && Objects.equals(previous.sheet().sourceId(),sourceId),"已保存任务不能更换来源 ID");
             }
-            require(db.queryForObject("SELECT COUNT(*) FROM company_feishu_source WHERE source_name=? AND id<>?",Integer.class,task.sheet().name(),sourceId==null?"0":sourceId)==0,"来源名称已存在，请选择接管或使用其他名称");
+            require(db.queryForObject("SELECT COUNT(*) FROM company_feishu_source WHERE source_name=? AND id<>?",Integer.class,task.sheet().name(),sourceId==null?"0":sourceId)==0,"任务名称已被使用，请在数据更新列表编辑已有任务；旧同步服务占用的名称请使用其他名称");
             if(existing) {
                 var rows=db.queryForList("SELECT * FROM company_feishu_source WHERE id=? FOR UPDATE",sourceId);
-                require(rows.size()==1,"历史来源不存在");var old=rows.getFirst();
+                require(rows.size()==1,"任务的飞书连接配置不存在");var old=rows.getFirst();
                 String linked=Objects.toString(old.get("managed_task_id"),"");
-                require(linked.isEmpty()?body.takeoverConfirmed() && task.id()==null:linked.equals(task.id()),"接管前请停止旧调度并确认在途同步已结束");
+                require(task.id()!=null && linked.equals(task.id()),"飞书连接配置必须属于当前同步任务");
                 require(Objects.toString(old.get("target_database"),"").equals(task.schema()) && Objects.toString(old.get("target_table"),"").equals(task.table()),"已有来源的目标库表不能改变");
-                if(linked.isEmpty())require(((Number)old.get("enabled")).intValue()==0,"请先停用旧来源调度，再执行接管");
             } else sourceId=Long.toString(IDUtils.snowID());
             require(task.id()==null || store.get(task.id()).mode()==UpdateDefinition.Mode.FEISHU,"不能将 SQL 任务替换为飞书任务");
             String id=sourceId; var source=task.sheet().withId(id);
-            var result=store.save(task.withSheet(source),runtime.owner(),()->audit.record(CompanyAdminAuditContext.from(request,user),CompanyAuditActionType.DATA_UPDATE_SAVE,"FEISHU_SOURCE",null,null,UpdateStore.json(Map.of("sourceId",id,"table",task.table(),"takeover",body.takeoverConfirmed()))));
+            var result=store.save(task.withSheet(source),runtime.owner(),()->audit.record(CompanyAdminAuditContext.from(request,user),CompanyAuditActionType.DATA_UPDATE_SAVE,"FEISHU_SOURCE",null,null,UpdateStore.json(Map.of("sourceId",id,"table",task.table()))));
             long now=System.currentTimeMillis();
             if(!existing) db.update("INSERT INTO company_feishu_source(id,source_name,spreadsheet_url,sheet_id,sheet_name,header_row,data_start_row,target_database,target_table,enabled,schema_json,created_at,created_by,updated_at) VALUES (?,?,?,?,?,?,?,?,?,0,?,?,?,?)",
                     id,source.name(),source.url(),source.sheetId(),source.sheetName(),source.headerRow(),source.dataStartRow(),task.schema(),task.table(),UpdateStore.json(source.fields()),now,user,now);
@@ -135,13 +134,6 @@ public class SheetController {
             return result;
         });
         tickets.remove(body.previewToken());return saved;
-    }
-    @GetMapping("/legacy") public List<Map<String,Object>> legacy() {
-        admin();return db.query("SELECT id,source_name,spreadsheet_url,sheet_id,sheet_name,header_row,data_start_row,data_end_row,column_range,target_database,target_table,enabled,schema_json,schedule_json,latest_success_at FROM company_feishu_source WHERE managed_task_id IS NULL ORDER BY source_name",(rs,n)->{
-            Map<String,Object> row=new LinkedHashMap<>();
-            for(int i=1;i<=rs.getMetaData().getColumnCount();i++)row.put(rs.getMetaData().getColumnLabel(i),rs.getObject(i));
-            row.put("id",rs.getString("id"));return row;
-        });
     }
     @PostMapping("/runs/{run}/reconcile") public void reconcile(@PathVariable String run,HttpServletRequest request)throws Exception {
         long user=admin();

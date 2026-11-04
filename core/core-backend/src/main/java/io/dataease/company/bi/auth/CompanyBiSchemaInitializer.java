@@ -108,6 +108,42 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
             ensureFeishuExecutionMode(conn);
             ensureFeishuDeliveryLane(conn);
             ensureSheetManagement(conn);
+            removeDeletedSheetTaskConfigs(conn);
+        }
+    }
+
+    private void removeDeletedSheetTaskConfigs(Connection conn) throws Exception {
+        // Only the old managed-task deletion path leaves these markers. Standalone
+        // sources created by the migration workbench do not have source_json.
+        boolean autoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("INSERT IGNORE INTO company_data_update_guard(id) VALUES (1)");
+            try (ResultSet lock = stmt.executeQuery("SELECT id FROM company_data_update_guard WHERE id=1 FOR UPDATE")) {
+                lock.next();
+            }
+            int removed = stmt.executeUpdate("""
+                    DELETE s FROM company_feishu_source s
+                    WHERE s.managed_task_id IS NULL AND s.enabled=0
+                      AND s.source_json IS NOT NULL AND s.target_datasource_id IS NOT NULL
+                      AND s.schedule_json IS NULL
+                      AND NOT EXISTS (
+                        SELECT 1 FROM company_data_update_task t
+                        WHERE JSON_UNQUOTE(JSON_EXTRACT(t.definition, '$.sheet.sourceId'))=CAST(s.id AS CHAR)
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1 FROM company_data_update_run r
+                        WHERE r.status IN ('QUEUED','RUNNING','NEEDS_REVIEW')
+                          AND JSON_UNQUOTE(JSON_EXTRACT(r.definition, '$.sheet.sourceId'))=CAST(s.id AS CHAR)
+                      )
+                    """);
+            conn.commit();
+            if (removed > 0) LogUtil.info("Removed deleted Feishu task configurations: " + removed);
+        } catch (Exception e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(autoCommit);
         }
     }
 

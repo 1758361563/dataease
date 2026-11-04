@@ -75,6 +75,11 @@ public class UpdateInspection {
                                     else {StringBuilder text=new StringBuilder();char[] buffer=new char[128];int length;while(text.length()<512&&(length=reader.read(buffer,0,Math.min(buffer.length,512-text.length())))!=-1)text.append(buffer,0,length);value=text.toString();}
                                 }
                             } else { String string=rs.getString(i); value=string==null?null:string.substring(0,Math.min(512,string.length())); }
+                            Column destination=target.columns().stream().filter(c->c.name().equals(fields.get(row.size()).name())).findFirst().orElse(null);
+                            if(destination!=null && decimal(destination.jdbcType())) {
+                                try { validateDecimalValue(rs.getObject(i),destination,rows.size()+1); }
+                                catch(UpdateDefinition.ValidationException e) { errors.add(e.getMessage()); }
+                            }
                             size+=value==null?4:value.toString().length()*6;
                             require(size<=131072,"预览响应超过 128 KB，请减少查询字段"); row.add(value);
                         }
@@ -95,7 +100,10 @@ public class UpdateInspection {
             if(destination==null) { errors.add("目标缺少字段："+column.name()); continue; }
             if(column.nullable()&&!destination.nullable()) warnings.add(column.name()+"：源字段可能为空，运行时将校验目标约束");
             if(text(column.jdbcType())&&text(destination.jdbcType())&&destination.precision()>0&&column.precision()>destination.precision()) errors.add(column.name()+"：源字符串长度超过目标容量");
-            if(decimal(column.jdbcType())&&decimal(destination.jdbcType()) && (column.scale()>destination.scale() || column.precision()-column.scale()>destination.precision()-destination.scale())) errors.add(column.name()+"：目标 decimal 精度不足");
+            if(decimal(column.jdbcType())&&decimal(destination.jdbcType())) {
+                if(column.scale()>destination.scale()) errors.add(column.name()+"：目标 decimal 小数位不足");
+                if(column.precision()-column.scale()>destination.precision()-destination.scale()) warnings.add(column.name()+"：查询声明的整数位超过目标容量，运行时按实际数值校验");
+            }
             if(column.jdbcType()!=destination.jdbcType()) warnings.add(column.name()+"："+column.type()+" → "+destination.type()+"，请确认类型转换");
             if(text(column.jdbcType())&&(numeric(destination.jdbcType())||temporal(destination.jdbcType()))) errors.add(column.name()+"：请在 SELECT 中显式转换为目标数值或日期类型");
             if(temporal(column.jdbcType())&&numeric(destination.jdbcType())||numeric(column.jdbcType())&&temporal(destination.jdbcType())) errors.add(column.name()+"：数值与日期类型不兼容");
@@ -104,6 +112,16 @@ public class UpdateInspection {
         for(Column column:target) if(!seen.contains(column.name())&&!column.nullable()&&column.defaultValue()==null&&!column.generated()) errors.add("缺少必填目标字段："+column.name());
         for(String key:task.keys()) if(!seen.contains(key)) errors.add("缺少主键字段："+key);
         if(task.strategy()==UpdateDefinition.Strategy.WINDOW&&!seen.contains(task.windowColumn())) errors.add("缺少窗口字段："+task.windowColumn());
+    }
+    static void validateDecimalValue(Object value,Column destination,long row) {
+        if(value==null || destination==null || !decimal(destination.jdbcType()) || destination.precision()<=0)return;
+        try {
+            var number=(value instanceof java.math.BigDecimal n?n:new java.math.BigDecimal(value.toString())).stripTrailingZeros();
+            require(Math.max(0,number.scale())<=destination.scale()
+                    && (number.signum()==0?0:Math.max(0,number.precision()-number.scale()))<=destination.precision()-destination.scale(),"数值超出目标精度");
+        } catch(IllegalArgumentException e) {
+            throw new UpdateDefinition.ValidationException("第 "+row+" 行「"+destination.name()+"」实际数值无法精确写入 DECIMAL("+destination.precision()+","+destination.scale()+")");
+        }
     }
     private static boolean text(int type) { return Set.of(Types.CHAR,Types.VARCHAR,Types.NCHAR,Types.NVARCHAR).contains(type); }
     private static boolean decimal(int type) { return type==Types.DECIMAL||type==Types.NUMERIC; }

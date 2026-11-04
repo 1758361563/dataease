@@ -119,11 +119,10 @@ assert.deepEqual(globalThis.updateRequests.at(-1).data, {
   connectionKey: 'app-key',
   url: 'https://example.feishu.cn/sheets/token'
 })
-await sheets.saveSheet({ ...task, mode: 'FEISHU', sheet }, 'preview-token', true)
+await sheets.saveSheet({ ...task, mode: 'FEISHU', sheet }, 'preview-token')
 assert.deepEqual(globalThis.updateRequests.at(-1).data, {
   definition: { ...task, mode: 'FEISHU', sheet },
-  previewToken: 'preview-token',
-  takeoverConfirmed: true
+  previewToken: 'preview-token'
 })
 await sheets.reconcileSheetRun('run/a')
 assert.ok(globalThis.updateRequests.at(-1).url.endsWith('/runs/run%2Fa/reconcile'))
