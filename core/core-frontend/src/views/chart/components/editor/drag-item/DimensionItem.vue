@@ -174,7 +174,14 @@ const beforeDateStyle = type => {
 
 const datePattern = param => {
   if (
-    ['month_name', 'month_number', 'week_year', 'week_range', 'weekday_name'].includes(param.type)
+    [
+      'month_name',
+      'month_number',
+      'week_year',
+      'week_range',
+      'weekday_name',
+      'weekday_date_name'
+    ].includes(param.type)
   )
     item.value.dateShowFormat = param.type
   else {
@@ -192,7 +199,8 @@ const beforeDatePattern = type => {
 }
 const dateFormatLabel = (pattern?: string) => {
   pattern = pattern ?? item.value.dateShowFormat ?? item.value.datePattern
-  if (item.value.dateStyle === 'y_M_d' && pattern === 'weekday_name') return '星期一'
+  if (item.value.dateStyle === 'y_M_d' && pattern === 'weekday_name') return '星期几分组'
+  if (item.value.dateStyle === 'y_M_d' && pattern === 'weekday_date_name') return '日期显示星期'
   if (item.value.dateStyle === 'y_W')
     return item.value.dateShowFormat === 'week_range' ? '日期区间' : '2026年第42周'
   if (
@@ -725,9 +733,12 @@ onMounted(() => {
                       class="sub-menu-content"
                       :class="
                         'date_sub' === item.datePattern &&
-                        !['month_name', 'month_number', 'weekday_name'].includes(
-                          item.dateShowFormat
-                        )
+                        ![
+                          'month_name',
+                          'month_number',
+                          'weekday_name',
+                          'weekday_date_name'
+                        ].includes(item.dateShowFormat)
                           ? 'content-active'
                           : ''
                       "
@@ -738,9 +749,12 @@ onMounted(() => {
                           name="icon_done_outlined"
                           v-if="
                             'date_sub' === item.datePattern &&
-                            !['month_name', 'month_number', 'weekday_name'].includes(
-                              item.dateShowFormat
-                            )
+                            ![
+                              'month_name',
+                              'month_number',
+                              'weekday_name',
+                              'weekday_date_name'
+                            ].includes(item.dateShowFormat)
                           "
                           ><icon_done_outlined class="svg-icon"
                         /></Icon>
@@ -756,9 +770,12 @@ onMounted(() => {
                       class="sub-menu-content"
                       :class="
                         'date_split' === item.datePattern &&
-                        !['month_name', 'month_number', 'weekday_name'].includes(
-                          item.dateShowFormat
-                        )
+                        ![
+                          'month_name',
+                          'month_number',
+                          'weekday_name',
+                          'weekday_date_name'
+                        ].includes(item.dateShowFormat)
                           ? 'content-active'
                           : ''
                       "
@@ -769,9 +786,12 @@ onMounted(() => {
                           name="icon_done_outlined"
                           v-if="
                             'date_split' === item.datePattern &&
-                            !['month_name', 'month_number', 'weekday_name'].includes(
-                              item.dateShowFormat
-                            )
+                            ![
+                              'month_name',
+                              'month_number',
+                              'weekday_name',
+                              'weekday_date_name'
+                            ].includes(item.dateShowFormat)
                           "
                           ><icon_done_outlined class="svg-icon"
                         /></Icon>
@@ -790,9 +810,25 @@ onMounted(() => {
                       class="sub-menu-content"
                       :class="item.dateShowFormat === 'weekday_name' ? 'content-active' : ''"
                     >
-                      星期名称（星期一）
+                      星期几（按周一至周日分组）
                       <el-icon class="sub-menu-content--icon"
                         ><Icon v-if="item.dateShowFormat === 'weekday_name'"
+                          ><icon_done_outlined class="svg-icon" /></Icon
+                      ></el-icon>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="item.dateStyle === 'y_M_d' && chart.type === 'table-pivot'"
+                    :command="beforeDatePattern('weekday_date_name')"
+                    class="menu-item-padding"
+                  >
+                    <span
+                      class="sub-menu-content"
+                      :class="item.dateShowFormat === 'weekday_date_name' ? 'content-active' : ''"
+                    >
+                      按具体日期分组（仅显示星期名称）
+                      <el-icon class="sub-menu-content--icon"
+                        ><Icon v-if="item.dateShowFormat === 'weekday_date_name'"
                           ><icon_done_outlined class="svg-icon" /></Icon
                       ></el-icon>
                     </span>

@@ -46,7 +46,9 @@ import { pivotHeaderFields } from './pivotHeaderLayout'
 import { isScopedPercent, pivotPercentValue } from './pivotPercent'
 import { fitPivotTotalColumns } from './pivotTotalWidth'
 import { expandMeasureFirstTotals } from './pivotMeasureTotals'
+import { findPivotTotalConfig } from './pivotTotalIdentity'
 import { configurePivotDisplayScope, fitSummaryOnlyHeader } from './pivotDisplayScope'
+import { normalizePivotSubtotalDimensions } from './pivotSubtotals'
 import {
   applyPivotAppearance,
   migratePivotAppearance,
@@ -56,9 +58,7 @@ import {
 function mapTotalCfg(cfgList = [], yAxis: Axis[] = []) {
   const map = {}
   yAxis.forEach(y => {
-    const cfg = cfgList.find(
-      n => n.dataeaseName === resultKey(y) || n.dataeaseName === y.dataeaseName
-    )
+    const cfg = findPivotTotalConfig(cfgList, y)
     if (cfg) {
       map[resultKey(y)] = cfg
     }
@@ -293,10 +293,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
     if (globalRowSort) {
       tableTotal.row.showSubTotals = false
     }
-    if (!tableTotal.row.subTotalsDimensionsNew || tableTotal.row.subTotalsDimensions == undefined) {
-      // 只使用真实行维度。$$extra$$ 是 S2 指标名，不能作为小计维度。
-      tableTotal.row.subTotalsDimensions = r
-    }
+    tableTotal.row.subTotalsDimensions = normalizePivotSubtotalDimensions(chart, tableTotal.row)
     tableTotal.col.subTotalsDimensions = c
 
     // 自定义总计小计
@@ -858,10 +855,21 @@ export class TablePivot extends S2ChartView<PivotSheet> {
   }
   private configSortParams(chart: Chart, newData: []) {
     // 行列分开处理，先行后列，样式设置中汇总总计排序的优先级最高，剩下的按照字段的排序优先级设置进行排序
-    // Shared and legacy fields can omit sort; missing settings mean no sorting.
+    // Shared and legacy fields can omit sort; weekday dimensions default to calendar order.
     // Normalize copies so rendering does not rewrite the saved chart definition.
     const [rowFields, columnFields, valueFields] = [chart.xAxis, chart.xAxisExt, chart.yAxis].map(
-      fields => fields.map(field => ({ ...field, sort: field.sort || 'none' }))
+      fields =>
+        fields.map(field => ({
+          ...field,
+          sort:
+            field.deType === 1 &&
+            field.dateStyle === 'y_M_d' &&
+            field.dateShowFormat === 'weekday_name'
+              ? !field.sort || field.sort === 'none'
+                ? 'asc'
+                : field.sort
+              : field.sort || 'none'
+        }))
     )
     const [r, c, v] = [rowFields, columnFields, valueFields].map(arr => arr.map(i => resultKey(i)))
     const { tableTotal } = parseJson(chart.customAttr)

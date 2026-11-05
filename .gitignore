@@ -67,6 +67,7 @@ core/core-frontend/src/assets/fsSvg.html
 /core/core-backend/src/test/java/io/dataease/chart/utils/*
 !/core/core-backend/src/test/java/io/dataease/chart/utils/PivotPercentCalculatorTest.java
 !/core/core-backend/src/test/java/io/dataease/chart/utils/PivotWeekSqlTest.java
+!/core/core-backend/src/test/java/io/dataease/chart/utils/PivotCustomTotalsTest.java
 !/core/core-backend/src/main/java/io/dataease/visualization/calculation/
 !/core/core-backend/src/main/java/io/dataease/visualization/calculation/*.java
 !/core/core-backend/src/main/java/io/dataease/visualization/manage/TemplateDerivedFieldRebind.java

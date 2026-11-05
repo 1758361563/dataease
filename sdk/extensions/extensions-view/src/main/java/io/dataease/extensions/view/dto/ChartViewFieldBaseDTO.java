@@ -27,7 +27,7 @@ public class ChartViewFieldBaseDTO extends DatasetTableFieldDTO implements Seria
     private String datePattern;
 
     /**
-     * 日期显示格式，仅前端图表格式化
+     * 日期显示格式；weekday_name同时用于按星期几聚合
      */
     private String dateShowFormat;
 

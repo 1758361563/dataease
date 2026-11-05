@@ -5,8 +5,14 @@ import {
   DEFAULT_BASIC_STYLE,
   DEFAULT_TABLE_TOTAL
 } from '@/views/chart/components/editor/util/chart'
-import { cloneDeep, defaultsDeep, find, includes } from 'lodash-es'
+import { cloneDeep, defaultsDeep, find } from 'lodash-es'
 import CustomAggrEdit from './CustomAggrEdit.vue'
+import { resultKey } from '@/views/chart/components/js/chartFieldInstance'
+import { normalizePivotTotalConfigs } from '@/views/chart/components/js/panel/charts/table/pivotTotalIdentity'
+import {
+  getPivotSubtotalOptions,
+  normalizePivotSubtotalDimensions
+} from '@/views/chart/components/js/panel/charts/table/pivotSubtotals'
 
 const { t } = useI18n()
 
@@ -27,6 +33,7 @@ watch(
   [
     () => props.chart.customAttr.tableTotal,
     () => props.chart.xAxis,
+    () => props.chart.xAxisExt,
     () => props.chart.yAxis,
     () => props.chart.customAttr.basicStyle
   ],
@@ -95,21 +102,12 @@ function changeRowSubTableTotal() {
 }
 
 const initSubTotalDimensionList = () => {
-  const list = []
-  if (props.chart.xAxis.length >= 2) {
-    for (let i = 0; i < props.chart.xAxis.length - 1; i++) {
-      //排除最后一个
-      const old = includes(
-        state.tableTotalForm.row.subTotalsDimensions,
-        props.chart.xAxis[i].dataeaseName
-      )
-      list.push({
-        displayName: props.chart.xAxis[i].name,
-        name: props.chart.xAxis[i].dataeaseName,
-        checked: !!state.tableTotalForm.row.subTotalsDimensionsNew ? old : true
-      })
-    }
-  }
+  const selected = new Set(normalizePivotSubtotalDimensions(props.chart, state.tableTotalForm.row))
+  const list = getPivotSubtotalOptions(props.chart).map(option => ({
+    ...option,
+    checked: selected.has(option.name)
+  }))
+  state.tableTotalForm.row.subTotalsDimensions = [...selected]
   state.subTotalDimensionList = list
 
   const existItem = find(
@@ -221,35 +219,7 @@ const changeTotalAggr = (totalItem, totals, colOrNum) => {
   changeTableTotal(colOrNum)
 }
 const setupTotalCfg = (totalCfg, axis) => {
-  if (!totalCfg.length) {
-    axis.forEach(i => {
-      totalCfg.push({
-        dataeaseName: i.dataeaseName,
-        aggregation: 'SUM',
-        label: i.chartShowName ?? i.name
-      })
-    })
-    return
-  }
-  if (!axis.length) {
-    totalCfg.splice(0, totalCfg.length)
-    return
-  }
-  const cfgMap = totalCfg.reduce((p, n) => {
-    p[n.dataeaseName] = n
-    return p
-  }, {})
-  totalCfg.splice(0, totalCfg.length)
-  axis.forEach(i => {
-    totalCfg.push({
-      dataeaseName: i.dataeaseName,
-      aggregation: cfgMap[i.dataeaseName] ? cfgMap[i.dataeaseName].aggregation : 'SUM',
-      originName: cfgMap[i.dataeaseName] ? cfgMap[i.dataeaseName].originName : '',
-      label: cfgMap[i.dataeaseName]?.label
-        ? cfgMap[i.dataeaseName].label
-        : i.chartShowName ?? i.name
-    })
-  })
+  totalCfg.splice(0, totalCfg.length, ...normalizePivotTotalConfigs(totalCfg, axis))
 }
 const quota = inject('quota', () => [])
 const dimension = inject('dimension', () => [])
@@ -271,7 +241,7 @@ const closeEditCalc = () => {
   editCalcField.value = false
 }
 const confirmEditCalc = () => {
-  calcEdit.value.setFieldForm()
+  if (!calcEdit.value.setFieldForm()) return
   const obj = cloneDeep(calcEdit.value.fieldForm)
   state.totalCfg?.forEach(item => {
     if (item.dataeaseName === obj.dataeaseName) {
@@ -363,9 +333,9 @@ onMounted(() => {
           >
             <el-option
               v-for="option in chart.yAxis"
-              :key="option.dataeaseName"
-              :label="option.name"
-              :value="option.dataeaseName"
+              :key="resultKey(option)"
+              :label="option.chartShowName ?? option.name"
+              :value="resultKey(option)"
             />
           </el-select>
         </el-col>
@@ -562,9 +532,9 @@ onMounted(() => {
           >
             <el-option
               v-for="option in chart.yAxis"
-              :key="option.dataeaseName"
-              :label="option.name"
-              :value="option.dataeaseName"
+              :key="resultKey(option)"
+              :label="option.chartShowName ?? option.name"
+              :value="resultKey(option)"
             />
           </el-select>
         </el-col>
@@ -670,9 +640,9 @@ onMounted(() => {
           >
             <el-option
               v-for="option in chart.yAxis"
-              :key="option.dataeaseName"
-              :label="option.name"
-              :value="option.dataeaseName"
+              :key="resultKey(option)"
+              :label="option.chartShowName ?? option.name"
+              :value="resultKey(option)"
             />
           </el-select>
         </el-col>
@@ -832,9 +802,9 @@ onMounted(() => {
           >
             <el-option
               v-for="option in chart.yAxis"
-              :key="option.dataeaseName"
-              :label="option.name"
-              :value="option.dataeaseName"
+              :key="resultKey(option)"
+              :label="option.chartShowName ?? option.name"
+              :value="resultKey(option)"
             />
           </el-select>
         </el-col>

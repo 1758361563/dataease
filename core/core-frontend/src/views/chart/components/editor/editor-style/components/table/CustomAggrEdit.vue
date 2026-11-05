@@ -11,6 +11,8 @@ import { getFunction } from '@/api/dataset'
 import { fieldType } from '@/utils/attr'
 import { cloneDeep } from 'lodash-es'
 import { iconFieldMap } from '@/components/icon-group/field-list'
+import { ElMessage } from 'element-plus-secondary'
+import { translateTotalFieldReferences } from './customTotalExpression'
 
 export interface CalcFieldType {
   id?: string
@@ -70,28 +72,15 @@ const dialogFormVisible = ref(false)
 const fieldForm = reactive<CalcFieldType>({ ...(defaultForm as CalcFieldType) })
 
 const setFieldForm = () => {
-  const str = mirror.value.state.doc.toString()
-  const name2Auto = []
-  fieldForm.originName = setNameIdTrans('name', 'id', str, name2Auto)
-}
-
-const setNameIdTrans = (from, to, originName, name2Auto?: string[]) => {
-  let name2Id = originName
-  const nameIdMap = [...quotaDataList].reduce((pre, next) => {
-    pre[next[from]] = next[to]
-    return pre
-  }, {})
-  const on = originName.match(/\[(.+?)\]/g) || []
-  if (on) {
-    on.forEach(itm => {
-      const ele = itm.slice(1, -1)
-      if (name2Auto) {
-        name2Auto.push(nameIdMap[ele])
-      }
-      name2Id = name2Id.replace(`[${ele}]`, `[${nameIdMap[ele]}]`)
-    })
+  try {
+    const str = mirror.value.state.doc.toString()
+    if (!str.trim()) throw new Error('请输入自定义聚合公式')
+    fieldForm.originName = translateTotalFieldReferences(str, quotaDataList, 'name', 'id')
+    return true
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '自定义聚合公式无效')
+    return false
   }
-  return name2Id
 }
 
 let quotaDataList = []
@@ -115,7 +104,7 @@ const initEdit = (obj, quotaData) => {
       changes: {
         from: 0,
         to: mirror.value.viewState.state.doc.length,
-        insert: setNameIdTrans('id', 'name', obj.originName)
+        insert: translateTotalFieldReferences(obj.originName, quotaDataList, 'id', 'name')
       }
     })
   })
@@ -202,14 +191,19 @@ const delParamsToQuota = () => {
   const [o] = fieldForm.params
   fieldForm.params = []
   const str = mirror.value.state.doc.toString()
-  const name2Auto = []
-  fieldForm.originName = setNameIdTrans('name', 'id', str, name2Auto).replaceAll(`[${o.id}]`, '')
+  fieldForm.originName = translateTotalFieldReferences(
+    str,
+    quotaDataList,
+    'name',
+    'id',
+    false
+  ).replaceAll(`[${o.id}]`, '')
   state.quotaData = state.quotaData.filter(ele => ele.id !== o.id)
   mirror.value.dispatch({
     changes: {
       from: 0,
       to: mirror.value.viewState.state.doc.length,
-      insert: setNameIdTrans('id', 'name', fieldForm.originName)
+      insert: translateTotalFieldReferences(fieldForm.originName, quotaDataList, 'id', 'name')
     }
   })
 }

@@ -95,8 +95,8 @@ public class Dimension2SQLObj {
     }
 
     public static SQLObj getXFields(ChartViewFieldDTO x, String originField, String fieldAlias, boolean isCross) {
-        if ("y_W".equals(x.getDateStyle()) && Objects.equals(x.getDeType(), DeTypeConstants.DE_TIME)) {
-            // Group by the ISO week's Monday, independently of the presentation format.
+        boolean weekday = "y_M_d".equals(x.getDateStyle()) && "weekday_name".equals(x.getDateShowFormat());
+        if (("y_W".equals(x.getDateStyle()) || weekday) && Objects.equals(x.getDeType(), DeTypeConstants.DE_TIME)) {
             String date = originField;
             if (!Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_TIME)) {
                 if (Objects.equals(x.getDeExtractType(), DeTypeConstants.DE_STRING)
@@ -113,6 +113,14 @@ public class Dimension2SQLObj {
                 date = String.format(SQLConstants.DE_STR_TO_DATE,
                         String.format(SQLConstants.CONCAT, originField, "' 00:00:00'"), SQLConstants.DEFAULT_DATE_FORMAT);
             }
+            if (weekday) {
+                // Monday=1 .. Sunday=7 is the grouping key, not a formatted calendar date.
+                // Keep string dimension values for the pivot's existing sorting pipeline.
+                return SQLObj.builder().fieldAlias(fieldAlias).fieldName(
+                        "CONCAT('', MOD(DAYOFWEEK(" + date + ") + 5, 7) + 1)"
+                ).build();
+            }
+            // Group by the ISO week's Monday, independently of the presentation format.
             return SQLObj.builder().fieldAlias(fieldAlias).fieldName(
                     String.format(SQLConstants.DE_DATE_FORMAT,
                             "TIMESTAMPADD(DAY, -MOD(DAYOFWEEK(" + date + ") + 5, 7), " + date + ")", "yyyy-MM-dd")

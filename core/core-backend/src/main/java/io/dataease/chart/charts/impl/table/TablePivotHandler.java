@@ -364,16 +364,23 @@ public class TablePivotHandler extends GroupChartHandler {
     }
 
     private List<ChartViewFieldDTO> getCustomFields(ChartViewDTO view, List<TableCalcTotalCfg> cfgList) {
-        var quotaIds = view.getYAxis().stream().map(ChartViewFieldDTO::getDataeaseName).collect(Collectors.toSet());
         var customFields = new ArrayList<ChartViewFieldDTO>();
-        for (TableCalcTotalCfg totalCfg : cfgList) {
-            if (!quotaIds.contains(totalCfg.getDataeaseName())) {
-                continue;
-            }
-            if (StringUtils.equalsIgnoreCase(totalCfg.getAggregation(), "CUSTOM")) {
+        if (CollectionUtils.isEmpty(cfgList) || CollectionUtils.isEmpty(view.getYAxis())) {
+            return customFields;
+        }
+        for (ChartViewFieldDTO quota : view.getYAxis()) {
+            // A result belongs to the placement, not just the underlying dataset field.
+            var totalCfg = cfgList.stream().filter(cfg -> Objects.equals(cfg.getDataeaseName(), quota.resultKey()))
+                    .findFirst().orElseGet(() -> cfgList.stream()
+                            .filter(cfg -> Objects.equals(cfg.getDataeaseName(), quota.getDataeaseName()))
+                            .findFirst().orElse(null));
+            if (totalCfg != null && StringUtils.equalsIgnoreCase(totalCfg.getAggregation(), "CUSTOM")) {
                 var field = new ChartViewFieldDTO();
                 field.setDeType(DeTypeConstants.DE_FLOAT);
                 BeanUtils.copyBean(field, totalCfg);
+                field.setDataeaseName(quota.getDataeaseName());
+                field.setFieldInstanceId(quota.getFieldInstanceId());
+                field.setMetricInstanceId(quota.getMetricInstanceId());
                 field.setId(IDUtils.snowID());
                 field.setExtField(ExtFieldConstant.EXT_CALC);
                 customFields.add(field);

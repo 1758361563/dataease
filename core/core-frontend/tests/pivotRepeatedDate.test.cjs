@@ -83,6 +83,20 @@ ensurePivotDimensionInstances(persisted)
 assert.notEqual(resultKey(persisted.xAxisExt[0]), resultKey(persisted.xAxisExt[1]))
 assert.equal(formatPivotDate('2026-10-13', persisted.xAxisExt[0]), '2026-10-13')
 assert.equal(formatPivotDate('2026-10-13', persisted.xAxisExt[1]), '星期二')
+assert.equal(
+  formatPivotDate('2026-10-13', { ...persisted.xAxisExt[1], dateShowFormat: 'weekday_date_name' }),
+  '星期二'
+)
+assert.equal(
+  formatPivotDate('2026-10-20', { ...persisted.xAxisExt[1], dateShowFormat: 'weekday_date_name' }),
+  '星期二'
+)
+for (let weekday = 1; weekday <= 7; weekday++) {
+  assert.equal(
+    formatPivotDate(String(weekday), persisted.xAxisExt[1]),
+    `星期${['一', '二', '三', '四', '五', '六', '日'][weekday - 1]}`
+  )
+}
 const weekly = persisted.xAxisExt.map((f, index) => ({
   ...f,
   dateStyle: 'y_W',
@@ -135,3 +149,59 @@ for (const dimensions of [persisted.xAxisExt, weekly]) {
   )
 }
 console.log('Repeated date drop, independent formats, persistence and real S2 cells passed')
+
+const dimensionSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/views/chart/components/editor/drag-item/DimensionItem.vue'),
+  'utf8'
+)
+const dimensionDescriptor = parse(dimensionSource).descriptor
+const dimensionAst = ts.createSourceFile(
+  'dimension.ts',
+  dimensionDescriptor.scriptSetup.content,
+  ts.ScriptTarget.Latest,
+  true
+)
+const switching = dimensionAst.statements
+  .filter(ts.isVariableStatement)
+  .flatMap(node =>
+    [...node.declarationList.declarations]
+      .filter(item => ['datePattern', 'dateFormatLabel'].includes(item.name.getText(dimensionAst)))
+      .map(item => 'const ' + item.getText(dimensionAst))
+  )
+  .join('\n')
+const placement = { value: { dateStyle: 'y_M_d', datePattern: 'date_sub' } }
+const changes = []
+const switcher = new Function(
+  'item',
+  'props',
+  'emit',
+  transpile(switching) + '\nreturn { datePattern, dateFormatLabel }'
+)(placement, { type: 'xAxisExt' }, (event, value) =>
+  changes.push(JSON.parse(JSON.stringify(value)))
+)
+for (const mode of ['weekday_date_name', 'weekday_name', 'date_split']) {
+  switcher.datePattern({ type: mode })
+  const saved = JSON.parse(JSON.stringify(placement.value))
+  if (mode === 'date_split') {
+    assert.equal(saved.datePattern, 'date_split')
+    assert.equal(saved.dateShowFormat, undefined)
+  } else {
+    assert.equal(saved.dateShowFormat, mode)
+    assert.equal(
+      switcher.dateFormatLabel(),
+      mode === 'weekday_name' ? '星期几分组' : '日期显示星期'
+    )
+  }
+  assert.equal(changes.at(-1).axisType, 'xAxisExt')
+}
+const dimensionScript = compileScript(dimensionDescriptor, { id: 'weekday-modes' })
+assert.deepEqual(
+  compileTemplate({
+    source: dimensionDescriptor.template.content,
+    filename: 'DimensionItem.vue',
+    id: 'weekday-modes',
+    compilerOptions: { bindingMetadata: dimensionScript.bindings }
+  }).errors,
+  []
+)
+console.log('Actual weekday mode menu switching, saved configuration and Vue compilation passed')

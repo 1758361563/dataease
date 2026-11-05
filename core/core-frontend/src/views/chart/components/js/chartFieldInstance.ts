@@ -37,7 +37,13 @@ export function ensurePivotDimensionInstances(chart: any) {
 export function formatPivotDate(value: any, field: any) {
   if (value == null || value === '') return value
   if (field?.deType !== 1) return value
-  if (field.dateStyle === 'y_M_d' && field.dateShowFormat === 'weekday_name') {
+  if (
+    field.dateStyle === 'y_M_d' &&
+    ['weekday_name', 'weekday_date_name'].includes(field.dateShowFormat)
+  ) {
+    // New queries group by Monday=1 .. Sunday=7; keep old date results readable as well.
+    if (field.dateShowFormat === 'weekday_name' && /^[1-7]$/.test(String(value)))
+      return `星期${['一', '二', '三', '四', '五', '六', '日'][Number(value) - 1]}`
     const match = String(value).match(/^(\d{4})[-/](\d{2})[-/](\d{2})$/)
     if (!match) return value
     const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))

@@ -74,6 +74,32 @@ chart.customAttr.tableTotal.col = {
 sorts = probe.configSortParams(chart, [])
 assert.equal(sorts[0].query['$$extra$$'], 'metric0')
 assert.equal(sorts[0].sortMethod, 'DESC')
+chart = makeChart()
+chart.xAxisExt = [
+  {
+    id: 'date',
+    fieldInstanceId: 'weekday',
+    dataeaseName: 'date',
+    deType: 1,
+    dateStyle: 'y_M_d',
+    dateShowFormat: 'weekday_name',
+    sort: 'none'
+  }
+]
+const weekdayBefore = JSON.stringify(chart)
+sorts = probe.configSortParams(chart, [])
+assert.equal(sorts[0].sortFieldId, 'fi_weekday')
+assert.equal(sorts[0].sortMethod, 'ASC', 'saved weekday charts default to Monday through Sunday')
+assert.equal(JSON.stringify(chart), weekdayBefore)
+chart.xAxisExt[0].sort = 'desc'
+assert.equal(probe.configSortParams(chart, [])[0].sortMethod, 'DESC')
+chart.xAxisExt[0].dateShowFormat = 'weekday_date_name'
+chart.xAxisExt[0].sort = 'none'
+assert.deepEqual(
+  probe.configSortParams(chart, []),
+  [],
+  'date-label mode keeps ordinary date sorting'
+)
 console.log(
   'Pivot nullable sort: three shared metrics, empty/legacy settings, explicit metric/dimension/custom/total sorting and no config mutation passed'
 )
