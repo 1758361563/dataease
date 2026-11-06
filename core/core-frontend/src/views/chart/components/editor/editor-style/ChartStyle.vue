@@ -32,6 +32,14 @@ import FlowMapLineSelector from '@/views/chart/components/editor/editor-style/co
 import FlowMapPointSelector from '@/views/chart/components/editor/editor-style/components/FlowMapPointSelector.vue'
 import CommonBorderSetting from '@/custom-component/common/CommonBorderSetting.vue'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
+import {
+  applyTableStylePreset,
+  currentTableStylePreset,
+  TABLE_STYLE_PRESETS,
+  applyTableDensity,
+  currentTableDensity,
+  TABLE_DENSITIES
+} from '@/views/chart/components/js/panel/charts/table/pivotAppearance'
 import BulletTargetSelector from '@/views/chart/components/editor/editor-style/components/bullet/BulletTargetSelector.vue'
 import BulletMeasureSelector from '@/views/chart/components/editor/editor-style/components/bullet/BulletMeasureSelector.vue'
 import BulletRangeSelector from '@/views/chart/components/editor/editor-style/components/bullet/BulletRangeSelector.vue'
@@ -224,6 +232,17 @@ const onStyleAttrChange = ({ key, value }) => {
 
 const onTableHeaderChange = (val, prop) => {
   emit('onTableHeaderChange', val, prop)
+}
+const changeTableStylePreset = (preset: string) => {
+  snapshotStore.recordSnapshotCache('tableStylePreset')
+  applyTableStylePreset(props.chart, preset)
+  // Header, cell and border settings have changed together; redraw once through the existing path.
+  onBasicStyleChange({ data: props.chart.customAttr.basicStyle }, 'tableStylePreset')
+}
+const changeTableDensity = (density: string) => {
+  snapshotStore.recordSnapshotCache('tableDensity')
+  applyTableDensity(props.chart, density)
+  onBasicStyleChange({ data: props.chart.customAttr.basicStyle }, 'tableDensity')
 }
 const onTableCellChange = (val, prop) => {
   emit('onTableCellChange', val, prop)
@@ -538,6 +557,56 @@ watch(
                 @onExtTooltipChange="onExtTooltipChange"
               />
             </collapse-switch-item>
+            <el-collapse-item
+              v-if="
+                !batchOptStatus &&
+                ['table-pivot', 'table-info', 'table-normal'].includes(chart.type)
+              "
+              name="tableStylePreset"
+              title="表格样式方案"
+              :effect="themes"
+            >
+              <el-form-item label="配色方案" class="attr-selector">
+                <el-select
+                  :model-value="currentTableStylePreset(chart)"
+                  :effect="themes"
+                  @change="changeTableStylePreset"
+                >
+                  <el-option
+                    v-for="preset in TABLE_STYLE_PRESETS"
+                    :key="preset.value"
+                    :label="preset.label"
+                    :value="preset.value"
+                  />
+                  <el-option
+                    v-if="currentTableStylePreset(chart) === 'custom'"
+                    label="自定义（当前设置）"
+                    value="custom"
+                    disabled
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="表格疏密" class="attr-selector">
+                <el-select
+                  :model-value="currentTableDensity(chart)"
+                  :effect="themes"
+                  @change="changeTableDensity"
+                >
+                  <el-option
+                    v-for="density in TABLE_DENSITIES"
+                    :key="density.value"
+                    :label="density.label"
+                    :value="density.value"
+                  />
+                  <el-option
+                    v-if="currentTableDensity(chart) === 'custom'"
+                    value="custom"
+                    label="自定义行高"
+                    disabled
+                  />
+                </el-select>
+              </el-form-item>
+            </el-collapse-item>
             <collapse-switch-item
               v-if="showProperties('table-header-selector')"
               v-model="chart.customAttr.tableHeader.showTableHeader"

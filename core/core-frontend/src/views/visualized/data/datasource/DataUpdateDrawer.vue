@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatBeijingTime } from '@/utils/beijingTime'
 import AdminHelp from '@/views/company/admin/AdminHelp.vue'
 import '@/views/company/admin/admin.less'
 import { computed, onBeforeUnmount, ref } from 'vue'
@@ -302,11 +303,7 @@ async function removeConfiguration() {
     saving.value = false
   }
 }
-function formatUtc(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}Z`)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
-}
+
 onBeforeUnmount(() => {
   ++generation
   stopPolling()
@@ -547,7 +544,7 @@ defineExpose({ open })
               <el-form-item label="业务时区"
                 ><el-select v-model="form.timezone" filterable allow-create default-first-option
                   ><el-option label="Asia/Shanghai" value="Asia/Shanghai" /><el-option
-                    label="UTC"
+                    label="协调世界时（UTC）"
                     value="UTC" /></el-select
               ></el-form-item>
               <el-form-item label="上游任务">
@@ -572,7 +569,7 @@ defineExpose({ open })
                 />
               </el-form-item>
               <p v-if="currentTask?.nextFireTime" class="hint">
-                下次定时执行：{{ formatUtc(currentTask.nextFireTime) }}
+                下次定时执行：{{ formatBeijingTime(currentTask.nextFireTime) }}
               </p>
               <div class="two-columns">
                 <el-form-item label="执行超时（秒）"
@@ -594,7 +591,7 @@ defineExpose({ open })
         </el-tab-pane>
         <el-tab-pane label="运行记录" name="history">
           <div class="history-toolbar">
-            <span>最近 50 次运行 · 时间按浏览器本地时区显示</span
+            <span>最近 50 次运行 · 北京时间（UTC+8）</span
             ><el-button :disabled="!form.id" @click="refreshRuns()">刷新</el-button>
           </div>
           <el-table :data="runs" empty-text="暂无运行记录" max-height="600">
@@ -610,14 +607,14 @@ defineExpose({ open })
                         : `运行日期：${row.businessDate}`
                     }}
                   </p>
-                  <p>结束：{{ formatUtc(row.finishedAt) }}</p>
+                  <p>结束：{{ formatBeijingTime(row.finishedAt) }}</p>
                   <p>{{ row.message || '等待执行结果' }}</p>
                 </div></template
               ></el-table-column
             >
             <el-table-column label="提交时间" width="175"
               ><template #default="{ row }">{{
-                formatUtc(row.requestedAt)
+                formatBeijingTime(row.requestedAt)
               }}</template></el-table-column
             >
             <el-table-column label="状态" width="110"

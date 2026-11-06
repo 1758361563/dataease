@@ -25,7 +25,11 @@ import ChartError from '@/views/chart/components/views/components/ChartError.vue
 import { defaultsDeep, cloneDeep, debounce } from 'lodash-es'
 import { BASE_VIEW_CONFIG } from '../../editor/util/chart'
 import { customAttrTrans, customStyleTrans, recursionTransObj } from '@/utils/canvasStyle'
-import { migratePivotAppearance } from '../../js/panel/charts/table/pivotAppearance'
+import {
+  migratePivotAppearance,
+  ensureTableStyle,
+  normalizeTableReadability
+} from '../../js/panel/charts/table/pivotAppearance'
 import { deepCopy, isISOMobile, isMobile } from '@/utils/utils'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { isDashboard, trackBarStyleCheck } from '@/utils/canvasUtils'
@@ -183,6 +187,7 @@ const renderChartFromDialog = (viewInfo: Chart, chartDataInfo) => {
 // 处理存量图表的默认值
 const handleDefaultVal = (chart: Chart) => {
   migratePivotAppearance(chart)
+  ensureTableStyle(chart)
   const customAttr = parseJson(chart.customAttr)
   // 明细表默认合并单元格，存量的不合并
   if (customAttr.tableCell.mergeCells === undefined) {
@@ -260,6 +265,7 @@ const renderChart = (viewInfo: Chart, resetPageInfo: boolean) => {
 
   recursionTransObj(customAttrTrans, actualChart.customAttr, scale.value, terminal.value)
   recursionTransObj(customStyleTrans, actualChart.customStyle, scale.value, terminal.value)
+  normalizeTableReadability(actualChart, viewInfo, scale.value)
 
   setupPage(actualChart, resetPageInfo)
   nextTick(() => debounceRender(resetPageInfo))
@@ -716,6 +722,11 @@ let timer
 const resize = (width, height) => {
   if (timer) {
     clearTimeout(timer)
+  }
+  if (showPosition.value === 'viewDialog' && actualChart) {
+    // Rebuild width-dependent headers/frozen columns from cached data at the new viewport size.
+    debounceRender(false)
+    return
   }
   timer = setTimeout(() => {
     if (!myChart?.facet) {

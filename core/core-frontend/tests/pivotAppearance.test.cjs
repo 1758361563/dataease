@@ -235,6 +235,13 @@ const helpers = utilAst.statements
   .filter(s => ts.isFunctionDeclaration(s) && functions.includes(s.name.text))
   .map(s => s.getText(utilAst).replace(/^export /, ''))
   .join('\n')
+const parseJsonModule = new Module(path.resolve(__dirname, '../src/utils/parseJson.ts'))
+parseJsonModule._compile(
+  ts.transpileModule(fs.readFileSync(parseJsonModule.id, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }
+  }).outputText,
+  parseJsonModule.id
+)
 const shared = commonAst.statements.find(
   s => ts.isFunctionDeclaration(s) && s.name.text === 'getCustomTheme'
 )
@@ -245,6 +252,7 @@ const configTheme = pivotClass.members.find(s => s.name?.getText(ast) === 'confi
 const themeSource = `${helpers}\n${shared.getText(commonAst).replace(/^export /, '')}
 class Base {configTheme(chart){return getCustomTheme(chart)}}
 class Pivot extends Base {${configTheme.getText(ast)}}
+Pivot.prototype.sharedTheme = getCustomTheme;
 return new Pivot();`
 const js = ts.transpileModule(themeSource, {
   compilerOptions: { target: ts.ScriptTarget.ES2020 }
@@ -271,6 +279,7 @@ const builder = new Function(
   'DEFAULT_TABLE_HEADER',
   'DEFAULT_TABLE_CELL',
   'applyPivotAppearance',
+  'parseJson',
   js
 )(
   merge,
@@ -279,7 +288,8 @@ const builder = new Function(
   attr.basicStyle,
   attr.tableHeader,
   attr.tableCell,
-  applyPivotAppearance
+  applyPivotAppearance,
+  parseJsonModule.exports.parseJson
 )
 sample.customAttr = JSON.stringify(attr)
 const actualTheme = builder.configTheme(sample)
@@ -310,3 +320,174 @@ for (const color of ['#FBFCFE', 'rgba(251,252,254,1)'])
     '#EDF3FB'
   )
 console.log('pivotAppearance: migration, custom settings, typography and render integration passed')
+
+const { ensureTableStyle, applyTableStylePreset, currentTableStylePreset, TABLE_STYLE_PRESETS } =
+  mod.exports
+for (const type of ['table-info', 'table-pivot', 'table-normal']) {
+  for (const serialized of [false, true]) {
+    const table = legacy()
+    table.type = type
+    table.customAttr.tableCell.formatterCfg = { decimalCount: 2 }
+    const originalTotals = structuredClone(table.customAttr.tableTotal)
+    if (serialized) table.customAttr = JSON.stringify(table.customAttr)
+    ensureTableStyle(table)
+    let attrs = serialized ? JSON.parse(table.customAttr) : table.customAttr
+    assert.equal(attrs.tableHeader.showVerticalBorder, true)
+    assert.equal(attrs.tableCell.showVerticalBorder, true)
+    assert.equal(attrs.tableCell.tableItemFontSize, 15)
+    assert.equal(attrs.tableCell.tableItemHeight, 28)
+    assert.equal(currentTableStylePreset(table), 'light')
+    assert.deepEqual(attrs.tableTotal, originalTotals)
+    assert.deepEqual(attrs.tableCell.formatterCfg, { decimalCount: 2 })
+    for (const palette of TABLE_STYLE_PRESETS) {
+      applyTableStylePreset(table, palette.value)
+      migratePivotAppearance(table)
+      ensureTableStyle(table)
+      assert.equal(currentTableStylePreset(table), palette.value)
+      attrs = serialized ? JSON.parse(table.customAttr) : table.customAttr
+      attrs.basicStyle.alpha = 100
+      attrs.basicStyle.tableScrollBarColor = 'rgba(0,0,0,0.15)'
+      table.customAttr = serialized ? JSON.stringify(attrs) : attrs
+      const actual =
+        type === 'table-pivot' ? builder.configTheme(table) : builder.sharedTheme(table)
+      assert.equal(pivotColorKey(actual.colCell.cell.backgroundColor), palette.header)
+      for (const cell of ['colCell', 'rowCell', 'dataCell', 'cornerCell']) {
+        for (const variant of ['text', 'bolderText', 'measureText', 'seriesText']) {
+          if (actual[cell][variant])
+            assert.equal(actual[cell][variant].textBaseline, 'middle', `${type}/${cell}/${variant}`)
+        }
+        assert.notEqual(
+          actual[cell].cell.verticalBorderWidth,
+          0,
+          `${type}/${palette.value}/${cell}`
+        )
+        assert.equal(
+          pivotColorKey(actual[cell].cell.verticalBorderColor),
+          palette.border,
+          `${type}/${palette.value}/${cell}`
+        )
+      }
+    }
+    attrs.tableCell.tableFontColor = '#123456'
+    attrs.tableCell.showVerticalBorder = false
+    table.customAttr = serialized ? JSON.stringify(attrs) : attrs
+    const saved = JSON.stringify(table)
+    ensureTableStyle(table)
+    assert.equal(
+      JSON.stringify(table),
+      saved,
+      'later custom colours and border choices survive reload'
+    )
+    assert.equal(currentTableStylePreset(table), 'custom')
+  }
+}
+console.log(
+  'Table presets: info/pivot defaults, all palettes, real themes with vertical separators and persisted custom edits passed'
+)
+
+const { applyTableDensity, currentTableDensity, normalizeTableReadability } = mod.exports
+for (const type of ['table-info', 'table-pivot', 'table-normal']) {
+  const table = legacy()
+  table.type = type
+  ensureTableStyle(table)
+  for (const [density, height] of [
+    ['compact', 24],
+    ['standard', 28],
+    ['comfortable', 32]
+  ]) {
+    applyTableDensity(table, density)
+    applyTableStylePreset(table, 'indigo')
+    assert.equal(
+      table.customAttr.tableCell.tableItemHeight,
+      height,
+      'palette changes preserve chosen density'
+    )
+    assert.equal(table.customAttr.tableHeader.tableTitleHeight, height)
+    assert.equal(currentTableDensity(table), density)
+  }
+  const saved = JSON.stringify(table)
+  const scaled = structuredClone(table)
+  for (const key of ['tableTitleFontSize', 'tableTitleColFontSize', 'tableTitleCornerFontSize'])
+    scaled.customAttr.tableHeader[key] *= 0.63
+  scaled.customAttr.tableHeader.tableTitleHeight *= 0.63
+  scaled.customAttr.tableCell.tableItemFontSize *= 0.63
+  scaled.customAttr.tableCell.tableItemHeight *= 0.63
+  normalizeTableReadability(scaled, table, 0.63)
+  assert.equal(scaled.customAttr.tableCell.tableItemFontSize, 13)
+  assert.equal(scaled.customAttr.tableHeader.tableTitleFontSize, 13)
+  assert.ok(Number.isInteger(scaled.customAttr.tableCell.tableItemHeight))
+  assert.ok(scaled.customAttr.tableCell.tableItemHeight >= 21)
+  assert.equal(
+    JSON.stringify(table),
+    saved,
+    'render readability changes do not alter saved settings'
+  )
+  const displayedHeights = []
+  for (const density of ['compact', 'standard', 'comfortable']) {
+    applyTableDensity(table, density)
+    const rendered = structuredClone(table)
+    rendered.customAttr.tableHeader.tableTitleHeight *= 0.63
+    rendered.customAttr.tableCell.tableItemHeight *= 0.63
+    rendered.customAttr.tableHeader.tableTitleFontSize *= 0.63
+    rendered.customAttr.tableCell.tableItemFontSize *= 0.63
+    normalizeTableReadability(rendered, table, 0.63)
+    displayedHeights.push(rendered.customAttr.tableCell.tableItemHeight)
+  }
+  assert.deepEqual(displayedHeights, [24, 28, 32], 'densities remain distinct on scaled dashboards')
+  const older = structuredClone(table)
+  older.customAttr.basicStyle.tableStyleVersion = 1
+  older.customAttr.basicStyle.tableStylePreset = 'light'
+  Object.assign(older.customAttr.tableHeader, {
+    tableHeaderFontColor: '#65728A',
+    tableTitleFontSize: 14,
+    tableTitleHeight: 40
+  })
+  Object.assign(older.customAttr.tableCell, {
+    tableFontColor: '#123456',
+    tableItemFontSize: 14,
+    tableItemHeight: 38,
+    showVerticalBorder: false
+  })
+  older.customAttr = JSON.stringify(older.customAttr)
+  ensureTableStyle(older)
+  const upgraded = JSON.parse(older.customAttr)
+  assert.equal(upgraded.basicStyle.tableStyleVersion, 3)
+  assert.equal(upgraded.tableHeader.tableHeaderFontColor, '#334155')
+  assert.equal(
+    upgraded.tableCell.tableFontColor,
+    '#123456',
+    'custom text colours survive version upgrade'
+  )
+  assert.equal(upgraded.tableCell.showVerticalBorder, false)
+}
+console.log(
+  'Density/readability: 24/28/32px choices, small fractional scales, rendering-only adjustment and custom-preserving upgrade passed'
+)
+for (const [density, before, after] of [
+  ['compact', 32, 24],
+  ['standard', 40, 28],
+  ['comfortable', 48, 32]
+]) {
+  for (const serialized of [false, true]) {
+    const table = legacy()
+    ensureTableStyle(table)
+    const attr = table.customAttr
+    Object.assign(attr.basicStyle, { tableStyleVersion: 2, tableDensity: density })
+    attr.tableHeader.tableTitleHeight = before
+    attr.tableCell.tableItemHeight = before
+    attr.tableCell.tableFontColor = '#123456'
+    if (serialized) table.customAttr = JSON.stringify(attr)
+    ensureTableStyle(table)
+    const migrated = serialized ? JSON.parse(table.customAttr) : table.customAttr
+    assert.equal(migrated.tableHeader.tableTitleHeight, after)
+    assert.equal(migrated.tableCell.tableItemHeight, after)
+    assert.equal(migrated.tableCell.tableFontColor, '#123456')
+    assert.equal(migrated.basicStyle.tableStyleVersion, 3)
+  }
+}
+const customHeight = legacy()
+ensureTableStyle(customHeight)
+customHeight.customAttr.basicStyle.tableStyleVersion = 2
+customHeight.customAttr.tableCell.tableItemHeight = 57
+ensureTableStyle(customHeight)
+assert.equal(customHeight.customAttr.tableCell.tableItemHeight, 57)

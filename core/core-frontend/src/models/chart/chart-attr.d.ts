@@ -61,6 +61,9 @@ declare interface ChartAttr {
 declare interface ChartBasicStyle {
   /** Versioned pivot-only defaults; preserves subsequent manual style edits. */
   pivotAppearanceVersion?: 1 | 2 | 3 | 4
+  tableStyleVersion?: number
+  tableStylePreset?: 'light' | 'indigo' | 'slate'
+  tableDensity?: 'compact' | 'standard' | 'comfortable'
   pieLayout?: 'legacy' | 'large' | 'ranking'
   pieLabelLimit?: number
   piePalette?: 'categorical' | 'theme'

@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { formatBeijingTime } from '@/utils/beijingTime'
 import AdminHelp from '../AdminHelp.vue'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
@@ -37,7 +38,7 @@ const isBootstrap = (row: CompanyUser) => keepStringId(row.id) === BOOTSTRAP_ADM
 
 const formatTime = (ms?: number) => {
   if (!ms) return '-'
-  return new Date(ms).toLocaleString('zh-CN')
+  return formatBeijingTime(ms)
 }
 
 const load = async () => {

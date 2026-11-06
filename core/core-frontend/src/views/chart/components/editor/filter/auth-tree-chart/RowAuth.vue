@@ -1,35 +1,17 @@
 <script lang="ts" setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import AuthTree from './AuthTree.vue'
 
 const { t } = useI18n()
 
 const errorMessage = ref('')
-const logic = ref<'or' | 'and'>('or')
+const logic = ref<'or' | 'and'>('and')
 const relationList = ref([])
-
-const svgRealinePath = computed(() => {
-  const lg = relationList.value.length
-  let a = { x: 0, y: 0, child: relationList.value }
-  a.y = Math.floor(dfsXY(a, 0) / 2)
-  if (!lg) return ''
-  let path = calculateDepth(a)
-  return path
-})
-
-const svgDashinePath = computed(() => {
-  const lg = relationList.value.length
-  let a = { x: 0, y: 0, child: relationList.value }
-  a.y = Math.floor(dfsXY(a, 0) / 2)
-  if (!lg) return `M48 20 L68 20`
-  let path = calculateDepthDash(a)
-  return path
-})
 
 const init = expressionTree => {
   const { items } = expressionTree
-  logic.value = expressionTree.logic || 'or'
+  logic.value = (items?.length ? expressionTree.logic : undefined) || 'and'
   relationList.value = dfsInit(items || [])
 }
 const submit = () => {
@@ -87,7 +69,7 @@ const errorDetected = ({
     }
   }
   if (filterType === 'enum') {
-    if (!['null', 'not_null'].includes(term) && enumValue.length < 1) {
+    if (!['null', 'not_null'].includes(term) && (enumValue || []).length < 1) {
       errorMessage.value = t('chart.enum_value_can_not_null')
       return
     }
@@ -163,7 +145,7 @@ const dfsInit = arr => {
     if (subTree) {
       const { items = [], logic } = subTree
       const child = dfsInit(items)
-      elementList.push({ logic, child })
+      elementList.push({ logic: logic || 'and', child })
     } else {
       const {
         enumValue,
@@ -251,127 +233,7 @@ const dfsSubmit = arr => {
 const removeRelationList = () => {
   relationList.value = []
 }
-const getY = arr => {
-  const [a] = arr
-  if (a.child?.length) {
-    return getY(a.child)
-  }
-  return a.y
-}
-const calculateDepthDash = obj => {
-  const lg = obj.child?.length
-  let path = ''
-  if (!lg && Array.isArray(obj.child)) {
-    const { x, y } = obj
-    path += `M${48 + x * 68} ${y * 41.4 + 20} L${88 + x * 68} ${y * 41.4 + 20}`
-  } else if (obj.child?.length) {
-    let y = Math.max(dfsY(obj, 0), dfs(obj.child, 0) + getY(obj.child) - 1)
-    let parent = (dfs(obj.child, 0) * 41.4) / 2 + (getY(obj.child) || 0) * 41.4
-    const { x } = obj
-    path += `M${24 + x * 68} ${parent} L${24 + x * 68} ${y * 41.4 + 20} L${64 + x * 68} ${
-      y * 41.4 + 20
-    }`
-    obj.child.forEach(item => {
-      path += calculateDepthDash(item)
-    })
-  }
 
-  return path
-}
-const calculateDepth = obj => {
-  const lg = obj.child.length
-  if (!lg) return ''
-  let path = ''
-  const { x: depth, y } = obj
-  obj.child.forEach((item, index) => {
-    const { y: siblingLg, z } = item
-    if (item.child?.length) {
-      let parent = (dfs(obj.child, 0) * 41.4) / 2 + (getY(obj.child) || 0) * 41.4
-      let children = (dfs(item.child, 0) * 41.4) / 2 + getY(item.child) * 41.4
-      let path1 = 0
-      let path2 = 0
-      if (parent < children) {
-        path1 = parent
-        path2 = children
-      } else {
-        ;[path1, path2] = [children, parent]
-      }
-      if (y >= siblingLg) {
-        path1 = parent
-        path2 = children
-      }
-      path += `M${24 + depth * 68} ${path1} L${24 + depth * 68} ${path2} L${
-        68 + depth * 68
-      } ${path2}`
-      path += calculateDepth(item)
-    }
-    if (!item.child?.length) {
-      if (siblingLg >= y) {
-        path += `M${24 + depth * 68} ${y * 40} L${24 + depth * 68} ${
-          (siblingLg + 1) * 41.4 - 20.69921875
-        } L${68 + depth * 68} ${(siblingLg + 1) * 41.4 - 20.69921875}`
-      } else {
-        path += `M${24 + depth * 68} ${
-          (siblingLg +
-            (lg === 1 && index === 0 ? 0 : 1) +
-            (obj.child[index + 1]?.child?.length ? y - siblingLg - 1 : 0)) *
-            41.4 +
-          20 +
-          (lg === 1 && index === 0 ? 26 : 0)
-        } L${24 + depth * 68} ${
-          (siblingLg + 1) * 41.4 - 20.69921875 - (lg === 1 && index === 0 ? (z || 0) * 1.4 : 0)
-        } L${68 + depth * 68} ${
-          (siblingLg + 1) * 41.4 - 20.69921875 - (lg === 1 && index === 0 ? (z || 0) * 1.4 : 0)
-        }`
-      }
-    }
-  })
-  return path
-}
-const changeAndOrDfs = (arr, logic) => {
-  arr.forEach(ele => {
-    if (ele.child) {
-      ele.logic = logic === 'and' ? 'or' : 'and'
-      changeAndOrDfs(ele.child, ele.logic)
-    }
-  })
-}
-const dfs = (arr, count) => {
-  arr.forEach(ele => {
-    if (ele.child?.length) {
-      count = dfs(ele.child, count)
-    } else {
-      count += 1
-    }
-  })
-  count += 1
-  return count
-}
-const dfsY = (obj, count) => {
-  obj.child.forEach(ele => {
-    if (ele.child?.length) {
-      count = dfsY(ele, count)
-    } else {
-      count = Math.max(count, ele.y, obj.y)
-    }
-  })
-  return count
-}
-const dfsXY = (obj, count) => {
-  obj.child.forEach(ele => {
-    ele.x = obj.x + 1
-    if (ele.child?.length) {
-      let l = dfs(ele.child, 0)
-      ele.y = Math.floor(l / 2) + count
-      count = dfsXY(ele, count)
-    } else {
-      count += 1
-      ele.y = count - 1
-    }
-  })
-  count += 1
-  return count
-}
 const addCondReal = (type, logic) => {
   relationList.value.push(
     type === 'condition'
@@ -388,7 +250,7 @@ const addCondReal = (type, logic) => {
           dynamicTimeSetting: {},
           deType: ''
         }
-      : { child: [], logic }
+      : { child: [], logic: logic || 'and' }
   )
 }
 const del = index => {
@@ -408,38 +270,16 @@ const emits = defineEmits(['save'])
       @del="idx => del(idx)"
       @addCondReal="addCondReal"
       @removeRelationList="removeRelationList"
-      @changeAndOrDfs="type => changeAndOrDfs(relationList, type)"
       :relationList="relationList"
       v-model:logic="logic"
     />
-    <svg width="388" height="100%" class="real-line">
-      <path
-        stroke-linejoin="round"
-        stroke-linecap="round"
-        :d="svgRealinePath"
-        fill="none"
-        stroke="#CCCCCC"
-        stroke-width="0.5"
-      ></path>
-    </svg>
-    <svg width="388" height="100%" class="dash-line">
-      <path
-        stroke-linejoin="round"
-        stroke-linecap="round"
-        :d="svgDashinePath"
-        fill="none"
-        stroke="#CCCCCC"
-        stroke-width="0.5"
-        stroke-dasharray="4,4"
-      ></path>
-    </svg>
   </div>
 </template>
 
 <style lang="less" scoped>
 .rowAuth {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  text-align: center;
+  font-family: inherit;
+  text-align: left;
   color: #2c3e50;
   position: relative;
 }

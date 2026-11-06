@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { formatBeijingTime } from '@/utils/beijingTime'
 import AdminHelp from '../AdminHelp.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router_2'
@@ -101,7 +102,7 @@ const activeRunId = ref('')
 const currentRunSubId = ref('')
 const polling = ref(false)
 
-const formatTime = (ms?: number | null) => (ms ? new Date(ms).toLocaleString('zh-CN') : '-')
+const formatTime = (ms?: number | null) => (ms ? formatBeijingTime(ms) : '-')
 
 const runOutcomeLabel = (row: FeishuDeliveryRun) =>
   runStatusLabel(row.status, inferExecutionMode(row))

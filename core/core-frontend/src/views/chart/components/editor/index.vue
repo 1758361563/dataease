@@ -44,7 +44,7 @@ import FilterTree from './filter/FilterTree.vue'
 import ChartStyle from '@/views/chart/components/editor/editor-style/ChartStyle.vue'
 import TooltipFields from './TooltipFields.vue'
 import SortAndLimit from './SortAndLimit.vue'
-import { migratePivotAppearance } from '../js/panel/charts/table/pivotAppearance'
+import { migratePivotAppearance, ensureTableStyle } from '../js/panel/charts/table/pivotAppearance'
 import { hasDisplayLimitPanel } from '../js/chartDisplayLimit'
 import { pivotAllowsEmptyRowDimension } from '@/views/chart/components/js/panel/charts/table/pivotMeasureRows'
 import { supportsTooltipShelf, syncTooltipAxes } from '@/views/chart/components/js/tooltipContent'
@@ -288,6 +288,7 @@ watch(
   () => [view.value.id, view.value.type],
   () => {
     migratePivotAppearance(view.value)
+    ensureTableStyle(view.value)
     syncTooltipAxes(view.value)
   },
   { immediate: true }

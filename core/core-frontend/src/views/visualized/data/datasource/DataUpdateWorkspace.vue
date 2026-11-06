@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatBeijingTime } from '@/utils/beijingTime'
 import AdminHelp from '@/views/company/admin/AdminHelp.vue'
 import '@/views/company/admin/admin.less'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -381,9 +382,9 @@ reloadInBackground()
           }}</span></template
         ></el-table-column
       >
-      <el-table-column label="最近成功（UTC）" min-width="180"
+      <el-table-column label="最近成功（北京时间）" min-width="180"
         ><template #default="{ row }">{{
-          row.latest?.lastSuccessAt || '—'
+          formatBeijingTime(row.latest?.lastSuccessAt)
         }}</template></el-table-column
       >
     </el-table>
@@ -561,7 +562,9 @@ reloadInBackground()
         /><el-button type="primary" :loading="submitting" @click="startGroup">运行整组</el-button
         ><el-button @click="refreshHistory">刷新</el-button>
       </div>
-      <AdminHelp content="各输出表分别提交；批次失败时，已成功的输出保留。记录时间为 UTC。" />
+      <AdminHelp
+        content="各输出表分别提交；批次失败时，已成功的输出保留。记录时间统一按北京时间（UTC+8）显示。"
+      />
       <el-table :data="history" row-key="id" @expand-change="expandRun">
         <el-table-column type="expand"
           ><template #default="{ row }"

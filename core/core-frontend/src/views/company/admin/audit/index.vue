@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { formatBeijingTime } from '@/utils/beijingTime'
 import { onMounted, ref } from 'vue'
 import GridTable from '@/components/grid-table/src/GridTable.vue'
 import { queryCompanyAudit } from '@/api/company/audit'
@@ -31,7 +32,7 @@ const pretty = (raw?: string) => {
   }
 }
 
-const formatTime = (ms?: number) => (ms ? new Date(ms).toLocaleString('zh-CN') : '-')
+const formatTime = (ms?: number) => (ms ? formatBeijingTime(ms) : '-')
 
 const operatorLabel = (userId?: string) => {
   const id = keepStringId(userId)

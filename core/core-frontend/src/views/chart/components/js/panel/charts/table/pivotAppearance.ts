@@ -26,6 +26,267 @@ export function pivotColorKey(value: string) {
   return color
 }
 
+export const TABLE_STYLE_PRESETS = [
+  {
+    value: 'light',
+    label: '清爽浅色',
+    header: '#F5F7FA',
+    headerText: '#334155',
+    row: '#F8FAFC',
+    rowText: '#334155',
+    text: '#1F2937',
+    stripe: '#FAFBFC',
+    border: '#E8ECF1'
+  },
+  {
+    value: 'indigo',
+    label: '靛蓝表头',
+    header: '#47578C',
+    headerText: '#FFFFFF',
+    row: '#F5F7FC',
+    rowText: '#334155',
+    text: '#1F2937',
+    stripe: '#FCFCFE',
+    border: '#E7EBF2'
+  },
+  {
+    value: 'slate',
+    label: '深色表头',
+    header: '#334155',
+    headerText: '#FFFFFF',
+    row: '#F8FAFC',
+    rowText: '#334155',
+    text: '#1F2937',
+    stripe: '#FAFBFC',
+    border: '#E8ECF1'
+  }
+]
+
+/** Change appearance only: keep formatting, conditional rules, layout and totals intact. */
+export function applyTableStylePreset(chart: any, preset: string) {
+  const palette = TABLE_STYLE_PRESETS.find(item => item.value === preset)
+  if (!palette || !['table-pivot', 'table-info', 'table-normal'].includes(chart?.type)) return
+  const serialized = typeof chart.customAttr === 'string'
+  const attr = serialized ? JSON.parse(chart.customAttr) : chart.customAttr
+  const basic = (attr.basicStyle ||= {})
+  const header = (attr.tableHeader ||= {})
+  const cell = (attr.tableCell ||= {})
+  Object.assign(basic, {
+    tableStylePreset: preset,
+    tableStyleVersion: 3,
+    tableBorderColor: palette.border
+  })
+  Object.assign(header, {
+    tableHeaderBgColor: palette.header,
+    tableHeaderCornerBgColor: palette.header,
+    tableHeaderColBgColor: palette.row,
+    tableHeaderFontColor: palette.headerText,
+    tableHeaderCornerFontColor: palette.headerText,
+    tableHeaderColFontColor: palette.rowText,
+    tableTitleFontSize: 15,
+    tableTitleColFontSize: 15,
+    tableTitleCornerFontSize: 15,
+    isBolder: true,
+    isCornerBolder: true,
+    isColBolder: false,
+    showVerticalBorder: true,
+    showHorizonBorder: true
+  })
+  Object.assign(cell, {
+    tableItemBgColor: '#FFFFFF',
+    tableItemSubBgColor: palette.stripe,
+    tableFontColor: palette.text,
+    enableTableCrossBG: true,
+    tableItemFontSize: 15,
+    isBolder: false,
+    showVerticalBorder: true,
+    showHorizonBorder: true
+  })
+  if (serialized) chart.customAttr = JSON.stringify(attr)
+  applyTableDensity(chart, basic.tableDensity || 'standard')
+}
+
+export const TABLE_DENSITIES = [
+  { value: 'compact', label: '紧凑 · 24px', height: 24 },
+  { value: 'standard', label: '标准 · 28px', height: 28 },
+  { value: 'comfortable', label: '舒适 · 32px', height: 32 }
+]
+
+export function applyTableDensity(chart: any, density: string) {
+  const option = TABLE_DENSITIES.find(item => item.value === density)
+  if (!option) return
+  const serialized = typeof chart.customAttr === 'string'
+  const attr = serialized ? JSON.parse(chart.customAttr) : chart.customAttr
+  attr.basicStyle.tableDensity = density
+  attr.tableHeader.tableTitleHeight = option.height
+  attr.tableCell.tableItemHeight = option.height
+  if (serialized) chart.customAttr = JSON.stringify(attr)
+}
+
+export function currentTableDensity(chart: any) {
+  const attr =
+    typeof chart.customAttr === 'string' ? JSON.parse(chart.customAttr) : chart.customAttr
+  return (
+    TABLE_DENSITIES.find(
+      item =>
+        attr.tableHeader?.tableTitleHeight === item.height &&
+        attr.tableCell?.tableItemHeight === item.height
+    )?.value || 'custom'
+  )
+}
+
+/** Adjust only the rendering copy, after canvas scaling, never the saved chart. */
+export function normalizeTableReadability(chart: any, source = chart, scale = 1) {
+  if (!['table-pivot', 'table-info', 'table-normal'].includes(chart?.type)) return
+  const { tableHeader: header, tableCell: cell } = chart.customAttr
+  for (const key of ['tableTitleFontSize', 'tableTitleColFontSize', 'tableTitleCornerFontSize']) {
+    if (Number.isFinite(header?.[key])) header[key] = Math.max(13, Math.round(header[key]))
+  }
+  if (Number.isFinite(cell?.tableItemFontSize))
+    cell.tableItemFontSize = Math.max(13, Math.round(cell.tableItemFontSize))
+  // Density is a screen-space choice. Do not collapse all three presets to the
+  // same minimum row height when a wide dashboard is scaled down.
+  const density = TABLE_DENSITIES.find(item => item.value === currentTableDensity(source))
+  if (density) {
+    header.tableTitleHeight = Math.round(density.height * Math.max(1, scale))
+    cell.tableItemHeight = header.tableTitleHeight
+  }
+  if (Number.isFinite(header?.tableTitleHeight))
+    header.tableTitleHeight = Math.max(
+      Math.round(header.tableTitleHeight),
+      Math.max(
+        header.tableTitleFontSize || 13,
+        header.tableTitleColFontSize || 13,
+        header.tableTitleCornerFontSize || 13
+      ) + 8
+    )
+  if (Number.isFinite(cell?.tableItemHeight))
+    cell.tableItemHeight = Math.max(
+      Math.round(cell.tableItemHeight),
+      (cell.tableItemFontSize || 13) + 8
+    )
+  if (!chart.fontFamily || chart.fontFamily === 'inherit')
+    chart.fontFamily = '"Segoe UI", "Microsoft YaHei UI", "PingFang SC", Arial, sans-serif'
+}
+
+/** Give new, imported and legacy tables one default; later field-level edits remain authoritative. */
+export function ensureTableStyle(chart: any) {
+  if (!['table-pivot', 'table-info', 'table-normal'].includes(chart?.type) || !chart.customAttr)
+    return
+  const attr =
+    typeof chart.customAttr === 'string' ? JSON.parse(chart.customAttr) : chart.customAttr
+  if (attr.basicStyle?.tableStyleVersion === 3) return
+  if (attr.basicStyle?.tableStyleVersion === 2) {
+    const previousHeight = { compact: 32, standard: 40, comfortable: 48 }[
+      attr.basicStyle.tableDensity
+    ]
+    const density = TABLE_DENSITIES.find(item => item.value === attr.basicStyle.tableDensity)
+    if (
+      density &&
+      attr.tableHeader?.tableTitleHeight === previousHeight &&
+      attr.tableCell?.tableItemHeight === previousHeight
+    ) {
+      attr.tableHeader.tableTitleHeight = density.height
+      attr.tableCell.tableItemHeight = density.height
+    }
+    attr.basicStyle.tableStyleVersion = 3
+    if (typeof chart.customAttr === 'string') chart.customAttr = JSON.stringify(attr)
+    return
+  }
+  if (attr.basicStyle?.tableStyleVersion === 1) {
+    const palette =
+      TABLE_STYLE_PRESETS.find(item => item.value === attr.basicStyle.tableStylePreset) ||
+      TABLE_STYLE_PRESETS[0]
+    const previous = {
+      light: {
+        header: '#F5F7FA',
+        headerText: '#65728A',
+        row: '#FAFBFD',
+        rowText: '#6B788E',
+        text: '#37465F',
+        stripe: '#FBFCFE',
+        border: '#DDE3EC'
+      },
+      indigo: {
+        header: '#4F5DA5',
+        headerText: '#FFFFFF',
+        row: '#F0F3FD',
+        rowText: '#37465F',
+        text: '#37465F',
+        stripe: '#F6F7FC',
+        border: '#DDE2EE'
+      },
+      slate: {
+        header: '#334155',
+        headerText: '#FFFFFF',
+        row: '#F1F5F9',
+        rowText: '#475569',
+        text: '#334155',
+        stripe: '#F8FAFC',
+        border: '#D8E0E9'
+      }
+    }[palette.value]
+    for (const [section, mappings] of [
+      [attr.basicStyle, { tableBorderColor: 'border' }],
+      [
+        attr.tableHeader,
+        {
+          tableHeaderBgColor: 'header',
+          tableHeaderCornerBgColor: 'header',
+          tableHeaderColBgColor: 'row',
+          tableHeaderFontColor: 'headerText',
+          tableHeaderCornerFontColor: 'headerText',
+          tableHeaderColFontColor: 'rowText'
+        }
+      ],
+      [attr.tableCell, { tableFontColor: 'text', tableItemSubBgColor: 'stripe' }]
+    ] as const) {
+      for (const [key, color] of Object.entries(mappings)) {
+        if (
+          typeof section?.[key] === 'string' &&
+          pivotColorKey(section[key]) === pivotColorKey(previous[color])
+        )
+          section[key] = palette[color]
+      }
+    }
+    for (const key of ['tableTitleFontSize', 'tableTitleColFontSize', 'tableTitleCornerFontSize']) {
+      if (attr.tableHeader[key] === 14) attr.tableHeader[key] = 15
+    }
+    if (attr.tableCell.tableItemFontSize === 14) attr.tableCell.tableItemFontSize = 15
+    if (attr.tableHeader.tableTitleHeight === 40) attr.tableHeader.tableTitleHeight = 32
+    if (attr.tableCell.tableItemHeight === 38) attr.tableCell.tableItemHeight = 32
+    attr.basicStyle.tableDensity ||= 'comfortable'
+    attr.basicStyle.tableStyleVersion = 3
+    if (typeof chart.customAttr === 'string') chart.customAttr = JSON.stringify(attr)
+    return
+  }
+  applyTableStylePreset(chart, 'light')
+}
+
+export function currentTableStylePreset(chart: any) {
+  const attr =
+    typeof chart.customAttr === 'string' ? JSON.parse(chart.customAttr) : chart.customAttr
+  const header = attr.tableHeader || {}
+  const cell = attr.tableCell || {}
+  const matches = (value, expected) =>
+    typeof value === 'string' && pivotColorKey(value) === pivotColorKey(expected)
+  return (
+    TABLE_STYLE_PRESETS.find(
+      palette =>
+        matches(header.tableHeaderBgColor, palette.header) &&
+        matches(header.tableHeaderCornerBgColor, palette.header) &&
+        matches(header.tableHeaderColBgColor, palette.row) &&
+        matches(header.tableHeaderFontColor, palette.headerText) &&
+        matches(header.tableHeaderCornerFontColor, palette.headerText) &&
+        matches(header.tableHeaderColFontColor, palette.rowText) &&
+        matches(attr.basicStyle?.tableBorderColor, palette.border) &&
+        matches(cell.tableFontColor, palette.text) &&
+        matches(cell.tableItemBgColor, '#FFFFFF') &&
+        matches(cell.tableItemSubBgColor, palette.stripe)
+    )?.value || 'custom'
+  )
+}
+
 /** One-time upgrade of the old built-in pivot appearance. User edits made after
  * this upgrade are authoritative, even when they equal an old default. */
 export function migratePivotAppearance(chart: any) {
@@ -33,6 +294,11 @@ export function migratePivotAppearance(chart: any) {
   const serialized = typeof chart.customAttr === 'string'
   const attr = serialized ? JSON.parse(chart.customAttr) : chart.customAttr
   const basic = (attr.basicStyle ||= {})
+  if (basic.tableStyleVersion >= 1) {
+    basic.pivotAppearanceVersion = 4
+    if (serialized) chart.customAttr = JSON.stringify(attr)
+    return
+  }
   if (basic.pivotAppearanceVersion === 4) return
   const header = (attr.tableHeader ||= {})
   const cell = (attr.tableCell ||= {})
@@ -129,6 +395,7 @@ export function applyPivotAppearance(theme: any, chart: any) {
     const current = (theme[kind] ||= {})
     for (const style of styles) {
       if (!current[style]) continue
+      current[style].textBaseline = 'middle'
       if (!customFont) current[style].fontFamily = fallbackFont
       const bold =
         kind === 'rowCell'

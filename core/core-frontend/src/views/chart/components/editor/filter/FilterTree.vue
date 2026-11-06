@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus-secondary'
 import { inject, computed, ref, nextTick, provide } from 'vue'
 import RowAuth from '@/views/chart/components/editor/filter/auth-tree-chart/RowAuth.vue'
 import { snapshotStoreWithOut } from '@/store/modules/data-visualization/snapshot'
+import { cloneDeep } from 'lodash-es'
 
 const emits = defineEmits(['filter-data'])
 const filedList = inject('filedList', () => [])
@@ -71,8 +72,9 @@ const dfsTree = arr => {
 const init = tree => {
   dialogVisible.value = true
   nextTick(() => {
-    dfsTree(tree.items || [])
-    rowAuth.value.init(tree || {})
+    const draft = cloneDeep(tree || {})
+    dfsTree(draft.items || [])
+    rowAuth.value.init(draft)
   })
 }
 
@@ -82,13 +84,17 @@ defineExpose({
 </script>
 <template>
   <el-dialog
-    width="min(960px, calc(100vw - 32px))"
+    width="min(1080px, calc(100vw - 32px))"
     append-to-body
     :title="$t('chart.add_filter')"
     destroy-on-close
+    :close-on-click-modal="false"
     class="de-dialog-form filter-tree-cont"
     v-model="dialogVisible"
   >
+    <div class="filter-description">
+      组合筛选条件，选择需要展示的数据。字段和值都可直接输入搜索。
+    </div>
     <div class="tree-cont">
       <div class="content">
         <RowAuth @save="changeFilter" ref="rowAuth" />
@@ -102,27 +108,41 @@ defineExpose({
 </template>
 <style lang="less">
 .filter-tree-cont {
-  max-height: calc(100vh - 32px);
-  margin-top: 16px !important;
-  margin-bottom: 16px !important;
+  max-height: calc(100dvh - 48px);
+  height: auto !important;
+  margin-top: 24px !important;
+  margin-bottom: 24px !important;
   display: flex;
   flex-direction: column;
 
+  .ed-dialog__header,
+  .ed-dialog__footer {
+    flex-shrink: 0;
+  }
+
   .ed-dialog__body {
     min-height: 0;
-    overflow: hidden;
+    overflow: auto;
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+
+  .filter-description {
+    color: #64748b;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .ed-dialog__footer {
+    border-top: 1px solid #e8ecf1;
+    padding-top: 16px;
   }
 
   .tree-cont {
     min-height: 67px;
     width: 100%;
-    padding: 16px;
-    border-radius: 6px;
-    border: 1px solid var(--deBorderBase, #dcdfe6);
-    overflow: auto;
-    max-height: calc(100vh - 190px);
+    padding: 0;
     .content {
-      height: 100%;
+      height: auto;
       width: 100%;
     }
   }

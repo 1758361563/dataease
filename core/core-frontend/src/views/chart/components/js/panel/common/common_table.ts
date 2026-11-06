@@ -399,8 +399,14 @@ export function getCustomTheme(chart: Chart): S2Theme {
         rowCell: {
           cell: {
             backgroundColor: tableItemBgColor,
-            horizontalBorderColor: tableItemBgColor,
-            verticalBorderColor: tableItemBgColor
+            horizontalBorderColor:
+              basicStyle.tableStyleVersion >= 1 && tableCell.showHorizonBorder !== false
+                ? basicStyle.tableBorderColor
+                : tableItemBgColor,
+            verticalBorderColor:
+              basicStyle.tableStyleVersion >= 1 && tableCell.showVerticalBorder !== false
+                ? basicStyle.tableBorderColor
+                : tableItemBgColor
           },
           bolderText: {
             fill: tableFontColor,
@@ -496,6 +502,11 @@ export function getCustomTheme(chart: Chart): S2Theme {
     }
   }
 
+  for (const kind of ['cornerCell', 'rowCell', 'colCell', 'dataCell']) {
+    for (const key of ['text', 'bolderText', 'measureText', 'seriesText']) {
+      if (theme[kind]?.[key]) theme[kind][key].textBaseline = 'middle'
+    }
+  }
   return theme
 }
 

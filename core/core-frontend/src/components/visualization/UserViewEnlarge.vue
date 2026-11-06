@@ -7,6 +7,8 @@
     width="70vw"
     trigger="click"
     class="userViewEnlarge-class"
+    :class="{ 'chart-enlarge-mode': optType === 'enlarge' }"
+    :fullscreen="optType === 'enlarge' && enlargeFullscreen"
     :style="dialogStyle"
     @close="handleClose"
   >
@@ -78,6 +80,34 @@
             /></el-icon>
             {{ t('chart.export_excel_formatter') }}
           </el-button>
+          <el-tooltip
+            v-if="optType === 'enlarge'"
+            :content="enlargeFullscreen ? '切换为窗口' : '切换为全屏'"
+          >
+            <button
+              type="button"
+              class="size-toggle"
+              :aria-label="enlargeFullscreen ? '切换为窗口' : '切换为全屏'"
+              :disabled="downLoading"
+              @click="toggleEnlargeSize"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <g v-if="enlargeFullscreen">
+                  <path d="M8 8V4h12v12h-4" />
+                  <rect x="4" y="8" width="12" height="12" rx="1" />
+                </g>
+                <path v-else d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />
+              </svg>
+            </button>
+          </el-tooltip>
           <el-divider
             class="close-divider"
             direction="vertical"
@@ -162,7 +192,7 @@ import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import { exportExcelDownload } from '@/views/chart/components/js/util'
 import { storeToRefs } from 'pinia'
 import { RefreshLeft } from '@element-plus/icons-vue'
-import { assign, merge } from 'lodash-es'
+import { assign } from 'lodash-es'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { ElMessage, ElButton } from 'element-plus-secondary'
 import { exportPivotExcel } from '@/views/chart/components/js/panel/common/common_table'
@@ -178,6 +208,12 @@ import html2canvas from 'html2canvas'
 const downLoading = ref(false)
 const dvMainStore = dvMainStoreWithOut()
 const dialogShow = ref(false)
+const enlargeFullscreen = ref(true)
+const toggleEnlargeSize = async () => {
+  enlargeFullscreen.value = !enlargeFullscreen.value
+  await nextTick()
+  initWatermark()
+}
 const requestStore = useRequestStoreWithOut()
 const permissionStore = usePermissionStoreWithOut()
 let viewInfo = ref<DeepPartial<ChartObj>>(null)
@@ -305,6 +341,7 @@ const dialogInit = (canvasStyle, view, item, opt, params = { scale: 0.5 }) => {
   sourceViewType.value = view.type
   detailsError.value = false
   optType.value = opt
+  enlargeFullscreen.value = opt === 'enlarge'
   dialogShow.value = true
   state.componentSourceType = view.type
   state.dataFrom = view.dataFrom
@@ -477,6 +514,39 @@ defineExpose({
 
 <style lang="less">
 .userViewEnlarge-class {
+  &.chart-enlarge-mode {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow: hidden;
+    height: 100dvh;
+    max-width: none;
+    &.is-fullscreen {
+      width: 100vw;
+      margin: 0;
+      border-radius: 0;
+    }
+    &:not(.is-fullscreen) {
+      width: 80vw !important;
+      height: 80dvh;
+      margin: 10dvh auto !important;
+    }
+    .ed-dialog__header {
+      flex-shrink: 0;
+    }
+    .ed-dialog__body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 20px 20px;
+    }
+    .enlarge-outer {
+      flex: 1;
+      min-height: 0;
+      height: auto;
+    }
+  }
   .ed-dialog__close {
     color: var(--ed-dialog__de-text) !important;
   }
@@ -529,6 +599,42 @@ defineExpose({
 <style lang="less" scoped>
 .export-button {
   margin-left: 16px;
+  .size-toggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    width: 32px;
+    height: 32px;
+    margin-left: 8px;
+    padding: 6px;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ed-dialog__de-text);
+    cursor: pointer;
+    svg,
+    svg * {
+      fill: none !important;
+    }
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+    &:hover {
+      color: var(--ed-color-primary, #4f5da5);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--ed-color-primary, #4f5da5);
+      outline-offset: 2px;
+    }
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
   .pixel-select {
     width: 125px;
     margin-right: 8px;

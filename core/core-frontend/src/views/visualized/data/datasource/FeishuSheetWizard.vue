@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatBeijingTime } from '@/utils/beijingTime'
 import AdminHelp from '@/views/company/admin/AdminHelp.vue'
 import '@/views/company/admin/admin.less'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -462,11 +463,14 @@ defineExpose({ open })
           <span>最近执行</span><strong>{{ status(latest?.status) }}</strong>
         </div>
         <div>
-          <span>最近成功 · UTC</span><strong>{{ latest?.lastSuccessAt || '等待首次同步' }}</strong>
+          <span>最近成功 · 北京时间</span
+          ><strong>{{ formatBeijingTime(latest?.lastSuccessAt, '等待首次同步') }}</strong>
         </div>
         <div>
           <span>调度</span
-          ><strong>{{ grouped ? '由任务组统一调度' : nextFire || '手动更新' }}</strong>
+          ><strong>{{
+            grouped ? '由任务组统一调度' : formatBeijingTime(nextFire, '手动更新')
+          }}</strong>
         </div>
         <el-button
           type="primary"
@@ -895,11 +899,12 @@ defineExpose({ open })
               ></template
             ></el-table-column
           >
-          <el-table-column
-            prop="requestedAt"
-            label="计划 / 请求时间（UTC）"
-            min-width="170"
-          /><el-table-column prop="finishedAt" label="完成时间（UTC）" min-width="170" />
+          <el-table-column label="计划 / 请求时间（北京时间）" min-width="190">
+            <template #default="{ row }">{{ formatBeijingTime(row.requestedAt) }}</template>
+          </el-table-column>
+          <el-table-column label="完成时间（北京时间）" min-width="190">
+            <template #default="{ row }">{{ formatBeijingTime(row.finishedAt) }}</template>
+          </el-table-column>
           <el-table-column prop="rows" label="同步行数" width="100" /><el-table-column
             prop="message"
             label="结果说明"

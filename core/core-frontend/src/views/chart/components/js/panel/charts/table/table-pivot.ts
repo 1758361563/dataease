@@ -93,6 +93,32 @@ class PivotAppearanceDataCell extends CustomDataCell {
 }
 
 class PivotAppearanceRowCell extends RowCell {
+  public getTextPosition() {
+    const position = super.getTextPosition()
+    const area = this.getTextArea()
+    const rowHeight = this.spreadsheet.options.style?.cellCfg?.height
+    const singleRow =
+      this.meta.isLeaf || (typeof rowHeight === 'number' && this.meta.height <= rowHeight + 1)
+    return {
+      ...position,
+      // S2's row-header scroll adjustment returns the TOP of the text box.
+      // Normal rows use a stable cell centre, including partially clipped rows.
+      // Merged headers retain viewport-aware positioning, converted to a middle baseline.
+      y: singleRow ? area.y + area.height / 2 : position.y + this.getTextStyle().fontSize / 2
+    }
+  }
+
+  public getIconYPosition() {
+    return this.getTextPosition().y - this.getStyle().icon.size / 2
+  }
+
+  public getIconPosition() {
+    const position = super.getIconPosition()
+    return this.textShape
+      ? { ...position, y: this.getTextPosition().y - this.getStyle().icon.size / 2 }
+      : position
+  }
+
   public getBackgroundColor() {
     return pivotTotalBackground(
       super.getBackgroundColor(),
@@ -758,7 +784,7 @@ export class TablePivot extends S2ChartView<PivotSheet> {
           fill: tableHeaderColFontColor,
           fontSize: tableHeader.tableTitleColFontSize,
           textAlign: tableHeader.tableHeaderColAlign,
-          textBaseline: 'top',
+          textBaseline: 'middle',
           fontStyle: colFontStyle,
           fontWeight: colFontWeight
         },

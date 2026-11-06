@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import icon_searchOutline_outlined from '@/assets/svg/icon_search-outline_outlined.svg'
-import icon_close_outlined from '@/assets/svg/icon_close_outlined.svg'
 import icon_deleteTrash_outlined from '@/assets/svg/icon_delete-trash_outlined.svg'
 import { ref, inject, computed, watch, onBeforeMount, toRefs, nextTick } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
@@ -12,11 +10,9 @@ import {
   dateOptions,
   valueOptions,
   textOptionsForSysParams,
-  sysParamsIlns,
-  fieldEnums
+  sysParamsIlns
 } from '@/views/visualized/data/dataset/options.js'
 import TimeSetDialog from '@/components/time-set-dialog/index.vue'
-import { iconFieldMap } from '@/components/icon-group/field-list'
 export interface Item {
   term: string
   fieldId: string
@@ -53,28 +49,16 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const { t } = useI18n()
-const enumInput = ref()
-const deElDropdownMenuFixed = ref()
-const showDel = ref(false)
-const keywords = ref('')
-const activeName = ref('')
-const filterFiled = ref('')
+
 const enumList = ref([])
-const showTextArea = ref()
-const keydownCanceled = ref(false)
-const checklist = ref([])
+const showTextArea = ref(false)
+
 const textareaValue = ref('')
 
 const { item } = toRefs(props)
 
 const getAuthTargetType = inject('getAuthTargetType')
 const filedList = inject('filedList')
-
-const checkListWithFilter = computed(() => {
-  if (!filterFiled.value) return enumList.value
-  const kw = String(filterFiled.value).toLowerCase()
-  return enumList.value.filter(ele => String(ele).toLowerCase().includes(kw))
-})
 
 const sysParamsIln = computed(() => {
   if (['in', 'not in'].includes(item.value.term)) {
@@ -119,10 +103,7 @@ const enumTerm = computed(() => item.value.filterType === 'enum')
 const termNeedsValue = computed(
   () => !['null', 'not_null', 'empty', 'not_empty'].includes(item.value.term)
 )
-const dimensions = computed(() => {
-  if (!keywords.value) return computedFiledList.value
-  return computedFiledList.value.filter(ele => ele.name.includes(keywords.value))
-})
+
 const computedFiledList = computed(() => {
   return Object.values(filedList.value || {})
 })
@@ -144,61 +125,9 @@ onBeforeMount(() => {
   initNameEnumName()
 })
 
-const confirm = () => {
-  if (['eq', 'not_eq'].includes(item.value.term) && checklist.value.length > 1) {
-    checklist.value = checklist.value.slice(0, 1)
-  }
-  cancelfixValue()
-  deElDropdownMenuFixed.value?.hide?.()
-}
-
-const cancelSelect = () => {
-  const { enumValue } = item.value
-  checklist.value = [...enumValue]
-  deElDropdownMenuFixed.value?.hide?.()
-}
-
-const openEnumPicker = () => {
-  checklist.value = [...(item.value.enumValue || [])]
-  filterFiled.value = ''
-  if (!enumList.value.length) {
-    initEnumOptions()
-  }
-}
-
-const initNameEnumName = () => {
-  const { name, enumValue, fieldId } = item.value
-  if (!name && fieldId) {
-    checklist.value = [...enumValue]
-  }
-  if (!name && !fieldId) return
-  initEnumOptions()
-  activeName.value = item.value.name
-  checklist.value = [...enumValue]
-  if (item.value.filterType === 'enum' && !item.value.term) item.value.term = 'in'
-}
-const cancelKeyDow = () => {
-  if (!showTextArea.value && !keydownCanceled.value) {
-    keydownCanceled.value = true
-  }
-  showTextArea.value = true
-}
 const filterTypeChangeTime = () => {
   item.value.term = ''
   item.value.timeValue = null
-}
-const initEnumOptions = () => {
-  // 查找枚举值
-  if (authTargetType.value === 'sysParams') {
-    return
-  }
-  const { deType, filterType, fieldId } = item.value
-  // 查找枚举值
-  if (filterType === 'enum' && [0, 5, 7].includes(deType)) {
-    multFieldValuesForPermissions({ fieldIds: [fieldId] }).then(res => {
-      enumList.value = optionData(res.data)
-    })
-  }
 }
 
 const dialogVisible = ref(false)
@@ -300,32 +229,6 @@ const optionData = data => {
   if (!data) return []
   return data.filter(item => item !== null && item !== undefined)
 }
-const cancel = () => {
-  item.value.name = activeName.value || ''
-}
-const cancelfixValue = () => {
-  item.value.enumValue = [...checklist.value]
-}
-const delChecks = idx => {
-  checklist.value.splice(idx, 1)
-}
-const selectItem = ({ name, id, deType }) => {
-  activeName.value = name
-  Object.assign(item.value, {
-    fieldId: id,
-    name,
-    deType,
-    filterType: [0, 5, 7].includes(deType) ? 'enum' : 'logic',
-    enumValue: [],
-    value: '',
-    term: [0, 5, 7].includes(deType) ? 'in' : 'eq',
-    filterTypeTime: 'dateValue',
-    timeValue: '',
-    dynamicTimeSetting: {}
-  })
-  checklist.value = []
-  initEnumOptions()
-}
 
 const filterListTime = [
   {
@@ -337,67 +240,6 @@ const filterListTime = [
     label: t('chart.dynamic')
   }
 ]
-const clearAll = () => {
-  checklist.value = []
-}
-
-const selectAll = () => {
-  checkListWithFilter.value.forEach(ele => {
-    if (!checklist.value.includes(ele)) {
-      checklist.value.push(ele)
-    }
-  })
-}
-
-const selectedInSearch = computed(() =>
-  checkListWithFilter.value.filter(ele => checklist.value.includes(ele))
-)
-const checkAll = computed(
-  () =>
-    checkListWithFilter.value.length > 0 &&
-    selectedInSearch.value.length === checkListWithFilter.value.length
-)
-const isIndeterminate = computed(() => selectedInSearch.value.length > 0 && !checkAll.value)
-const checkAllChange = val => {
-  if (val) {
-    selectAll()
-  } else {
-    checklist.value = checklist.value.filter(ele => !checkListWithFilter.value.includes(ele))
-  }
-}
-const enumSelectionChange = values => {
-  if (['eq', 'not_eq'].includes(item.value.term) && values.length > 1) {
-    checklist.value = values.slice(-1)
-  }
-}
-const operatorChange = term => {
-  if (['in', 'not in'].includes(term)) {
-    item.value.filterType = 'enum'
-    item.value.value = ''
-    initEnumOptions()
-  } else if (['like', 'not like', 'empty', 'not_empty'].includes(term)) {
-    item.value.filterType = 'logic'
-    item.value.enumValue = []
-    checklist.value = []
-  }
-  if (!termNeedsValue.value) {
-    item.value.value = ''
-    item.value.enumValue = []
-    checklist.value = []
-  }
-}
-const addFields = () => {
-  const list = textareaValue.value.split('\n').reduce((pre, next) => {
-    const str = next.trim()
-    if (!str) return pre
-    pre.add(str)
-    return pre
-  }, new Set([]))
-  if (list.size) {
-    checklist.value = [...new Set([...checklist.value, ...Array.from(list)])]
-  }
-  showTextArea.value = false
-}
 
 const timeDialogRef = ref()
 const showTimeDialog = (obj: any) => {
@@ -411,59 +253,138 @@ const saveTime = (type, value) => {
 }
 
 const emits = defineEmits(['update:item', 'del'])
+
+const enumLoading = ref(false)
+const enumLoadError = ref(false)
+let enumRequest = 0
+let enumRequestField = ''
+const filterPopperOptions = {
+  strategy: 'fixed',
+  modifiers: [
+    { name: 'flip', options: { fallbackPlacements: ['bottom-start', 'top-start'], padding: 12 } },
+    { name: 'preventOverflow', options: { boundary: 'viewport', padding: 12 } }
+  ]
+}
+const enumQuery = ref('')
+const enumOptions = computed(() => {
+  const values = [...new Set([...(item.value.enumValue || []), ...enumList.value])]
+  const query = enumQuery.value.trim().toLowerCase()
+  return query ? values.filter(value => String(value).toLowerCase().includes(query)) : values
+})
+const selectAllFiltered = () => {
+  item.value.enumValue = [...new Set([...item.value.enumValue, ...enumOptions.value])]
+}
+const initEnumOptions = async () => {
+  const { deType, filterType, fieldId } = item.value
+  if (
+    authTargetType.value === 'sysParams' ||
+    filterType !== 'enum' ||
+    ![0, 5, 7].includes(deType) ||
+    !fieldId
+  )
+    return
+  if (enumLoading.value && enumRequestField === String(fieldId)) return
+  const request = ++enumRequest
+  enumRequestField = String(fieldId)
+  enumLoading.value = true
+  enumLoadError.value = false
+  try {
+    const response = await multFieldValuesForPermissions({ fieldIds: [fieldId] })
+    if (request === enumRequest && String(item.value.fieldId) === String(fieldId))
+      enumList.value = optionData(response.data)
+  } catch {
+    if (request === enumRequest && String(item.value.fieldId) === String(fieldId))
+      enumLoadError.value = true
+  } finally {
+    if (request === enumRequest) enumLoading.value = false
+  }
+}
+const initNameEnumName = () => {
+  item.value.enumValue ||= []
+  if (item.value.filterType === 'enum' && !item.value.term) item.value.term = 'in'
+  initEnumOptions()
+}
+const openEnumPicker = (visible: boolean) => {
+  if (!visible) enumQuery.value = ''
+  if (visible && !enumList.value.length) initEnumOptions()
+}
+const selectItem = ({ name, id, deType }) => {
+  ++enumRequest
+  enumQuery.value = ''
+  enumLoading.value = false
+  enumList.value = []
+  Object.assign(item.value, {
+    fieldId: id,
+    name,
+    deType,
+    filterType: [0, 5, 7].includes(deType) ? 'enum' : 'logic',
+    enumValue: [],
+    value: '',
+    term: [0, 5, 7].includes(deType) ? 'in' : 'eq',
+    filterTypeTime: 'dateValue',
+    timeValue: '',
+    dynamicTimeSetting: {}
+  })
+  initEnumOptions()
+}
+const selectField = id => {
+  const field = computedFiledList.value.find(field => String(field.id) === String(id))
+  if (field) selectItem(field)
+  else selectItem({ id: '', name: '', deType: 0 })
+}
+const enumSelectionChange = values => {
+  if (['eq', 'not_eq'].includes(item.value.term) && values.length > 1)
+    item.value.enumValue = values.slice(-1)
+}
+const operatorChange = term => {
+  if (['in', 'not in'].includes(term)) {
+    item.value.filterType = 'enum'
+    item.value.value = ''
+    initEnumOptions()
+  } else if (['like', 'not like', 'empty', 'not_empty'].includes(term)) {
+    item.value.filterType = 'logic'
+    item.value.enumValue = []
+  }
+  if (['eq', 'not_eq'].includes(term) && item.value.enumValue.length > 1)
+    item.value.enumValue = item.value.enumValue.slice(0, 1)
+  if (!termNeedsValue.value) {
+    item.value.value = ''
+    item.value.enumValue = []
+  }
+}
+const addFields = () => {
+  const values = textareaValue.value
+    .split('\n')
+    .map(value => value.trim())
+    .filter(Boolean)
+  item.value.enumValue = [...new Set([...item.value.enumValue, ...values])]
+  textareaValue.value = ''
+  showTextArea.value = false
+}
 </script>
 
 <template>
   <div class="white-nowrap">
-    <div class="filed condition-row" @mouseover="showDel = true" @mouseleave="showDel = false">
-      <el-dropdown class="condition-field" trigger="click" :hide-on-click="false">
-        <el-input
-          :placeholder="t('auth.select_filter_fields')"
-          v-model="item.name"
-          size="small"
-          @input="cancel"
-        >
-        </el-input>
-        <template #dropdown>
-          <el-dropdown-menu class="de-el-dropdown-menu">
-            <el-input
-              @keydown.stop
-              :placeholder="t('auth.enter_keywords')"
-              size="small"
-              v-model="keywords"
-            >
-              <template #prefix>
-                <el-icon>
-                  <Icon name="icon_search-outline_outlined"
-                    ><icon_searchOutline_outlined class="svg-icon"
-                  /></Icon>
-                </el-icon>
-              </template>
-            </el-input>
-            <ul class="dimension">
-              <li
-                @click="selectItem(ele)"
-                :style="{
-                  backgroundColor: activeName === ele.name ? '#f0f7ff' : ''
-                }"
-                :key="ele.id"
-                v-for="ele in dimensions"
-              >
-                <el-icon>
-                  <Icon :className="`field-icon-${fieldEnums[ele.deType]}`"
-                    ><component
-                      class="svg-icon"
-                      :class="`field-icon-${fieldEnums[ele.deType]}`"
-                      :is="iconFieldMap[fieldEnums[ele.deType]]"
-                    ></component
-                  ></Icon>
-                </el-icon>
-                <span>{{ ele.name }}</span>
-              </li>
-            </ul>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+    <div class="filed condition-row">
+      <el-select
+        class="condition-field"
+        v-model="item.fieldId"
+        filterable
+        clearable
+        placeholder="选择或搜索字段"
+        placement="bottom-start"
+        popper-class="chart-filter-options"
+        :popper-options="filterPopperOptions"
+        @change="selectField"
+      >
+        <el-option
+          v-for="field in computedFiledList"
+          :key="field.id"
+          :label="field.name"
+          :value="field.id"
+          :title="field.name"
+        />
+      </el-select>
       <div class="condition-controls" v-if="item.fieldId">
         <el-select
           class="condition-operator"
@@ -518,7 +439,6 @@ const emits = defineEmits(['update:item', 'del'])
               v-model="item.value"
               controls-position="right"
             ></el-input-number>
-            <div class="bottom-line"></div>
           </template>
           <template v-else>
             <el-input
@@ -556,116 +476,59 @@ const emits = defineEmits(['update:item', 'del'])
                 v-model="item.value"
             /></el-tooltip>
             <el-input v-else class="condition-value" size="small" v-model="item.value" />
-            <div class="bottom-line"></div>
           </template>
         </template>
 
-        <el-popover
-          v-if="enumTerm && termNeedsValue"
-          popper-class="de-el-dropdown-menu-fixed"
-          width="min(560px, calc(100vw - 32px))"
-          trigger="click"
-          placement="top-start"
-          ref="deElDropdownMenuFixed"
-          :hide-on-click="false"
-          @show="openEnumPicker"
-        >
-          <template #reference>
-            <el-input
-              class="condition-value enum-value-summary"
-              :value="
-                item.enumValue.length > 1
-                  ? `${item.enumValue[0]} ${t('chart.enum_value_summary', {
-                      count: item.enumValue.length
-                    })}`
-                  : item.enumValue.join(',')
-              "
-              ref="enumInput"
-              size="small"
-              readonly
-              clearable
+        <div v-if="enumTerm && termNeedsValue" class="condition-enum">
+          <el-select
+            v-model="item.enumValue"
+            class="condition-value"
+            filterable
+            :filter-method="query => (enumQuery = query)"
+            multiple
+            allow-create
+            default-first-option
+            :reserve-keyword="false"
+            collapse-tags
+            collapse-tags-tooltip
+            :multiple-limit="['eq', 'not_eq'].includes(item.term) ? 1 : 0"
+            :loading="enumLoading"
+            placeholder="输入搜索或回车添加值"
+            placement="bottom-start"
+            popper-class="chart-filter-options"
+            :popper-options="filterPopperOptions"
+            @visible-change="openEnumPicker"
+            @change="enumSelectionChange"
+          >
+            <template #header>
+              <div v-if="!['eq', 'not_eq'].includes(item.term)" class="chart-filter-enum-actions">
+                <el-button link @mousedown.prevent @click="selectAllFiltered"
+                  >全选搜索结果</el-button
+                >
+                <el-button link @mousedown.prevent @click="item.enumValue = []">清空</el-button>
+              </div>
+            </template>
+            <el-option
+              v-for="value in enumOptions"
+              :key="String(value)"
+              :label="String(value)"
+              :value="value"
+              :title="String(value)"
+            />
+            <template #empty
+              ><div class="chart-filter-empty">
+                {{
+                  enumLoadError
+                    ? '加载失败，可直接输入值后回车添加'
+                    : '暂无匹配值，可直接输入后回车添加'
+                }}
+              </div></template
             >
-            </el-input>
-          </template>
-          <div class="de-panel clearfix">
-            <div class="enum-search">
-              <el-input :placeholder="t('auth.enter_keywords')" v-model="filterFiled"> </el-input>
-            </div>
-            <div class="enum-columns">
-              <div class="mod-left">
-                <ul class="autochecker-list">
-                  <div v-if="!['eq', 'not_eq'].includes(item.term)" class="select-all">
-                    <el-checkbox
-                      :model-value="checkAll"
-                      :indeterminate="isIndeterminate"
-                      :label="t('chart.select_current_search_results')"
-                      @change="checkAllChange"
-                    />
-                  </div>
-                  <el-scrollbar class="enum-scroll">
-                    <el-checkbox-group v-model="checklist" @change="enumSelectionChange">
-                      <li :key="i" v-for="i in checkListWithFilter" :title="i">
-                        <el-checkbox :label="i">{{ i }}</el-checkbox>
-                      </li>
-                    </el-checkbox-group>
-                  </el-scrollbar>
-                </ul>
-              </div>
-              <div class="mod-left right-de">
-                <div class="right-top clearfix">
-                  {{ t('common.list_selection') }}
-                  <div class="right-btn">
-                    <span @click="cancelKeyDow">
-                      <i class="el-icon-edit"></i>
-                      {{ t('auth.manual_input') }}
-                    </span>
-                    <transition name="el-zoom-in-top">
-                      <div v-if="showTextArea" class="de-el-dropdown-menu-manu">
-                        <div class="text-area">
-                          <textarea
-                            :placeholder="t('auth.please_fill')"
-                            class="input"
-                            v-model="textareaValue"
-                          ></textarea>
-                          <div class="text-area-btn">
-                            <button type="button" @click="showTextArea = false" class="btn">
-                              <span>{{ t('auth.close') }}</span>
-                            </button>
-                            <button type="button" @click="addFields" class="btn right-add">
-                              <span>{{ t('auth.add') }}</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </transition>
-                  </div>
-                </div>
-                <ul class="autochecker-list selected-list">
-                  <div class="clear-checkbox__label">
-                    <span>{{ t('auth.added') + ' ' + checklist.length }}</span
-                    ><span @click="clearAll">{{ t('user.clear_button') }}</span>
-                  </div>
-                  <el-scrollbar class="enum-scroll">
-                    <li :key="i" v-for="(i, idx) in checklist">
-                      <div :title="i" class="right-checkbox__label">{{ i }}</div>
-                      <el-icon @click="delChecks(idx)" class="remove-hover-icon">
-                        <Icon><icon_close_outlined class="svg-icon" /></Icon>
-                      </el-icon>
-                    </li>
-                  </el-scrollbar>
-                </ul>
-              </div>
-            </div>
-            <div class="right-menu-foot">
-              <el-button secondary @click="cancelSelect">
-                {{ t('common.cancel') }}
-              </el-button>
-              <el-button type="primary" @click="confirm">
-                {{ t('auth.sure') }}
-              </el-button>
-            </div>
-          </div>
-        </el-popover>
+          </el-select>
+          <el-button v-if="!['eq', 'not_eq'].includes(item.term)" link @click="showTextArea = true"
+            >批量输入</el-button
+          >
+        </div>
       </div>
       <el-icon class="font12 condition-delete" @click="emits('del')">
         <Icon name="icon_delete-trash_outlined"
@@ -673,6 +536,24 @@ const emits = defineEmits(['update:item', 'del'])
         /></Icon>
       </el-icon>
     </div>
+    <el-dialog
+      v-model="showTextArea"
+      title="批量输入筛选值"
+      width="min(520px, calc(100vw - 32px))"
+      append-to-body
+      destroy-on-close
+    >
+      <el-input
+        v-model="textareaValue"
+        type="textarea"
+        :rows="8"
+        placeholder="每行一个值，重复值会自动合并"
+      />
+      <template #footer>
+        <el-button @click="showTextArea = false">取消</el-button>
+        <el-button type="primary" @click="addFields">添加</el-button>
+      </template>
+    </el-dialog>
     <el-dialog
       class="create-dialog"
       append-to-body
@@ -696,655 +577,98 @@ const emits = defineEmits(['update:item', 'del'])
 
 <style lang="less" scoped>
 .white-nowrap {
-  white-space: nowrap;
+  min-width: 0;
 }
-.filed {
-  width: calc(100% - 20px);
-  min-height: 48px;
-  padding: 8px 10px;
-  box-sizing: border-box;
-  display: flex;
+.condition-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr) 24px;
   align-items: center;
-  margin-left: 20px;
-  min-width: 200px;
-  justify-content: left;
-  position: relative;
-  white-space: normal;
-  gap: 8px;
-  border: 1px solid #e5e6eb;
-  border-radius: 6px;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   background: #fff;
-
+  width: 100%;
+  box-sizing: border-box;
   .condition-field {
-    flex: 0 1 220px;
-    min-width: 140px;
+    min-width: 0;
+    width: 100%;
   }
-
   .condition-controls {
     display: flex;
-    flex: 1 1 360px;
-    min-width: 0;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    min-width: 0;
   }
-
   .condition-operator {
-    width: 132px !important;
-    flex: 0 0 132px;
+    flex: 0 0 130px;
+    width: 130px;
   }
-
   .condition-value {
-    width: min(280px, 100%) !important;
-    flex: 1 1 180px;
+    flex: 1 1 140px;
     min-width: 120px;
+    width: 100%;
   }
-
   .date-value-type {
-    width: 112px !important;
-    flex: 0 0 112px;
+    width: 110px;
+    flex: 0 0 110px;
   }
-
-  .condition-delete {
-    opacity: 0.7;
-    flex: 0 0 auto;
-  }
-  :deep(.ed-input-number.is-controls-right .ed-input__wrapper) {
-    padding-left: 1px !important;
-    padding-right: 1px !important;
-  }
-
-  .filed-title {
-    word-wrap: break-word;
-    line-height: 28px;
-    color: #7e7e7e;
-    font-size: 14px;
-    white-space: nowrap;
-    box-sizing: border-box;
-    margin-right: 5px;
-    display: inline-block;
-    min-width: 50px;
-    text-align: right;
-  }
-
-  .font12 {
-    font-size: 14px;
-    margin: 0 10px;
-    cursor: pointer;
-  }
-
-  .ed-input {
-    width: 170px;
-  }
-
-  .w100.ed-select {
-    width: 100px !important;
-  }
-
-  .w181.ed-select {
-    width: 181px !important;
-  }
-
-  .w70 {
-    width: 70px !important;
-  }
-
-  .mar5 {
-    margin-left: -5px;
-  }
-
-  :deep(.ed-input-number__decrease:not(.is-disabled)),
-  :deep(.ed-input-number__increase:not(.is-disabled)) {
-    &:hover {
-      z-index: 10;
-      &::after {
-        display: block;
-      }
-      & ~ .ed-input:not(.is-disabled) .ed-input__wrapper {
-        box-shadow: 0 0 0 0 #000 inset !important;
-      }
-    }
-  }
-  :deep(.ed-input-number__decrease),
-  :deep(.ed-input-number__increase) {
-    width: 20px;
-    height: 12px;
+  .condition-enum {
     display: flex;
+    flex: 1;
     align-items: center;
-    justify-content: center;
-    transition: height 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
-    display: none;
+    gap: 8px;
+    min-width: 0;
   }
-
-  :deep(.ed-input-number__decrease:hover) {
-    height: 16px;
-    & + .ed-input-number__increase {
-      height: 8px;
-    }
-  }
-  :deep(.ed-input-number__increase:hover) {
-    height: 16px;
-    & + .ed-input-number__decrease {
-      height: 8px;
-    }
-  }
-
-  .bottom-line {
-    font-family: var(--de-custom_font, 'PingFang');
-    font-variant: tabular-nums;
-    font-feature-settings: 'tnum';
-    word-wrap: break-word;
-    text-align: left;
-    line-height: 28px;
-    color: #7e7e7e;
-    white-space: pre;
-    box-sizing: border-box;
-    height: 1px;
-    background-color: #000;
-    opacity: 0.3;
-    position: absolute;
-    right: 5px;
-    bottom: 5px;
-    width: 70px;
-    z-index: 10;
-  }
-
-  :deep(.ed-input-number.is-controls-right .ed-input__inner) {
-    padding-right: 20px;
-  }
-
-  .ed-input-number {
-    line-height: 26px;
-    height: 26px;
-  }
-
-  :deep(.ed-select) {
-    :deep(.ed-input__suffix-inner) {
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      .ed-input__icon {
-        height: auto;
-      }
-    }
-  }
-
-  :deep(.ed-input__wrapper),
-  :deep(.ed-select__wrapper) {
-    background-color: #f8f8fa;
-    border: none;
-    border-radius: 0;
-    box-shadow: none !important;
-    height: 26px;
-    font-family: var(--de-custom_font, 'PingFang');
-    word-wrap: break-word;
-    text-align: left;
-    color: rgba(0, 0, 0, 0.65);
-    font-size: 14px;
-    list-style: none;
-    user-select: none;
+  .condition-delete {
     cursor: pointer;
-    line-height: 26px;
-    box-sizing: border-box;
-    max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    opacity: 1;
+    color: #64748b;
+    justify-self: center;
   }
-  :deep(.ed-select .ed-input.is-focus .ed-input__wrapper),
-  :deep(.ed-select:hover:not(.ed-select--disabled) .ed-input__wrapper),
-  :deep(.ed-select .ed-input__wrapper.is-focus) {
-    box-shadow: none !important;
+  .condition-delete:hover {
+    color: #dc2626;
   }
-
-  i {
-    margin-left: 5px;
-    color: #7e7e7e;
+  :deep(.ed-select__wrapper),
+  :deep(.ed-input__wrapper) {
+    min-height: 36px;
+    font-size: 14px;
+    border-radius: 6px;
   }
 }
-.filed:hover {
-  background-color: #f8f9fa;
-  border-color: #bbbfc4;
-  :deep(.ed-input-number__decrease),
-  :deep(.ed-input-number__increase) {
-    display: flex;
+@media (max-width: 720px) {
+  .condition-row {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    gap: 8px;
+  }
+  .condition-controls {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .condition-delete {
+    grid-column: 2;
+    grid-row: 1;
   }
 }
 </style>
-
 <style lang="less">
-.de-el-dropdown-menu {
-  .dimension {
-    max-height: 200px;
-    padding: 0;
-    overflow-y: auto;
-    li {
-      list-style: none;
-      box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      white-space: nowrap;
-      cursor: pointer;
-      transition: color 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
-        border-color 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
-        background 0.3s cubic-bezier(0.645, 0.045, 0.355, 1),
-        padding 0.15s cubic-bezier(0.645, 0.045, 0.355, 1);
-      position: relative;
-      overflow: hidden;
-      font-size: 14px;
-      text-overflow: ellipsis;
-      padding: 0 16px 0 28px;
-      line-height: 32px;
-      height: 32px;
-      margin: 0;
-      padding-left: 16px;
-      color: rgba(0, 0, 0, 0.65);
-      .ed-icon {
-        margin-right: 5px;
-      }
-    }
-    li:hover {
-      color: #2e74ff;
-      background-color: #f0f7ff;
-    }
+.chart-filter-options {
+  max-width: calc(100vw - 32px);
+  .ed-select-dropdown__wrap {
+    max-height: min(240px, 40dvh);
   }
-
-  .ed-input {
-    font-family: inherit;
-    overflow: visible;
-    box-sizing: border-box;
-    margin: 0;
-    font-variant: tabular-nums;
-    list-style: none;
-    font-feature-settings: 'tnum';
-    display: inline-block;
-    width: 100%;
-    height: 28px;
-    padding: 4px 7px;
-    color: rgba(0, 0, 0, 0.65);
-    font-size: 14px;
-    line-height: 28px;
-    background-color: #fff;
-    background-image: none;
-    transition: all 0.3s;
-    touch-action: manipulation;
-    text-overflow: ellipsis;
-    position: relative;
-    text-align: inherit;
-    min-height: 100%;
-    border: 0;
-    border-radius: 0;
-    padding-left: 26px;
-
-    .ed-input__wrapper {
-      box-shadow: none;
-      border-bottom: 1px solid #e5e5e5;
-      &:focus {
-        box-shadow: 0 0 0 2px rgb(46 116 255 / 20%);
-        border-right-width: 1px !important;
-        outline: 0;
-        border-color: none;
-      }
-    }
-  }
-
-  .ed-input {
-    font-family: var(--de-custom_font, 'PingFang');
-    box-sizing: border-box;
-    margin: 0;
-    color: rgba(0, 0, 0, 0.65);
-    font-size: 14px;
-    font-variant: tabular-nums;
-    line-height: 1.5;
-    list-style: none;
-    font-feature-settings: 'tnum';
-    position: relative;
-    display: inline-block;
-    width: 100%;
-    text-align: start;
-    padding: 0 6px;
+  .ed-select-dropdown__item {
+    max-width: min(440px, calc(100vw - 48px));
   }
 }
-
-.de-el-dropdown-menu-fixed {
-  padding: 0 !important;
-  border: none !important;
-  max-width: calc(100vw - 32px) !important;
-  max-height: calc(100vh - 32px);
-  overflow: hidden;
-  .de-panel {
-    color: rgba(0, 0, 0, 0.65);
-    font-size: 14px;
-    box-sizing: border-box;
-    position: relative;
-    padding: 0;
-    width: 560px;
-    max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 48px);
-    display: flex;
-    flex-direction: column;
-    min-height: 30px;
-    background-color: #fff;
-    box-shadow: none;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    .right-menu-foot {
-      position: relative;
-      z-index: 20;
-      background: #fff;
-      text-align: right;
-      padding: 5px;
-      float: right;
-      width: 100%;
-      border-top: 1px solid hsla(0, 0%, 59%, 0.1);
-      flex: 0 0 auto;
-      .ed-button {
-        line-height: 28px;
-        height: 28px;
-        min-width: 70px;
-      }
-    }
-    .mod-left {
-      font-family: var(--de-custom_font, 'PingFang');
-      color: rgba(0, 0, 0, 0.65);
-      font-size: 14px;
-      vertical-align: top;
-      padding: 5px;
-      width: 50%;
-      min-width: 0;
-      height: min(340px, calc(100vh - 180px));
-      box-sizing: border-box;
-      .ed-input__wrapper {
-        font-family: inherit;
-        overflow: visible;
-        box-sizing: border-box;
-        margin: 0;
-        position: relative;
-        display: inline-block;
-        color: rgba(0, 0, 0, 0.65);
-        font-size: 14px;
-        line-height: 28px;
-        background-color: #fff;
-        background-image: none;
-        border-radius: 2px;
-        transition: all 0.3s;
-        -webkit-appearance: none;
-        touch-action: manipulation;
-        text-overflow: ellipsis;
-        width: 100%;
-        border-bottom: 1px solid hsla(0, 0%, 59%, 0.1);
-        border: 1px solid hsla(0, 0%, 59%, 0.1);
-        height: 30px;
-        padding: 0 8px;
-        outline: 0;
-
-        &:focus {
-          box-shadow: 0 0 0 2px rgb(46 116 255 / 20%);
-          border-right-width: 1px !important;
-          outline: 0;
-          border-color: none;
-        }
-      }
-    }
-
-    .enum-search {
-      flex: 0 0 auto;
-      padding: 10px;
-      border-bottom: 1px solid #f0f0f0;
-    }
-
-    .enum-columns {
-      display: flex;
-      min-height: 0;
-    }
-
-    .enum-scroll {
-      height: calc(100% - 34px);
-    }
-
-    .right-de {
-      border-left: 1px solid hsla(0, 0%, 59%, 0.1);
-    }
-    .autochecker-list {
-      width: 100%;
-      position: relative;
-
-      .select-all {
-        padding: 0 5px;
-        .ed-checkbox__label {
-          font-weight: 400;
-        }
-      }
-
-      .clear-checkbox__label {
-        display: flex;
-        align-items: center;
-        line-height: 32px;
-        padding: 0 5px;
-        height: 32px;
-        font-weight: 400;
-        width: 100%;
-        justify-content: space-between;
-        :nth-child(2) {
-          height: 26px;
-          line-height: 26px;
-          border-radius: 6px;
-          padding: 0 4px;
-          color: var(--ed-color-primary, #3370ff);
-          &:hover {
-            background-color: var(--ed-color-primary-1a, #3370ff1a);
-          }
-        }
-      }
-
-      .right-checkbox__label {
-        text-overflow: ellipsis;
-        overflow: hidden;
-        width: 140px;
-        color: #1f2329;
-        white-space: nowrap;
-        font-weight: 400;
-        font-size: 14px;
-      }
-
-      li {
-        padding: 0 5px;
-        list-style: none;
-        display: flex;
-        align-items: center;
-        line-height: 32px;
-        height: 32px;
-        width: 100%;
-        position: relative;
-        .ed-checkbox__label {
-          text-overflow: ellipsis;
-          overflow: hidden;
-          width: 140px;
-          white-space: nowrap;
-          font-weight: 400;
-        }
-
-        &:hover {
-          background-color: #1f23291a;
-        }
-
-        .remove-hover-icon {
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
-          color: #8f959e;
-          margin: 4px;
-          &:hover {
-            width: 24px;
-            margin: 0px;
-            height: 24px;
-            border-radius: 6px;
-            background-color: #1f23291a;
-          }
-        }
-      }
-    }
-
-    .right-top {
-      color: rgba(0, 0, 0, 0.65);
-      text-align: left;
-      box-sizing: border-box;
-      zoom: 1;
-      border-bottom: 1px solid #f8f8fa;
-      height: 30px;
-      width: 100%;
-      font-size: 14px;
-      line-height: 27px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-
-      .right-btn {
-        color: rgba(0, 0, 0, 0.65);
-        font-size: 14px;
-        box-sizing: border-box;
-        position: relative;
-        z-index: 10;
-        float: right;
-        cursor: pointer;
-        line-height: 25px;
-        padding: 0 5px;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        background: rgba(70, 140, 255, 0.1);
-        width: 75px;
-      }
-    }
-  }
+.chart-filter-empty {
+  padding: 14px;
+  color: #64748b;
+  font-size: 13px;
 }
-
-.de-el-dropdown-menu-manu {
-  padding: 0;
-  margin: 5px 0;
-  background-color: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  margin-top: 12px;
-  position: absolute;
-  top: 20px;
-  width: 150px;
-  box-sizing: border-box;
-  right: 0;
-  .text-area {
-    box-sizing: border-box;
-    height: 220px;
-    position: relative;
-    .input {
-      touch-action: manipulation;
-      overflow: auto;
-      resize: vertical;
-      box-sizing: border-box;
-      position: relative;
-      display: inline-block;
-      color: rgba(0, 0, 0, 0.65);
-      font-size: 14px;
-      background-color: #fff;
-      background-image: none;
-      max-width: 100%;
-      min-height: 28px;
-      line-height: 1.5;
-      vertical-align: bottom;
-      transition: all 0.3s, height 0s;
-      text-overflow: ellipsis;
-      outline: 0;
-      padding: 5px 5px 28px;
-      width: 100%;
-      height: 220px;
-      border-radius: 0;
-      border: none;
-      box-shadow: 0 2px 6px 0 rgba(130, 150, 183, 0.72);
-    }
-
-    .text-area-btn {
-      position: absolute;
-      width: 100%;
-      text-align: center;
-      background: #fff;
-      bottom: -1px;
-      padding-bottom: 4px;
-
-      .btn {
-        font-weight: 400;
-        text-align: center;
-        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.015);
-        transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
-        user-select: none;
-        touch-action: manipulation;
-        height: 28px;
-        padding: 0 15px;
-        font-size: 14px;
-        color: rgba(0, 0, 0, 0.65);
-        background-color: #fff;
-        outline: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 1;
-        -webkit-appearance: button;
-        cursor: pointer;
-        border-radius: 0;
-        width: 70px;
-        border: 1px solid rgba(33, 83, 212, 0.9);
-      }
-
-      .right-add {
-        background: #2153d4;
-        color: #fff;
-      }
-    }
-  }
-}
-
-.clearfix:after {
-  content: '020';
-  display: block;
-  height: 0;
-  clear: both;
-  visibility: hidden;
-}
-
-.clearfix {
-  /* 触发 hasLayout */
-  zoom: 1;
-}
-
-@media (max-width: 720px) {
-  .filed.condition-row {
-    align-items: stretch;
-    flex-wrap: wrap;
-
-    .condition-field,
-    .condition-controls {
-      flex-basis: 100%;
-      width: 100%;
-    }
-
-    .condition-controls {
-      flex-wrap: wrap;
-    }
-  }
-
-  .de-el-dropdown-menu-fixed .de-panel {
-    .enum-columns {
-      flex-direction: column;
-      overflow-y: auto;
-    }
-
-    .mod-left {
-      width: 100%;
-      height: min(220px, calc((100vh - 190px) / 2));
-    }
-
-    .right-de {
-      border-left: 0;
-      border-top: 1px solid hsla(0, 0%, 59%, 0.1);
-    }
-  }
+.chart-filter-enum-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }
 </style>
