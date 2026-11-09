@@ -55,6 +55,7 @@ import tableNormalOrigin from '@/assets/svg/table-normal-origin.svg'
 import tablePivotOrigin from '@/assets/svg/table-pivot-origin.svg'
 import treemapOrigin from '@/assets/svg/treemap-origin.svg'
 import waterfallOrigin from '@/assets/svg/waterfall-origin.svg'
+import paretoOrigin from '@/assets/svg/pareto.svg'
 import wordCloudOrigin from '@/assets/svg/word-cloud-origin.svg'
 import tHeatmapOrigin from '@/assets/svg/t-heatmap-origin.svg'
 import dvEyeClose from '@/assets/svg/dv-eye-close.svg'
@@ -250,6 +251,7 @@ const iconMap = {
   'table-pivot-origin': tablePivotOrigin,
   'treemap-origin': treemapOrigin,
   'waterfall-origin': waterfallOrigin,
+  'pareto-origin': paretoOrigin,
   'word-cloud-origin': wordCloudOrigin,
   't-heatmap-origin': tHeatmapOrigin,
   group: group,

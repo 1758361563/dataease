@@ -50,6 +50,25 @@ public class UpdateSchedules implements ApplicationRunner {
         Trigger trigger = scheduler.getTrigger(new TriggerKey(taskId, group()));
         return trigger == null || trigger.getNextFireTime() == null ? "" : trigger.getNextFireTime().toInstant().toString();
     }
+    /** Project a Beijing calendar day using the schedule's own timezone; never submit runs. */
+    static Map<String,Object> plannedTimes(String cron, String timezone, String date) {
+        try {
+            LocalDate day = LocalDate.parse(date);
+            var start = day.atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant();
+            var end = day.plusDays(1).atStartOfDay(ZoneId.of("Asia/Shanghai")).toInstant();
+            var expression = new CronExpression(cron);
+            expression.setTimeZone(TimeZone.getTimeZone(ZoneId.of(timezone)));
+            List<String> times = new ArrayList<>();
+            Date next = expression.getNextValidTimeAfter(Date.from(start.minusMillis(1)));
+            while (next != null && next.toInstant().isBefore(end) && times.size() < 1000) {
+                times.add(next.toInstant().toString());
+                next = expression.getNextValidTimeAfter(next);
+            }
+            return Map.of("values", times, "truncated", next != null && next.toInstant().isBefore(end));
+        } catch (java.text.ParseException | java.time.DateTimeException ex) {
+            throw new UpdateDefinition.ValidationException("调度日期、Cron 或时区无效");
+        }
+    }
     @DisallowConcurrentExecution
     public static class UpdateJob implements Job {
         @Override public void execute(JobExecutionContext context) throws JobExecutionException {

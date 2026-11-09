@@ -59,6 +59,11 @@ declare interface ChartAttr {
  * 基础样式设置
  */
 declare interface ChartBasicStyle {
+  paretoLineColor?: string
+  paretoThreshold?: number
+  paretoThresholdShow?: boolean
+  paretoValueLabels?: boolean
+  paretoPercentLabels?: boolean
   /** Versioned pivot-only defaults; preserves subsequent manual style edits. */
   pivotAppearanceVersion?: 1 | 2 | 3 | 4
   tableStyleVersion?: number

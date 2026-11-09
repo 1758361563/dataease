@@ -7,6 +7,7 @@ import { ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { Codemirror } from 'vue-codemirror'
 import { sql } from '@codemirror/lang-sql'
 import DataUpdateDrawer from './DataUpdateDrawer.vue'
+import DataUpdateSchedule from './DataUpdateSchedule.vue'
 import FeishuSheetWizard from './FeishuSheetWizard.vue'
 const sheetWizard = ref<InstanceType<typeof FeishuSheetWizard>>()
 import { fetchDataUpdates, dataUpdateStatus } from '@/api/company/dataUpdate'
@@ -38,6 +39,7 @@ const state = ref<DataUpdateState>({
 const groups = ref<UpdateGroup[]>([])
 const operations = ref<DdlOperation[]>([])
 const loading = ref(false)
+const workspaceTab = ref('tasks')
 const submitting = ref(false)
 const drawer = ref<InstanceType<typeof DataUpdateDrawer>>()
 const tasks = computed(() =>
@@ -200,6 +202,9 @@ const groupForm = ref<UpdateGroup>({
   timezone: 'Asia/Shanghai',
   owner: null
 })
+const groupTasks = computed(() =>
+  state.value.tasks.filter(task => task.definition.datasourceId === groupForm.value.datasourceId)
+)
 function editGroup(group?: UpdateGroup) {
   groupForm.value = group
     ? structuredClone(group)
@@ -344,95 +349,111 @@ reloadInBackground()
       ><el-button @click="editGroup()">新建任务组</el-button
       ><el-button type="primary" @click="newTask">新建更新任务</el-button>
     </div>
-    <el-table :data="tasks" empty-text="尚未配置更新任务">
-      <el-table-column label="目标表"
-        ><template #default="{ row }">{{ row.definition.table }}</template></el-table-column
-      >
-      <el-table-column label="执行方式" width="130"
-        ><template #default="{ row }">{{
-          row.definition.mode === 'FEISHU'
-            ? '飞书电子表格'
-            : row.definition.mode === 'QUERY'
-            ? '查询抽取'
-            : 'SQL 聚合'
-        }}</template></el-table-column
-      >
-      <el-table-column label="调度" width="180"
-        ><template #default="{ row }">{{
-          row.grouped ? '任务组统一调度' : row.definition.enabled ? '自动调度已开启' : '手动'
-        }}</template></el-table-column
-      >
-      <el-table-column label="操作" width="140"
-        ><template #default="{ row }"
-          ><el-button text @click="drawer?.open(datasourceId, row.definition.table)"
-            >配置 / 记录</el-button
-          ></template
-        ></el-table-column
-      >
-      <el-table-column label="最近结果" width="110"
-        ><template #default="{ row }">{{
-          status(row.latest?.status || '—')
-        }}</template></el-table-column
-      >
-      <el-table-column label="更新状态" width="120"
-        ><template #default="{ row }"
-          ><el-tag v-if="row.freshness === 'OVERDUE'" type="warning">更新已超期</el-tag
-          ><span v-else>{{
-            row.freshness === 'WAITING' ? '等待首次计划' : row.grouped ? '跟随任务组' : '—'
-          }}</span></template
-        ></el-table-column
-      >
-      <el-table-column label="最近成功（北京时间）" min-width="180"
-        ><template #default="{ row }">{{
-          formatBeijingTime(row.latest?.lastSuccessAt)
-        }}</template></el-table-column
-      >
-    </el-table>
-    <h3>任务组</h3>
-    <AdminHelp
-      content="组内任务每批执行一次，依赖使用本批输入；共享输入在本批结束前保持稳定。加入组后由组统一调度。"
+    <el-tabs v-model="workspaceTab" class="workspace-tabs">
+      <el-tab-pane label="更新任务" name="tasks" />
+      <el-tab-pane label="调度计划" name="schedule" />
+    </el-tabs>
+    <DataUpdateSchedule
+      v-if="workspaceTab === 'schedule'"
+      :state="state"
+      :groups="groups"
+      :datasource-id="datasourceId"
+      @configure="(id, table) => drawer?.open(id, table)"
+      @group="editGroup"
     />
-    <el-table :data="localGroups" empty-text="暂无任务组">
-      <el-table-column prop="name" label="名称" /><el-table-column label="任务数" width="90"
-        ><template #default="{ row }">{{ row.tasks.length }}</template></el-table-column
-      >
-      <el-table-column label="自动调度" width="120"
-        ><template #default="{ row }">{{
-          row.enabled
-            ? row.owner === state.instanceId && !state.hardDisabled
-              ? '已开启'
-              : '当前实例未启用'
-            : '关闭'
-        }}</template></el-table-column
-      >
-      <el-table-column label="操作" width="240"
-        ><template #default="{ row }"
-          ><el-button text @click="editGroup(row)">编辑</el-button
-          ><el-button text @click="openHistory(row)">执行 / 批次</el-button
-          ><el-button text type="danger" @click="removeGroup(row)">解散</el-button></template
-        ></el-table-column
-      >
-    </el-table>
-    <h3>建表操作</h3>
-    <el-table :data="operations" empty-text="暂无建表操作">
-      <el-table-column prop="table_name" label="目标表" /><el-table-column label="状态" width="120"
-        ><template #default="{ row }">{{ status(row.status) }}</template></el-table-column
-      >
-      <el-table-column prop="completed_steps" label="完成步骤" width="110" /><el-table-column
-        prop="message"
-        label="结果"
+    <template v-else>
+      <el-table :data="tasks" empty-text="尚未配置更新任务">
+        <el-table-column label="目标表"
+          ><template #default="{ row }">{{ row.definition.table }}</template></el-table-column
+        >
+        <el-table-column label="执行方式" width="130"
+          ><template #default="{ row }">{{
+            row.definition.mode === 'FEISHU'
+              ? '飞书电子表格'
+              : row.definition.mode === 'QUERY'
+              ? '查询抽取'
+              : 'SQL 聚合'
+          }}</template></el-table-column
+        >
+        <el-table-column label="调度" width="180"
+          ><template #default="{ row }">{{
+            row.grouped ? '任务组统一调度' : row.definition.enabled ? '自动调度已开启' : '手动'
+          }}</template></el-table-column
+        >
+        <el-table-column label="操作" width="140"
+          ><template #default="{ row }"
+            ><el-button text @click="drawer?.open(datasourceId, row.definition.table)"
+              >配置 / 记录</el-button
+            ></template
+          ></el-table-column
+        >
+        <el-table-column label="最近结果" width="110"
+          ><template #default="{ row }">{{
+            status(row.latest?.status || '—')
+          }}</template></el-table-column
+        >
+        <el-table-column label="更新状态" width="120"
+          ><template #default="{ row }"
+            ><el-tag v-if="row.freshness === 'OVERDUE'" type="warning">更新已超期</el-tag
+            ><span v-else>{{
+              row.freshness === 'WAITING' ? '等待首次计划' : row.grouped ? '跟随任务组' : '—'
+            }}</span></template
+          ></el-table-column
+        >
+        <el-table-column label="最近成功（北京时间）" min-width="180"
+          ><template #default="{ row }">{{
+            formatBeijingTime(row.latest?.lastSuccessAt)
+          }}</template></el-table-column
+        >
+      </el-table>
+      <h3>任务组</h3>
+      <AdminHelp
+        content="组内任务每批执行一次，依赖使用本批输入；共享输入在本批结束前保持稳定。加入组后由组统一调度。"
       />
-      <el-table-column label="操作" width="150"
-        ><template #default="{ row }"
-          ><el-button
-            v-if="['NEEDS_REVIEW', 'RUNNING'].includes(row.status)"
-            text
-            @click="reconcileDdl(row)"
-            >核查并解除占用</el-button
-          ></template
-        ></el-table-column
-      >
-    </el-table>
+      <el-table :data="localGroups" empty-text="暂无任务组">
+        <el-table-column prop="name" label="名称" /><el-table-column label="任务数" width="90"
+          ><template #default="{ row }">{{ row.tasks.length }}</template></el-table-column
+        >
+        <el-table-column label="自动调度" width="120"
+          ><template #default="{ row }">{{
+            row.enabled
+              ? row.owner === state.instanceId && !state.hardDisabled
+                ? '已开启'
+                : '当前实例未启用'
+              : '关闭'
+          }}</template></el-table-column
+        >
+        <el-table-column label="操作" width="240"
+          ><template #default="{ row }"
+            ><el-button text @click="editGroup(row)">编辑</el-button
+            ><el-button text @click="openHistory(row)">执行 / 批次</el-button
+            ><el-button text type="danger" @click="removeGroup(row)">解散</el-button></template
+          ></el-table-column
+        >
+      </el-table>
+      <h3>建表操作</h3>
+      <el-table :data="operations" empty-text="暂无建表操作">
+        <el-table-column prop="table_name" label="目标表" /><el-table-column
+          label="状态"
+          width="120"
+          ><template #default="{ row }">{{ status(row.status) }}</template></el-table-column
+        >
+        <el-table-column prop="completed_steps" label="完成步骤" width="110" /><el-table-column
+          prop="message"
+          label="结果"
+        />
+        <el-table-column label="操作" width="150"
+          ><template #default="{ row }"
+            ><el-button
+              v-if="['NEEDS_REVIEW', 'RUNNING'].includes(row.status)"
+              text
+              @click="reconcileDdl(row)"
+              >核查并解除占用</el-button
+            ></template
+          ></el-table-column
+        >
+      </el-table>
+    </template>
     <DataUpdateDrawer ref="drawer" @saved="reload" />
 
     <el-dialog
@@ -526,7 +547,7 @@ reloadInBackground()
         <el-form-item label="组内任务"
           ><el-select v-model="groupForm.tasks" multiple filterable style="width: 100%"
             ><el-option
-              v-for="task in tasks"
+              v-for="task in groupTasks"
               :key="task.definition.id || ''"
               :value="task.definition.id || ''"
               :label="task.definition.table"

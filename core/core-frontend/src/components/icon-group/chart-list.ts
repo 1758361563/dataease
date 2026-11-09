@@ -1,4 +1,5 @@
 import outerParams from '@/assets/svg/icon_params_setting.svg'
+import pareto from '@/assets/svg/pareto.svg'
 import filter from '@/assets/svg/filter.svg'
 import pictureGroup from '@/assets/svg/picture-group.svg'
 import richText from '@/assets/svg/rich-text.svg'
@@ -8,6 +9,7 @@ import { iconChartMapEmpty } from './chart-list-empty'
 const svgs = import.meta.glob('@/assets/svg/chart-light/*.svg')
 
 const iconChartMap = {
+  pareto,
   'chart-mix-dual-line': chartMixDualLine,
   'rich-text': richText,
   'picture-group': pictureGroup,

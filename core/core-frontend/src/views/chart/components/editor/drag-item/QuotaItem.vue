@@ -420,6 +420,7 @@ const NOT_SUPPORT_SORT = [
 ]
 
 const showSort = computed(() => {
+  if (chart.value.type === 'pareto') return false
   if (chart.value.type === 'multi-scatter') {
     return false
   }
@@ -806,7 +807,7 @@ onMounted(() => {
           <el-dropdown-item
             @click.prevent
             v-if="
-              !['table-info', 'bullet-graph', 'multi-scatter'].includes(chart.type) &&
+              !['table-info', 'bullet-graph', 'multi-scatter', 'pareto'].includes(chart.type) &&
               props.type !== 'extBubble'
             "
           >

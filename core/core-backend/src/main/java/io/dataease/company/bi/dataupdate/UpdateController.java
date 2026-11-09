@@ -44,6 +44,16 @@ public class UpdateController {
                 (rs,n) -> Map.of("id", rs.getString(1), "name", rs.getString(2), "type", rs.getString(3), "schema", connections.schema(rs.getString(1)))));
         return result;
     }
+    @GetMapping("/schedule") public Object schedule(@RequestParam String date) {
+        admin();
+        var plans = new ArrayList<Map<String,Object>>();
+        for (var task : store.all()) {
+            if (!task.enabled() || task.trigger()!=UpdateDefinition.Trigger.CRON || store.grouped(task.id())) continue;
+            plans.add(Map.of("id", task.id(), "times", UpdateSchedules.plannedTimes(task.cron(), task.timezone(), date),
+                    "effective", runtime.owns(task)));
+        }
+        return plans;
+    }
     @PostMapping public UpdateDefinition save(@RequestBody UpdateDefinition task, HttpServletRequest request) {
         long user = admin();
         require(task.mode()!=UpdateDefinition.Mode.FEISHU,"请通过飞书来源配置入口保存");

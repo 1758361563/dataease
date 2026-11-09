@@ -258,6 +258,7 @@ const showCustomSort = item => {
 
 const NOT_SUPPORT_SORT = ['word-cloud', 'stock-line', 'treemap', 'circle-packing']
 const showSort = computed(() => {
+  if (props.chart.type === 'pareto') return false
   const { type: chartType } = props.chart
   const { type: propType } = props
   const notShowSort = NOT_SUPPORT_SORT.includes(chartType)

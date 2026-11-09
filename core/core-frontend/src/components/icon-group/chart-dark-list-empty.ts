@@ -1,4 +1,5 @@
 import richTextDark from '@/assets/svg/rich-text-dark.svg'
+import pareto from '@/assets/svg/pareto.svg'
 import chartMixDualLineDark from '@/assets/svg/empty-dark/icon_line_light.svg'
 import { defineAsyncComponent } from 'vue'
 const svgs = import.meta.glob('@/assets/svg/empty-dark/*.svg')
@@ -50,6 +51,7 @@ const iconChartMapEmpty = {
   'icon_word-cloud_light': 'word-cloud-dark'
 }
 const iconChartDarkMap = {
+  'pareto-dark': pareto,
   'chart-mix-dual-line-dark': chartMixDualLineDark,
   'rich-text-dark': richTextDark
 }

@@ -412,6 +412,46 @@ onMounted(async () => {
 </script>
 <template>
   <el-form size="small" style="width: 100%">
+    <template v-if="chart.type === 'pareto'">
+      <el-form-item label="累计线颜色" class="form-item" :class="'form-item-' + themes">
+        <el-color-picker
+          v-model="state.basicStyleForm.paretoLineColor"
+          @change="changeBasicStyle('paretoLineColor')"
+        />
+      </el-form-item>
+      <el-form-item label="参考线" class="form-item" :class="'form-item-' + themes">
+        <el-switch
+          v-model="state.basicStyleForm.paretoThresholdShow"
+          @change="changeBasicStyle('paretoThresholdShow')"
+        />
+      </el-form-item>
+      <el-form-item
+        v-if="state.basicStyleForm.paretoThresholdShow"
+        label="参考比例（%）"
+        class="form-item"
+        :class="'form-item-' + themes"
+      >
+        <el-input-number
+          v-model="state.basicStyleForm.paretoThreshold"
+          :min="0"
+          :max="100"
+          :precision="0"
+          @change="changeBasicStyle('paretoThreshold')"
+        />
+      </el-form-item>
+      <el-form-item label="柱形数值" class="form-item" :class="'form-item-' + themes">
+        <el-switch
+          v-model="state.basicStyleForm.paretoValueLabels"
+          @change="changeBasicStyle('paretoValueLabels')"
+        />
+      </el-form-item>
+      <el-form-item label="累计占比标签" class="form-item" :class="'form-item-' + themes">
+        <el-switch
+          v-model="state.basicStyleForm.paretoPercentLabels"
+          @change="changeBasicStyle('paretoPercentLabels')"
+        />
+      </el-form-item>
+    </template>
     <template v-if="showProperty('piePresentation')">
       <el-form-item label="布局样式" class="form-item" :class="'form-item-' + themes">
         <div class="pie-layout-picker">

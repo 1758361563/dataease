@@ -18,6 +18,16 @@ public class UpdateGroupController {
     private long admin(){return guard.require(CompanyCapability.ETL_ACCESS);}
     private void record(HttpServletRequest request,long user,String id,String action){audit.record(CompanyAdminAuditContext.from(request,user),CompanyAuditActionType.DATA_UPDATE_SAVE,"DATA_UPDATE_GROUP",null,null,UpdateStore.json(Map.of("id",id,"action",action)));}
     @GetMapping public Object list(){admin();return groups.all();}
+    @GetMapping("/schedule") public Object schedule(@RequestParam String date) {
+        admin();
+        var plans = new ArrayList<Map<String,Object>>();
+        for (var group : groups.all()) {
+            if (!group.enabled()) continue;
+            plans.add(Map.of("id", group.id(), "times", UpdateSchedules.plannedTimes(group.cron(), group.timezone(), date),
+                    "effective", !runtime.disabled() && runtime.owner()!=null && runtime.owner().equals(group.owner())));
+        }
+        return plans;
+    }
     @PostMapping public Object save(@RequestBody UpdateGroups.Definition body,HttpServletRequest request){long user=admin();return groups.save(body,runtime.owner(),saved->record(request,user,saved.id(),"SAVE"));}
     public record Request(long version,String businessDate){}
     @PostMapping("/{id}/run") public Object run(@PathVariable String id,@RequestBody Request body,HttpServletRequest request){long user=admin();var group=groups.get(id);String date=UpdateDefinition.clean(body.businessDate()).isEmpty()?LocalDate.now(ZoneId.of(group.timezone())).toString():body.businessDate();return Map.of("id",runner.submit(id,body.version(),date,"manual:"+UUID.randomUUID(),runId->record(request,user,runId,"RUN")));}

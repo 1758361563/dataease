@@ -1154,6 +1154,13 @@ export const CHART_TYPE_CONFIGS = [
       {
         render: 'antv',
         category: 'compare',
+        value: 'pareto',
+        title: '帕累托图',
+        icon: 'pareto'
+      },
+      {
+        render: 'antv',
+        category: 'compare',
         value: 'waterfall',
         title: t('chart.chart_waterfall'),
         icon: 'waterfall'
@@ -1444,6 +1451,11 @@ export const DEFAULT_BASIC_STYLE: ChartBasicStyle = {
   radiusColumnBar: 'rightAngle',
   columnBarRightAngleRadius: 20,
   columnWidthRatio: 60,
+  paretoLineColor: '#e6a23c',
+  paretoThreshold: 80,
+  paretoThresholdShow: true,
+  paretoValueLabels: false,
+  paretoPercentLabels: false,
   barWidth: 40,
   barGap: 0.4,
   lineType: 'solid',

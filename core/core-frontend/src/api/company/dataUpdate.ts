@@ -56,6 +56,20 @@ export interface DataUpdateRun {
   message: string
 }
 const base = '/company/etl/data-update'
+export interface UpdateSchedulePlan {
+  id: string
+  times: { values: string[]; truncated: boolean }
+  effective: boolean
+}
+export const fetchUpdateSchedule = async (
+  date: string
+): Promise<{ tasks: UpdateSchedulePlan[]; groups: UpdateSchedulePlan[] }> => {
+  const [tasks, groups] = await Promise.all([
+    request.get({ url: `${base}/schedule`, params: { date }, loading: false }),
+    request.get({ url: `${base}/groups/schedule`, params: { date }, loading: false })
+  ])
+  return { tasks: tasks.data, groups: groups.data }
+}
 export const fetchDataUpdates = async (): Promise<DataUpdateState> =>
   (await request.get({ url: base, loading: false })).data
 export const saveDataUpdate = async (data: DataUpdateDefinition): Promise<DataUpdateDefinition> =>

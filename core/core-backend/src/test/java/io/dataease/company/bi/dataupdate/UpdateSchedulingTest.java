@@ -15,6 +15,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class UpdateSchedulingTest {
+    @Test void scheduleProjectionUsesBeijingDayAndIncludesMidnight() {
+        var daily = UpdateSchedules.plannedTimes("0 0 0 * * ?", "Asia/Shanghai", "2026-11-06");
+        assertEquals(List.of("2026-11-05T16:00:00Z"), daily.get("values"));
+        assertEquals(false, daily.get("truncated"));
+        var utc = UpdateSchedules.plannedTimes("0 0 0 * * ?", "UTC", "2026-11-06");
+        assertEquals(List.of("2026-11-06T00:00:00Z"), utc.get("values"));
+        var future = UpdateSchedules.plannedTimes("0 0 0 1 1 ? 2030", "UTC", "2026-11-06");
+        assertEquals(List.of(), future.get("values"));
+    }
+    @Test void scheduleProjectionCapsHighFrequencyAndRejectsInvalidTimezone() {
+        var frequent = UpdateSchedules.plannedTimes("* * * * * ?", "Asia/Shanghai", "2026-11-06");
+        assertEquals(1000, ((List<?>) frequent.get("values")).size());
+        assertEquals(true, frequent.get("truncated"));
+        assertThrows(UpdateDefinition.ValidationException.class, () -> UpdateSchedules.plannedTimes("0 0 0 * * ?", "bad/zone", "2026-11-06"));
+    }
     static final Instant PLANNED=Instant.parse("2026-10-29T19:00:00Z");
     static final LocalDate DATE=LocalDate.of(2026,10,30);
     static UpdateDefinition scheduled(String owner) {

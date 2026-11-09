@@ -27,7 +27,7 @@ import {
   queryShareBaseApi,
   updateBase
 } from '@/api/visualization/dataVisualization'
-import { ElIcon, ElMessage, ElMessageBox, ElScrollbar } from 'element-plus-secondary'
+import { ElIcon, ElMessage, ElMessageBox } from 'element-plus-secondary'
 import { Icon } from '@/components/icon-custom'
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { HandleMore } from '@/components/handle-more'
@@ -780,7 +780,9 @@ defineExpose({
         {{ option.label }}
       </button>
     </div>
-    <el-scrollbar
+    <div
+      tabindex="0"
+      aria-label="仪表板快捷列表"
       v-if="quickAccessEnabled && sidebarMode !== 'all'"
       class="dashboard-shortcut-scroll"
     >
@@ -793,8 +795,10 @@ defineExpose({
         @select="selectShortcut"
         @ready="shortcutsReady"
       />
-    </el-scrollbar>
-    <el-scrollbar
+    </div>
+    <div
+      tabindex="0"
+      aria-label="仪表板资源列表"
       v-show="!quickAccessEnabled || sidebarMode === 'all'"
       class="custom-tree"
       v-loading="copyLoading"
@@ -887,7 +891,7 @@ defineExpose({
         @finish="resourceOptFinish"
         ref="resourceGroupOpt"
       />
-    </el-scrollbar>
+    </div>
   </div>
   <AppImportDialog v-if="curCanvasType === 'dashboard'" ref="appImportDialog" />
   <XpackComponent ref="openHandler" jsname="L2NvbXBvbmVudC9lbWJlZGRlZC1pZnJhbWUvT3BlbkhhbmRsZXI=" />
@@ -939,6 +943,19 @@ defineExpose({
   }
 }
 
+.custom-tree,
+.dashboard-shortcut-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
 .filter-icon-span {
   border: 1px solid #d9dcdf;
   width: 32px;
@@ -965,6 +982,9 @@ defineExpose({
   padding: 16px 0 0;
   width: 100%;
   height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 

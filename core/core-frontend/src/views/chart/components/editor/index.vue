@@ -1181,6 +1181,19 @@ const onTypeChange = (render, type) => {
       removedAxis.length &&
         emitter.emit('removeAxis', { axisType: axis, axis: removedAxis, editType: 'remove' })
     })
+    if (view.value.type === 'pareto') {
+      view.value.resultMode = 'all'
+      view.value.xAxis.forEach(field => {
+        field.sort = 'none'
+        field.customSort = []
+      })
+      view.value.yAxis.forEach(field => {
+        field.sort = 'desc'
+        field.customSort = []
+        field.compareCalc = { ...field.compareCalc, type: 'none' }
+      })
+      removeItems('drillFields')
+    }
     if (view.value.type === 'line') {
       if (view.value?.xAxisExt?.length && view.value?.yAxis?.length > 1) {
         const axis = view.value.yAxis.splice(1)
@@ -3722,7 +3735,14 @@ const chartStyleScroll = (val: any) => {
                         </el-row>
                       </el-row>
                       <el-row class="result-style" :class="'result-style-' + themes">
-                        <div v-if="!hasDisplayLimitPanel(view)" class="result-style-input">
+                        <div
+                          v-if="view.type === 'pareto'"
+                          class="result-style-input"
+                          title="按筛选后的全部类别降序累计；最多支持 5000 个类别，超过时请缩小筛选范围。"
+                        >
+                          全部类别 · 指标降序
+                        </div>
+                        <div v-else-if="!hasDisplayLimitPanel(view)" class="result-style-input">
                           <span v-if="view.type !== 'richTextView'">
                             {{ t('chart.result_count') }}
                           </span>

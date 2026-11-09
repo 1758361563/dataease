@@ -245,14 +245,15 @@ export const useAppearanceStore = defineStore('appearanceStore', {
         }
       })
       if (!isDataEaseBi) {
-        document.title = ''
+        setTitle('气味数据')
+        setLinkIcon()
       }
       const res = await uiLoadApi()
       this.loaded = true
       const resData = res.data
       if (!resData?.length) {
         if (!isDataEaseBi) {
-          document.title = 'DataEase'
+          setTitle('气味数据')
           setLinkIcon()
         }
         return
@@ -341,26 +342,17 @@ export const useAppearanceStore = defineStore('appearanceStore', {
       this.foot = data.foot
       this.footContent = data.footContent
       if (isDataEaseBi) return
-      if (this.name) {
-        document.title = this.name
-        setTitle(this.name)
-      } else {
-        document.title = 'DataEase'
-        setTitle('DataEase')
-      }
-      setLinkIcon(this.web)
+      setTitle('气味数据')
+      setLinkIcon()
     }
   }
 })
 
-const setLinkIcon = (linkWeb?: string) => {
-  const link = document.querySelector('link[rel="icon"]')
+const setLinkIcon = () => {
+  const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
   if (link) {
-    if (linkWeb) {
-      link['href'] = baseUrl + linkWeb
-    } else {
-      link['href'] = '/dataease.svg'
-    }
+    link.type = 'image/png'
+    link.href = import.meta.env.BASE_URL + 'branding/company-logo.png'
   }
 }
 
