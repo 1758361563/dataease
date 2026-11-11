@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { formatBeijingTime } from '@/utils/beijingTime'
+import FeishuAccountSelect from './FeishuAccountSelect.vue'
 import AdminHelp from '../AdminHelp.vue'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
@@ -31,7 +32,8 @@ const createForm = ref<CompanyUserCreateBody>({
   status: 'ENABLED',
   password: ''
 })
-const editForm = ref({ id: '', username: '', displayName: '' })
+const createFeishu = ref('')
+const editForm = ref({ id: '', username: '', displayName: '', feishuUserId: '', feishuName: '' })
 const pwdForm = ref({ id: '', password: '', confirm: '' })
 
 const isBootstrap = (row: CompanyUser) => keepStringId(row.id) === BOOTSTRAP_ADMIN_ID
@@ -51,6 +53,7 @@ const load = async () => {
 }
 
 const resetCreate = () => {
+  createFeishu.value = ''
   createForm.value = {
     username: '',
     displayName: '',
@@ -65,7 +68,7 @@ const submitCreate = async () => {
     ElMessage.warning('用户名和临时密码不能为空')
     return
   }
-  await createCompanyUser({ ...createForm.value })
+  await createCompanyUser({ ...createForm.value, feishuUserId: createFeishu.value })
   ElMessage.success('用户已创建')
   resetCreate()
   createVisible.value = false
@@ -76,7 +79,9 @@ const openEdit = (row: CompanyUser) => {
   editForm.value = {
     id: keepStringId(row.id),
     username: row.username,
-    displayName: row.displayName
+    displayName: row.displayName,
+    feishuUserId: row.feishu?.userId || '',
+    feishuName: row.feishu?.name || ''
   }
   editVisible.value = true
 }
@@ -84,7 +89,8 @@ const openEdit = (row: CompanyUser) => {
 const submitEdit = async () => {
   await updateCompanyUser(editForm.value.id, {
     username: editForm.value.username,
-    displayName: editForm.value.displayName
+    displayName: editForm.value.displayName,
+    feishuUserId: editForm.value.feishuUserId
   })
   ElMessage.success('已保存')
   editVisible.value = false
@@ -165,6 +171,9 @@ onMounted(load)
     <GridTable :show-pagination="false" :table-data="users" class="admin-grid">
       <el-table-column prop="username" label="用户名" min-width="140" />
       <el-table-column prop="displayName" label="显示名" min-width="140" />
+      <el-table-column label="飞书账号" min-width="150"
+        ><template #default="{ row }">{{ row.feishu?.name || '未绑定' }}</template></el-table-column
+      >
       <el-table-column label="角色" width="160">
         <template #default="{ row }">
           <el-tooltip
@@ -235,6 +244,7 @@ onMounted(load)
         <el-form-item label="显示名">
           <el-input v-model="createForm.displayName" />
         </el-form-item>
+        <el-form-item label="飞书账号"><FeishuAccountSelect v-model="createFeishu" /></el-form-item>
         <el-form-item label="角色">
           <el-select v-model="createForm.accountRole">
             <el-option
@@ -268,6 +278,12 @@ onMounted(load)
         <el-form-item label="显示名">
           <el-input v-model="editForm.displayName" />
         </el-form-item>
+        <el-form-item label="飞书账号"
+          ><FeishuAccountSelect
+            v-model="editForm.feishuUserId"
+            :initial-name="editForm.feishuName"
+            :bi-user-id="editForm.id"
+        /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editVisible = false">取消</el-button>

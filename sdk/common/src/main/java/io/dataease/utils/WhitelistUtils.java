@@ -24,6 +24,10 @@ public class WhitelistUtils {
 
     public static List<String> WHITE_PATH = List.of(
             "/login/localLogin",
+            "/login/feishu/config",
+            "/login/feishu/start",
+            "/login/feishu/complete",
+            "/login/feishu/callback",
             "/apisix/check",
             "/dekey",
             "/index.html",

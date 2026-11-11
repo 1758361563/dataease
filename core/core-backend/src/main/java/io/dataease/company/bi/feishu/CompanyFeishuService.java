@@ -158,13 +158,14 @@ public class CompanyFeishuService {
         }
         return tx.execute(() -> {
             store.insertRecipient(row);
-            maybeMapIdentity(body, row, operatorId);
+            rejectIdentityBinding(body);
             return recipientVo(store.findRecipient(row.id));
         });
     }
 
     public Map<String, Object> updateRecipient(Long id, Map<String, Object> body, long operatorId) {
         rejectSecretFields(body);
+        rejectIdentityBinding(body);
         CompanyFeishuRepository.Recipient existing = requireRecipient(id);
         CompanyFeishuRepository.Recipient row = newRecipient(body, operatorId, false);
         row.id = existing.id;
@@ -175,6 +176,10 @@ public class CompanyFeishuService {
         if (body.get("status") == null) {
             row.status = existing.status;
         }
+        if (store.findMapByRecipient(id) != null && (!java.util.Objects.equals(existing.appId, row.appId)
+                || !java.util.Objects.equals(existing.feishuId, row.feishuId)
+                || !java.util.Objects.equals(existing.receiveIdType, row.receiveIdType)))
+            CompanyAdminErrors.invalid("已绑定 BI 用户的收件人身份不可修改，请在用户管理中更换绑定");
         CompanyFeishuRepository.Recipient clash = store.findRecipientByKey(row.appId, row.receiveIdType, row.feishuId);
         if (clash != null && !clash.id.equals(existing.id)) {
             CompanyAdminErrors.conflict("收件人已存在");
@@ -407,37 +412,8 @@ public class CompanyFeishuService {
         return row;
     }
 
-    private void maybeMapIdentity(Map<String, Object> body, CompanyFeishuRepository.Recipient row, long operatorId) {
-        Object raw = body.get("biUserId");
-        if (raw == null || StringUtils.isBlank(String.valueOf(raw))) {
-            return;
-        }
-        if (!"PERSONAL".equals(row.recipientType)) {
-            CompanyAdminErrors.invalid("只有个人收件人可以绑定 BI 用户");
-        }
-        long biUserId;
-        try {
-            biUserId = Long.parseLong(String.valueOf(raw));
-        } catch (NumberFormatException e) {
-            CompanyAdminErrors.invalid("biUserId 非法");
-            return;
-        }
-        if (store.findMapByUser(row.appId, biUserId) != null || store.findMapByRecipient(row.id) != null) {
-            CompanyAdminErrors.conflict("身份映射已存在");
-        }
-        CompanyFeishuRepository.IdentityMap map = new CompanyFeishuRepository.IdentityMap();
-        long now = System.currentTimeMillis();
-        map.id = ids.getAsLong();
-        map.biUserId = biUserId;
-        map.recipientId = row.id;
-        map.appId = row.appId;
-        map.source = "MANUAL";
-        map.status = "ENABLED";
-        map.createdAt = now;
-        map.createdBy = operatorId;
-        map.updatedAt = now;
-        map.updatedBy = operatorId;
-        store.insertIdentityMap(map);
+    private void rejectIdentityBinding(Map<String, Object> body) {
+        if (body.get("biUserId") != null) CompanyAdminErrors.invalid("请在用户管理中绑定飞书账号");
     }
 
     private CompanyFeishuRepository.Subscription newSubscription(Map<String, Object> body, long operatorId, boolean creating) {

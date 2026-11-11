@@ -379,6 +379,8 @@ defineExpose({
 .dv-preview {
   width: 100%;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   background: #ffffff;
@@ -386,6 +388,8 @@ defineExpose({
   .resource-area {
     position: relative;
     height: 100%;
+    min-height: 0;
+    flex-shrink: 0;
     width: 279px;
     padding: 0;
     border-right: 1px solid #d7d7d7;
@@ -397,6 +401,8 @@ defineExpose({
   }
   .preview-area {
     flex: 1;
+    min-height: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
@@ -411,8 +417,9 @@ defineExpose({
     .content {
       position: relative;
       display: flex;
+      flex: 1 1 0;
+      min-height: 0;
       width: 100%;
-      height: 100%;
       overflow-x: hidden;
       overflow-y: auto;
       align-items: center;

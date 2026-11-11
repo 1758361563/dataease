@@ -32,4 +32,15 @@ public class CompanyTokenIssuer {
     public TokenUserBO toUser(Long userId) {
         return new TokenUserBO(userId, DEFAULT_OID);
     }
+
+    public TokenVO issueFeishu(Long userId, Long bindingId, String appId) {
+        long expiry = System.currentTimeMillis() + 12 * 60 * 60 * 1000L;
+        String token = JWT.create().withIssuer("de-company-bi")
+                .withClaim("uid", userId).withClaim("oid", DEFAULT_OID)
+                .withClaim("fs_binding", bindingId).withClaim("fs_app", appId)
+                .withExpiresAt(new java.util.Date(expiry)).sign(Algorithm.HMAC256(tokenSecret.getSecret()));
+        // The community frontend refresh endpoint does not support external login tokens.
+        // JWT expiry is still enforced by the backend on every request.
+        return new TokenVO(token, 0L);
+    }
 }

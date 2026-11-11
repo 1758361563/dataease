@@ -10,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CompanyUserVO {
+    private java.util.Map<String, Object> feishu = java.util.Map.of();
+    public java.util.Map<String, Object> getFeishu() { return feishu; }
+    public void setFeishu(java.util.Map<String, Object> value) { feishu = value; }
 
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;

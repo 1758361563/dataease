@@ -43,7 +43,13 @@ router.beforeEach(async (to, from, next) => {
     await appStore.setAppModel()
     isDesktop = appStore.getDesktop
   }
-  if (isMobile() && !['/chart-view'].includes(to.path)) {
+  const feishuLoginRoute =
+    to.path === '/login' &&
+    (to.query.feishu === '1' ||
+      !!to.query.feishu_code ||
+      !!to.query.feishu_error ||
+      !!to.query.feishu_return)
+  if (isMobile() && !['/chart-view'].includes(to.path) && !feishuLoginRoute) {
     done()
     loadDone()
     if (to.name === 'link') {

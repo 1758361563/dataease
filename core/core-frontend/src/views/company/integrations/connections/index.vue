@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FeishuLoginSettings from './FeishuLoginSettings.vue'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus-secondary'
 import request from '@/config/axios'
@@ -175,6 +176,7 @@ onMounted(load)
         </p>
       </div>
     </section>
+    <FeishuLoginSettings v-if="canEdit" />
   </div>
 </template>
 

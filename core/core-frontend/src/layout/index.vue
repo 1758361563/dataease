@@ -103,6 +103,12 @@ const { t } = useI18n()
   overflow-x: auto;
 
   .layout-container {
+    // Keep route content inside the space left by the navigation bar.
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+
     .layout-sidebar {
       height: calc(100vh - 106px);
     }
@@ -130,6 +136,9 @@ const { t } = useI18n()
 
     .layout-main {
       flex: 1;
+      min-height: 0;
+      min-width: 0;
+      height: 100%;
       background-color: var(--MainBG, #f5f6f7);
       padding: 0;
     }

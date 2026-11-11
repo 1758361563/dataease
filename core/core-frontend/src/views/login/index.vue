@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import FeishuLogin from './FeishuLogin.vue'
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import { FormRules, FormInstance } from 'element-plus-secondary'
@@ -58,6 +59,7 @@ const rules = reactive<FormRules>({
 })
 
 const activeName = ref('simple')
+const feishuActive = ref(false)
 
 const getCurLocation = () => {
   let queryRedirectPath = '/panel/index'
@@ -285,9 +287,10 @@ onMounted(async () => {
               {{ slogan || t('system.available_to_everyone') }}
             </div>
             <div class="login-form border-radius-12">
+              <FeishuLogin @active="feishuActive = $event" />
               <div
                 class="default-login-tabs"
-                v-if="activeName === 'simple' || activeName === 'ldap'"
+                v-if="!feishuActive && (activeName === 'simple' || activeName === 'ldap')"
               >
                 <div class="login-form-title">
                   <span>{{

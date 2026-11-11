@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { formatBeijingTime } from '@/utils/beijingTime'
+import request from '@/config/axios'
 import AdminHelp from '../AdminHelp.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router_2'
@@ -56,6 +57,9 @@ const router = useRouter()
 const loading = ref(false)
 const tab = ref('subscriptions')
 const recipients = ref<FeishuRecipient[]>([])
+const boundUsers = ref<
+  Array<{ recipientId: string; username: string; biName: string; feishuName: string }>
+>([])
 const subscriptions = ref<FeishuSubscription[]>([])
 const integration = ref<FeishuIntegration>({ configured: false })
 
@@ -145,7 +149,12 @@ const parseFilterJson = (raw: string) => {
 }
 
 const loadRecipients = async () => {
-  recipients.value = await listFeishuRecipients()
+  const [rows, bound] = await Promise.all([
+    listFeishuRecipients(),
+    request.get({ url: '/company/bi/feishu/bound-users' })
+  ])
+  recipients.value = rows
+  boundUsers.value = bound.data || []
 }
 
 const loadSubscriptions = async () => {
@@ -700,8 +709,17 @@ onMounted(async () => {
         </el-form-item>
         <el-form-item label="收件人" required>
           <el-select v-model="subForm.recipientIds" multiple filterable style="width: 100%">
+            <el-option-group label="BI 用户" v-if="boundUsers.length"
+              ><el-option
+                v-for="user in boundUsers"
+                :key="user.recipientId"
+                :value="user.recipientId"
+                :label="`${user.biName || user.username} · ${user.feishuName}`"
+            /></el-option-group>
             <el-option
-              v-for="item in recipients.filter(r => r.status === 'ENABLED')"
+              v-for="item in recipients.filter(
+                r => r.status === 'ENABLED' && !boundUsers.some(u => u.recipientId === r.id)
+              )"
               :key="keepStringId(item.id)"
               :label="recipientOptionLabel(item)"
               :value="keepStringId(item.id)"

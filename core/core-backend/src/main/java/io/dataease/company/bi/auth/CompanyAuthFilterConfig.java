@@ -21,10 +21,12 @@ import java.util.List;
 public class CompanyAuthFilterConfig {
 
     @Bean
-    public FilterRegistrationBean<CompanyUserStatusFilter> companyUserStatusFilter(CompanyUserStatusGuard statusGuard) {
+    public FilterRegistrationBean<CompanyUserStatusFilter> companyUserStatusFilter(CompanyUserStatusGuard statusGuard,
+            io.dataease.company.bi.feishu.CompanyFeishuIdentityService identities,
+            io.dataease.company.bi.feishu.FeishuLoginSettings settings) {
         FilterRegistrationBean<CompanyUserStatusFilter> filter = new FilterRegistrationBean<>();
         filter.setName("companyUserStatusFilter");
-        filter.setFilter(new CompanyUserStatusFilter(statusGuard));
+        filter.setFilter(new CompanyUserStatusFilter(statusGuard, identities, settings));
         filter.addUrlPatterns("/*");
         filter.setOrder(6);
         return filter;

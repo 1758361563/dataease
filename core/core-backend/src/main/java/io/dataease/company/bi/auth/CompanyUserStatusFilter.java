@@ -25,6 +25,14 @@ public class CompanyUserStatusFilter implements Filter {
     private static final String HEAD_NAME = "DE-GATEWAY-FLAG";
 
     private final CompanyUserStatusGuard statusGuard;
+    private io.dataease.company.bi.feishu.CompanyFeishuIdentityService identities;
+    private io.dataease.company.bi.feishu.FeishuLoginSettings loginSettings;
+
+    public CompanyUserStatusFilter(CompanyUserStatusGuard guard,
+            io.dataease.company.bi.feishu.CompanyFeishuIdentityService identities,
+            io.dataease.company.bi.feishu.FeishuLoginSettings settings) {
+        this(guard); this.identities=identities; this.loginSettings=settings;
+    }
 
     public CompanyUserStatusFilter(CompanyUserStatusGuard statusGuard) {
         this.statusGuard = statusGuard;
@@ -41,6 +49,18 @@ public class CompanyUserStatusFilter implements Filter {
             }
             try {
                 statusGuard.requireActive(user.getUserId());
+                String rawToken = io.dataease.utils.ServletUtils.getToken();
+                if (identities != null && rawToken != null && !rawToken.isBlank()) {
+                    var token = com.auth0.jwt.JWT.decode(rawToken);
+                    Long binding = token.getClaim("fs_binding").asLong();
+                    if (binding != null) {
+                        var settings = loginSettings.get();
+                        String app = token.getClaim("fs_app").asString();
+                        if (!Boolean.TRUE.equals(settings.get("enabled")) || !java.util.Objects.equals(app, settings.get("appId"))
+                                || !identities.sessionActive(binding, user.getUserId(), app))
+                            DEException.throwException("飞书绑定已变更，请重新登录");
+                    }
+                }
             } catch (DEException e) {
                 LogUtil.error(e.getMessage(), e);
                 HttpServletResponse res = (HttpServletResponse) servletResponse;

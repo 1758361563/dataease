@@ -1067,7 +1067,9 @@ defineExpose({
 }
 
 .custom-tree {
-  height: calc(100vh - 148px);
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
   padding: 0 8px;
 }
 

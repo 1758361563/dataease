@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 @Component
 @ConditionalOnProperty(name = CompanyAuthSupport.ENABLED_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class CompanyUserAdminService {
+    @Autowired
+    private io.dataease.company.bi.feishu.CompanyFeishuIdentityService feishuIdentity;
 
     private final CompanyBiUserService userService;
     private final CompanyGroupRepository groupRepository;
@@ -103,8 +105,11 @@ public class CompanyUserAdminService {
             } catch (DuplicateKeyException e) {
                 CompanyAdminErrors.conflict("用户名已存在");
             }
+            if (feishuIdentity != null) feishuIdentity.bind(user.getId(), request.getFeishuUserId(), context.operatorUserId());
+            Map<String,Object> created = userSnapshot(user);
+            if (feishuIdentity != null) created.put("feishu", feishuIdentity.binding(user.getId()));
             auditRecorder.record(context, CompanyAuditActionType.USER_CREATE, "USER", user.getId(),
-                    null, CompanyAuditLogService.json(userSnapshot(user)));
+                    null, CompanyAuditLogService.json(created));
             return toVo(user);
         });
     }
@@ -142,7 +147,7 @@ public class CompanyUserAdminService {
                 changed = true;
             }
         }
-        if (!changed) {
+        if (!changed && request.getFeishuUserId() == null) {
             return toVo(user);
         }
         user.setUpdatedAt(System.currentTimeMillis());
@@ -151,6 +156,11 @@ public class CompanyUserAdminService {
         return tx.execute(() -> {
             userService.updateById(user);
             Map<String, Object> after = userSnapshot(user);
+            if (feishuIdentity != null) {
+                before.put("feishu", feishuIdentity.binding(userId));
+                feishuIdentity.bind(userId, request.getFeishuUserId(), context.operatorUserId());
+                after.put("feishu", feishuIdentity.binding(userId));
+            }
             if (roleForAudit != null && !roleForAudit.name().equals(before.get("accountRole"))) {
                 auditRecorder.record(context, CompanyAuditActionType.USER_ROLE_CHANGE, "USER", userId,
                         CompanyAuditLogService.json(Map.of("accountRole", before.get("accountRole"))),
@@ -230,6 +240,7 @@ public class CompanyUserAdminService {
         if (vo == null) {
             return null;
         }
+        if (feishuIdentity != null) vo.setFeishu(feishuIdentity.binding(user.getId()));
         List<CompanyBiGroupMember> memberships = groupRepository.listMemberships(user.getId());
         vo.setGroupIds(memberships.stream().map(CompanyBiGroupMember::getGroupId).collect(Collectors.toList()));
         return vo;

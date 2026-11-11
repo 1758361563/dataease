@@ -25,6 +25,7 @@ export interface CompanyMe {
 }
 
 export interface CompanyUser {
+  feishu?: { userId?: string; name?: string; bindingId?: string; source?: string }
   id: CompanyId
   username: string
   displayName: string
@@ -37,6 +38,7 @@ export interface CompanyUser {
 }
 
 export interface CompanyUserCreateBody {
+  feishuUserId?: string
   username: string
   displayName: string
   accountRole: CompanyAccountRole
@@ -45,6 +47,7 @@ export interface CompanyUserCreateBody {
 }
 
 export interface CompanyUserUpdateBody {
+  feishuUserId?: string
   username?: string
   displayName?: string
   accountRole?: CompanyAccountRole
