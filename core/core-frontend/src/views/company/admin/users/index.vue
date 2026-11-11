@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { formatBeijingTime } from '@/utils/beijingTime'
 import FeishuAccountSelect from './FeishuAccountSelect.vue'
+import { listCompanyGroups } from '@/api/company/group'
+import type { CompanyGroup } from '@/api/company/types'
 import AdminHelp from '../AdminHelp.vue'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus-secondary'
@@ -32,6 +34,29 @@ const createForm = ref<CompanyUserCreateBody>({
   status: 'ENABLED',
   password: ''
 })
+const groups = ref<CompanyGroup[]>([])
+const groupsLoading = ref(false)
+const groupsError = ref(false)
+const creating = ref(false)
+const createGroups = ref<string[]>([])
+const loadGroups = async () => {
+  groupsLoading.value = true
+  groupsError.value = false
+  try {
+    groups.value = (await listCompanyGroups())
+      .filter(group => group.status === 'ENABLED')
+      .map(group => ({ ...group, id: keepStringId(group.id) }))
+  } catch {
+    groupsError.value = true
+    groups.value = []
+  } finally {
+    groupsLoading.value = false
+  }
+}
+const openCreate = () => {
+  createVisible.value = true
+  if (companyStore.hasCapability('GROUP_MANAGE')) void loadGroups()
+}
 const createFeishu = ref('')
 const editForm = ref({ id: '', username: '', displayName: '', feishuUserId: '', feishuName: '' })
 const pwdForm = ref({ id: '', password: '', confirm: '' })
@@ -54,6 +79,7 @@ const load = async () => {
 
 const resetCreate = () => {
   createFeishu.value = ''
+  createGroups.value = []
   createForm.value = {
     username: '',
     displayName: '',
@@ -68,11 +94,21 @@ const submitCreate = async () => {
     ElMessage.warning('用户名和临时密码不能为空')
     return
   }
-  await createCompanyUser({ ...createForm.value, feishuUserId: createFeishu.value })
-  ElMessage.success('用户已创建')
-  resetCreate()
-  createVisible.value = false
-  await load()
+  if (creating.value) return
+  creating.value = true
+  try {
+    await createCompanyUser({
+      ...createForm.value,
+      feishuUserId: createFeishu.value,
+      groupIds: createGroups.value
+    })
+    ElMessage.success('用户已创建')
+    resetCreate()
+    createVisible.value = false
+    await load()
+  } finally {
+    creating.value = false
+  }
 }
 
 const openEdit = (row: CompanyUser) => {
@@ -166,13 +202,15 @@ onMounted(load)
       <span class="admin-title"
         >用户管理 <AdminHelp content="系统初始管理员不可禁用或降级。"
       /></span>
-      <el-button type="primary" @click="createVisible = true">新建用户</el-button>
+      <el-button type="primary" @click="openCreate">新建用户</el-button>
     </div>
     <GridTable :show-pagination="false" :table-data="users" class="admin-grid">
       <el-table-column prop="username" label="用户名" min-width="140" />
       <el-table-column prop="displayName" label="显示名" min-width="140" />
       <el-table-column label="飞书账号" min-width="150"
-        ><template #default="{ row }">{{ row.feishu?.name || '未绑定' }}</template></el-table-column
+        ><template #default="{ row }">{{
+          row.feishu?.userId ? `${row.feishu.name || '飞书用户'}（${row.feishu.userId}）` : '未绑定'
+        }}</template></el-table-column
       >
       <el-table-column label="角色" width="160">
         <template #default="{ row }">
@@ -255,6 +293,26 @@ onMounted(load)
             />
           </el-select>
         </el-form-item>
+        <el-form-item v-if="companyStore.hasCapability('GROUP_MANAGE')" label="用户组">
+          <el-select
+            v-model="createGroups"
+            multiple
+            filterable
+            clearable
+            :loading="groupsLoading"
+            :disabled="groupsLoading || groupsError"
+            placeholder="选择用户组，可多选"
+            no-data-text="暂无可用用户组"
+          >
+            <el-option
+              v-for="group in groups"
+              :key="group.id"
+              :label="group.name"
+              :value="group.id"
+            />
+          </el-select>
+          <el-button v-if="groupsError" text @click="loadGroups">加载失败，重试</el-button>
+        </el-form-item>
         <el-form-item label="临时密码" required>
           <el-input
             v-model="createForm.password"
@@ -266,7 +324,7 @@ onMounted(load)
       </el-form>
       <template #footer>
         <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitCreate">创建</el-button>
+        <el-button type="primary" :loading="creating" @click="submitCreate">创建</el-button>
       </template>
     </el-drawer>
 

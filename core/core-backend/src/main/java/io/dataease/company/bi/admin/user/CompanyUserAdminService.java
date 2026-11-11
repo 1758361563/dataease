@@ -80,6 +80,8 @@ public class CompanyUserAdminService {
         if (request == null) {
             CompanyAdminErrors.invalid("用户信息不完整");
         }
+        List<Long> groupIds = request.getGroupIds() == null ? List.of()
+                : new ArrayList<>(new java.util.LinkedHashSet<>(request.getGroupIds()));
         String username = requireText(request.getUsername(), "username");
         CompanyAccountRole role = parseRole(request.getAccountRole());
         CompanyUserStatus status = parseStatus(request.getStatus() == null ? CompanyUserStatus.ENABLED.name() : request.getStatus());
@@ -100,13 +102,30 @@ public class CompanyUserAdminService {
         user.setUpdatedAt(now);
         user.setUpdatedBy(context.operatorUserId());
         return tx.execute(() -> {
+            for (Long groupId : groupIds) {
+                var group = groupRepository.findById(groupId);
+                if (group == null || !CompanyUserStatus.ENABLED.name().equals(group.getStatus())) {
+                    CompanyAdminErrors.invalid("所选用户组不存在或已停用，请重新选择");
+                }
+            }
             try {
                 userService.insert(user);
             } catch (DuplicateKeyException e) {
                 CompanyAdminErrors.conflict("用户名已存在");
             }
             if (feishuIdentity != null) feishuIdentity.bind(user.getId(), request.getFeishuUserId(), context.operatorUserId());
+            for (Long groupId : groupIds) {
+                CompanyBiGroupMember member = new CompanyBiGroupMember();
+                member.setUserId(user.getId());
+                member.setGroupId(groupId);
+                member.setCreatedAt(now);
+                member.setCreatedBy(context.operatorUserId());
+                groupRepository.insertMember(member);
+                auditRecorder.record(context, CompanyAuditActionType.GROUP_MEMBER_ADD, "GROUP", groupId,
+                        null, CompanyAuditLogService.json(Map.of("userId", user.getId(), "groupId", groupId)));
+            }
             Map<String,Object> created = userSnapshot(user);
+            created.put("groupIds", groupIds);
             if (feishuIdentity != null) created.put("feishu", feishuIdentity.binding(user.getId()));
             auditRecorder.record(context, CompanyAuditActionType.USER_CREATE, "USER", user.getId(),
                     null, CompanyAuditLogService.json(created));

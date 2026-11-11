@@ -75,13 +75,14 @@ onMounted(load)
 </template>
 <style scoped>
 .login-settings {
+  max-width: 960px;
+  padding: 24px;
+  margin-top: 20px;
   background: #fff;
   border: 1px solid #e5e9f0;
   border-radius: 12px;
-  padding: 24px;
-  margin-top: 20px;
-  max-width: 960px;
 }
+
 .head,
 .footer {
   display: flex;
@@ -89,15 +90,18 @@ onMounted(load)
   justify-content: space-between;
   gap: 16px;
 }
+
 .head {
   margin-bottom: 20px;
 }
+
 h3 {
-  font-size: 16px;
   margin: 0;
+  font-size: 16px;
 }
+
 .help {
-  color: #8791a3;
   font-size: 13px;
+  color: #8791a3;
 }
 </style>

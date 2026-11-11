@@ -71,14 +71,12 @@ onBeforeUnmount(() => {
         v-for="item in options"
         :key="item.userId"
         :value="item.userId"
-        :label="item.name"
+        :label="`${item.name}（${item.userId}）`"
         :disabled="!!item.boundUserId && item.boundUserId !== biUserId"
       >
-        <span>{{ item.name }}</span>
+        <span>{{ item.name }}（{{ item.userId }}）</span>
         <span v-if="item.boundUserId" class="identity-detail">已绑定 {{ item.boundUsername }}</span>
-        <span class="identity-detail"
-          >{{ item.departments.join(' / ') }} · {{ item.userIdTail }}</span
-        >
+        <span class="identity-detail">{{ item.departments.join(' / ') }}</span>
       </el-option>
     </el-select>
     <span v-if="error" class="error">{{ error }}</span>
@@ -90,13 +88,15 @@ onBeforeUnmount(() => {
 .el-select {
   width: 100%;
 }
+
 .identity-detail {
   margin-left: 12px;
+  font-size: 12px;
   color: #8a94a6;
-  font-size: 12px;
 }
+
 .error {
-  color: #d84c4c;
   font-size: 12px;
+  color: #d84c4c;
 }
 </style>

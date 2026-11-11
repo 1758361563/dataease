@@ -218,30 +218,34 @@ onBeforeUnmount(cleanup)
   margin-bottom: 24px;
   border-bottom: 1px solid #e8ecf2;
 }
+
 .tabs button {
   padding: 10px 0;
-  border: 0;
-  background: transparent;
+  font-size: 15px;
   color: #8791a3;
   cursor: pointer;
-  font-size: 15px;
+  background: transparent;
+  border: 0;
 }
+
 .tabs button.selected {
   color: #536db4;
   box-shadow: 0 2px #536db4;
 }
+
 .qr-panel {
+  display: flex;
   min-height: 320px;
   text-align: center;
-  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
 }
+
 .qr-panel p {
-  font-size: 13px;
-  color: #7b879b;
   max-width: 300px;
+  font-size: 13px;
   line-height: 1.6;
+  color: #7b879b;
 }
 </style>

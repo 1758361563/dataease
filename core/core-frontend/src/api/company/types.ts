@@ -38,6 +38,7 @@ export interface CompanyUser {
 }
 
 export interface CompanyUserCreateBody {
+  groupIds?: CompanyId[]
   feishuUserId?: string
   username: string
   displayName: string

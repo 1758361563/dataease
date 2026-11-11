@@ -46,6 +46,9 @@ public class CompanyUserAdminController {
     @PostMapping
     public CompanyUserVO create(@RequestBody CompanyUserCreateRequest body, HttpServletRequest request) {
         long operator = adminGuard.require(CompanyCapability.USER_MANAGE);
+        if (body != null && body.getGroupIds() != null && !body.getGroupIds().isEmpty()) {
+            adminGuard.require(CompanyCapability.GROUP_MANAGE);
+        }
         return userAdminService.create(body, CompanyAdminAuditContext.from(request, operator));
     }
 

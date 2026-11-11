@@ -1,6 +1,10 @@
 package io.dataease.company.bi.admin.user;
 
 public class CompanyUserCreateRequest {
+    private java.util.List<Long> groupIds;
+    public java.util.List<Long> getGroupIds() { return groupIds; }
+    public void setGroupIds(java.util.List<Long> value) { groupIds = value; }
+
     private String feishuUserId;
     public String getFeishuUserId() { return feishuUserId; }
     public void setFeishuUserId(String value) { feishuUserId = value; }
