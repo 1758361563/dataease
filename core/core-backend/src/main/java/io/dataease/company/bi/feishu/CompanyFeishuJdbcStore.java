@@ -179,13 +179,13 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
                 INSERT INTO company_feishu_subscription
                   (id, name, dashboard_id, chart_id, chart_name, title_template, body_template, include_detail_link,
                    fixed_filter_json, biz_date_rule, schedule_json, freshness_json, status,
-                   created_at, created_by, updated_at, updated_by)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   created_at, created_by, updated_at, updated_by, content_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 row.id, row.name, row.dashboardId, row.chartId, row.chartName, row.titleTemplate, row.bodyTemplate,
                 row.includeDetailLink == null ? 0 : row.includeDetailLink, row.fixedFilterJson, row.bizDateRule,
                 row.scheduleJson, row.freshnessJson, row.status, row.createdAt, row.createdBy, row.updatedAt,
-                row.updatedBy);
+                row.updatedBy, row.contentJson);
     }
 
     @Override
@@ -194,12 +194,12 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
                 UPDATE company_feishu_subscription
                    SET name=?, dashboard_id=?, chart_id=?, chart_name=?, title_template=?, body_template=?,
                        include_detail_link=?, fixed_filter_json=?, biz_date_rule=?, schedule_json=?, freshness_json=?,
-                       status=?, updated_at=?, updated_by=?
+                       status=?, updated_at=?, updated_by=?, content_json=?
                  WHERE id=?
                 """,
                 row.name, row.dashboardId, row.chartId, row.chartName, row.titleTemplate, row.bodyTemplate,
                 row.includeDetailLink == null ? 0 : row.includeDetailLink, row.fixedFilterJson, row.bizDateRule,
-                row.scheduleJson, row.freshnessJson, row.status, row.updatedAt, row.updatedBy, row.id);
+                row.scheduleJson, row.freshnessJson, row.status, row.updatedAt, row.updatedBy, row.contentJson, row.id);
     }
 
     @Override
@@ -311,6 +311,7 @@ public class CompanyFeishuJdbcStore implements CompanyFeishuRepository {
             row.name = rs.getString("name");
             row.dashboardId = rs.getString("dashboard_id");
             row.chartId = rs.getString("chart_id");
+            row.contentJson = rs.getString("content_json");
             row.chartName = rs.getString("chart_name");
             row.titleTemplate = rs.getString("title_template");
             row.bodyTemplate = rs.getString("body_template");

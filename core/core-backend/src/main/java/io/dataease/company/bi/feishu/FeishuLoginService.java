@@ -42,7 +42,7 @@ public class FeishuLoginService {
         jdbc.update("DELETE FROM company_feishu_login_attempt WHERE expires_at < ?", now);
         jdbc.update("INSERT INTO company_feishu_login_attempt(state_hash,verifier_hash,app_id,tenant_key,callback_url,login_mode,expires_at) VALUES (?,?,?,?,?,?,?)",
                 hash(state), hash(verifier), appId, config.get("tenantKey"), callback, mode, now + 300_000);
-        String url = "https://accounts.feishu.cn/open-apis/authen/v1/authorize?client_id=" + enc(appId)
+        String url = "https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=" + enc(appId)
                 + "&redirect_uri=" + enc(callback) + "&response_type=code&state=" + enc(state);
         return Map.of("state",state,"appId",appId,"authorizeUrl",url,"expiresAt",now+300_000);
     }

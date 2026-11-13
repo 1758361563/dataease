@@ -27,6 +27,9 @@ export async function refreshManagedConnection() {
     await invalidateSession()
     previous = row.secret_cipher + row.config_json
   }
+  const loginRows = await query("SELECT config_json FROM company_integration_connection WHERE provider=? AND connection_key=?", ['FEISHU', 'login'])
+  const loginConfig = loginRows.length ? (typeof loginRows[0].config_json === 'string' ? JSON.parse(loginRows[0].config_json) : loginRows[0].config_json) : {}
+  CONFIG.publicBaseUrl = String(loginConfig.baseUrl || '').replace(/\/$/, '')
   CONFIG.feishuAppId = config.appId || ''
   CONFIG.feishuAppSecret = secrets.appSecret || ''
   CONFIG.user = config.screenshotUser || ''

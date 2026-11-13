@@ -24,6 +24,36 @@ import java.util.Map;
 @ConditionalOnProperty(name = CompanyAuthSupport.ENABLED_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class CompanyFeishuController {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private FeishuSubscriptionContent content;
+    @org.springframework.beans.factory.annotation.Autowired
+    private CompanyFeishuWorker worker;
+
+    @GetMapping("/content/dashboards")
+    public Object dashboards() {
+        adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
+        return content.dashboards();
+    }
+    @GetMapping("/content/{id}")
+    public Object contentOptions(@PathVariable("id") Long id) {
+        adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
+        return content.options(id);
+    }
+    @GetMapping("/content/execution/{id}")
+    public Object executionContent(@PathVariable("id") Long id) {
+        adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
+        content.requireExecution(id);
+        return Map.of("allowed", true);
+    }
+    @PostMapping("/content/preview")
+    public Object preview(@RequestBody Map<String, Object> body) {
+        adminGuard.require(CompanyCapability.FEISHU_SUBSCRIPTION_MANAGE);
+        String dashboard = String.valueOf(body.get("dashboardId"));
+        var normalized = content.normalize(dashboard, body.get("content"), null);
+        return worker.call("subscription.preview", Map.of("dashboardId", dashboard, "content", normalized,
+                "filters", body.getOrDefault("filters", List.of())));
+    }
+
     private final CompanyAdminGuard adminGuard;
     private final CompanyFeishuService feishuService;
 

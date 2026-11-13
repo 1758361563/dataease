@@ -6,6 +6,7 @@ import RangeFilterTime from '@/custom-component/v-query/RangeFilterTime.vue'
 import FilterTime from '@/custom-component/v-query/FilterTime.vue'
 import { useI18n } from '@/hooks/web/useI18n'
 import DynamicTime from '@/custom-component/v-query/DynamicTime.vue'
+import DateRangeEndpoints from './DateRangeEndpoints.vue'
 import DynamicTimeRange from '@/custom-component/v-query/DynamicTimeRange.vue'
 import Time from '@/custom-component/v-query/Time.vue'
 import Select from '@/custom-component/v-query/Select.vue'
@@ -540,7 +541,9 @@ defineExpose({
       <div class="setting">
         <el-radio-group @change="handleTimeTypeChange" v-model="curComponent.timeType">
           <el-radio value="fixed">{{ t('dynamic_time.fix') }}</el-radio>
-          <el-radio value="dynamic">{{ t('dynamic_time.dynamic') }}</el-radio>
+          <el-radio value="dynamic">{{
+            curComponent.displayType === '7' ? '动态范围' : t('dynamic_time.dynamic')
+          }}</el-radio>
         </el-radio-group>
       </div>
       <template v-if="dynamicTime && curComponent.displayType === '1'">
@@ -595,7 +598,7 @@ defineExpose({
       </template>
       <template v-else-if="dynamicTime && curComponent.displayType === '7'">
         <div class="setting">
-          <div class="setting-label">{{ t('dynamic_time.relative') }}</div>
+          <div class="setting-label">范围规则</div>
           <div class="setting-value select">
             <el-select @focus="handleDialogClick" v-model="curComponent.relativeToCurrentRange">
               <el-option
@@ -607,82 +610,21 @@ defineExpose({
             </el-select>
           </div>
         </div>
-        <div
-          class="setting"
+        <DateRangeEndpoints
           v-if="curComponent.relativeToCurrentRange === 'custom'"
-          :class="
-            ['yearrange', 'monthrange', 'daterange'].includes(
-              curComponent.timeGranularityMultiple
-            ) && 'is-year-month-range'
-          "
-        >
-          <div class="setting-label">{{ t('datasource.start_time') }}</div>
-          <div class="setting-input with-date range">
-            <el-input-number
-              step-strictly
-              v-model="curComponent.timeNum"
-              :min="0"
-              controls-position="right"
-            />
-            <el-select @focus="handleDialogClick" v-model="curComponent.relativeToCurrentType">
-              <el-option
-                v-for="item in relativeToCurrentTypeList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-            <el-select @focus="handleDialogClick" v-model="curComponent.around">
-              <el-option
-                v-for="item in aroundList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-            <el-time-picker v-model="curComponent.arbitraryTime" />
-          </div>
-        </div>
-        <div
-          class="setting"
-          v-if="curComponent.relativeToCurrentRange === 'custom'"
-          :class="
-            ['yearrange', 'monthrange', 'daterange'].includes(
-              curComponent.timeGranularityMultiple
-            ) && 'is-year-month-range'
-          "
-        >
-          <div class="setting-label">{{ t('datasource.end_time') }}</div>
-          <div class="setting-input with-date range">
-            <el-input-number
-              v-model="curComponent.timeNumRange"
-              :min="0"
-              step-strictly
-              controls-position="right"
-            />
-            <el-select @focus="handleDialogClick" v-model="curComponent.relativeToCurrentTypeRange">
-              <el-option
-                v-for="item in relativeToCurrentTypeList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-            <el-select @focus="handleDialogClick" v-model="curComponent.aroundRange">
-              <el-option
-                v-for="item in aroundList"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-            <el-time-picker v-model="curComponent.arbitraryTimeRange" />
-          </div>
-        </div>
+          :config="curComponent"
+        />
       </template>
     </div>
     <div
       v-if="curComponent.defaultValueCheck && loadingDefault"
+      v-show="
+        !(
+          dynamicTime &&
+          curComponent.displayType === '7' &&
+          curComponent.relativeToCurrentRange === 'custom'
+        )
+      "
       class="parameters"
       :class="dynamicTime && 'setting'"
     >

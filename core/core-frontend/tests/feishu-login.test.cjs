@@ -39,6 +39,17 @@ async function main() {
   const api = module.exports.default.setup({}, { expose: () => {}, emit: () => {} })
   for (const unsafe of ['//evil.example', 'https://evil.example', '/\\evil', '/login', '/ok\nInjected']) assert.equal(api.safePath(unsafe), '/panel/index')
   assert.equal(api.safePath('/preview?id=123'), '/preview?id=123')
+  const frameWindow = {}, frame = { contentWindow: frameWindow }
+  const qr = { matchOrigin: () => true, matchData: data => data?.source === 'qrcode' && !!data.tmp_code }
+  const authorizeUrl = 'https://passport.feishu.cn/suite/passport/oauth/authorize?client_id=cli_test&state=state&redirect_uri=https%3A%2F%2Fbi.example%2Fcallback'
+  const event = { origin: 'https://passport.feishu.cn', source: frameWindow, data: { source: 'qrcode', tmp_code: 'code&state=forged' } }
+  const redirected = new URL(api.qrRedirect(event, qr, frame, authorizeUrl))
+  assert.equal(redirected.searchParams.get('state'), 'state')
+  assert.equal(redirected.searchParams.get('tmp_code'), event.data.tmp_code)
+  assert.equal(api.qrRedirect({ ...event, origin: 'https://passport.feishu.cn.evil.example' }, qr, frame, authorizeUrl), null)
+  assert.equal(api.qrRedirect({ ...event, source: {} }, qr, frame, authorizeUrl), null)
+  assert.equal(api.qrRedirect({ ...event, data: 'legacy-string' }, qr, frame, authorizeUrl), null)
+  assert.equal(api.qrRedirect({ ...event, data: { source: 'other', tmp_code: 'code' } }, qr, frame, authorizeUrl), null)
   const attempt = { state: 'state', verifier: 'verifier', expiresAt: Date.now() + 10000, redirect: '/preview?id=123' }
   const save = value => storage.set('company.feishu.login', JSON.stringify(value))
   save(attempt)

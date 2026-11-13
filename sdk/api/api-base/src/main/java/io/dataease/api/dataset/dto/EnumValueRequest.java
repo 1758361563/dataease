@@ -10,6 +10,8 @@ import java.util.List;
  */
 @Data
 public class EnumValueRequest {
+    private Long sceneId;
+    private String resourceTable = "core";
     private Long queryId;// 查询字段
     private Long displayId;// 显示字段
     private Long sortId;// 排序字段

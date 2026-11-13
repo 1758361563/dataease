@@ -1,4 +1,5 @@
 import { EnumValue, enumValueObj } from '@/api/dataset'
+import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 
 let filterEnumMap = {}
 
@@ -7,7 +8,14 @@ const filterIdNameEnumMap = {}
 const findFilterEnum = async (val: EnumValue) => {
   const queryId = val.queryId
   const displayId = val.displayId
-  const arr = await enumValueObj({ queryId: queryId, displayId: displayId, searchText: '' })
+  const { dvInfo } = dvMainStoreWithOut()
+  const arr = await enumValueObj({
+    queryId,
+    displayId,
+    searchText: '',
+    sceneId: dvInfo.id,
+    resourceTable: dvInfo.resourceTable
+  })
   return arr?.reduce((acc, item) => {
     acc[item[displayId]] = item[queryId]
     return acc

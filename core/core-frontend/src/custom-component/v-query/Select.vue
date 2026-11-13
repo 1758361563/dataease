@@ -283,6 +283,8 @@ const displayTypeChange = () => {
 const handleFieldIdDefaultChange = (val: string[]) => {
   loading.value = true
   getEnumValue({
+    sceneId: dvMainStore.dvInfo.id,
+    resourceTable: dvMainStore.dvInfo.resourceTable,
     fieldIds: val,
     resultMode: config.value.resultMode || 0
   })
@@ -343,7 +345,11 @@ const customSort = () => {
 const handleFieldIdChange = (val: EnumValue) => {
   let change = false
   loading.value = true
-  enumValueObj(val)
+  enumValueObj({
+    ...val,
+    sceneId: dvMainStore.dvInfo.id,
+    resourceTable: dvMainStore.dvInfo.resourceTable
+  })
     .then(res => {
       let oldArr = []
       if (selectValue.value?.length && config.value.multiple) {

@@ -62,6 +62,16 @@ async function handle(method, args) {
         directoryErrorCode: body.code || null, browserInstalled: fs.existsSync(chromium.executablePath()),
         checked: '已真实验证飞书应用认证；通讯录权限和浏览器状态分别显示', feishuCalled: true }
     }
+    if (method === 'subscription.preview') {
+      const { captureSubscription } = await import('./subscription-content.mjs')
+      const bundle = await captureSubscription(args)
+      try {
+        const total = bundle.images.reduce((sum, image) => sum + fs.statSync(image.pngPath).size, 0)
+        if (total > 16 * 1024 * 1024) throw new Error('预览图片过大，请减少卡片数量')
+        return { filters: bundle.filters, images: bundle.images.map(image => ({ chartId: image.chartId,
+          name: image.name, url: 'data:image/png;base64,' + fs.readFileSync(image.pngPath).toString('base64') })) }
+      } finally { for (const image of bundle.images) fs.rmSync(image.pngPath, { force: true }) }
+    }
     if (method === 'start') {
       if (args.dryRun === true) throw new Error('Managed subscriptions do not support simulated delivery')
       const claimed = await startManualRun({ ...args, subscriptionId: String(args.subscriptionId), dryRun: false })

@@ -54,6 +54,7 @@ public interface CompanyFeishuRepository {
         public String name;
         public String dashboardId;
         public String chartId;
+        public String contentJson;
         public String chartName;
         public String titleTemplate;
         public String bodyTemplate;

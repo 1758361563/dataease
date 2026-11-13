@@ -88,6 +88,8 @@ public class DatasetDataManage {
     @Resource
     private CorePermissionManage corePermissionManage;
     @Autowired(required = false)
+    private io.dataease.company.bi.permission.CompanyDashboardDataGuard dashboardDataGuard;
+    @Autowired(required = false)
     private RowPermissionsApi rowPermissionsApi;
     @Resource
     private DataSourceManage dataSourceManage;
@@ -807,7 +809,9 @@ public class DatasetDataManage {
             BusiPerCheckDTO dto = new BusiPerCheckDTO();
             dto.setId(datasetGroupId);
             dto.setAuthEnum(AuthEnum.READ);
-            boolean checked = corePermissionManage.checkAuth(dto);
+            boolean checked = dashboardDataGuard != null && dashboardDataGuard.canReadFilterDataset(
+                    datasetGroupId, multFieldValuesRequest.getSceneId(), multFieldValuesRequest.getResourceTable())
+                    || corePermissionManage.checkAuth(dto);
             if (!checked) {
                 DEException.throwException(Translator.get("i18n_no_dataset_permission"));
             }
@@ -974,7 +978,9 @@ public class DatasetDataManage {
             BusiPerCheckDTO dto = new BusiPerCheckDTO();
             dto.setId(datasetGroupId);
             dto.setAuthEnum(AuthEnum.READ);
-            boolean checked = corePermissionManage.checkAuth(dto);
+            boolean checked = dashboardDataGuard != null && dashboardDataGuard.canReadFilterDataset(
+                    datasetGroupId, request.getSceneId(), request.getResourceTable())
+                    || corePermissionManage.checkAuth(dto);
             if (!checked) {
                 DEException.throwException(Translator.get("i18n_no_dataset_permission"));
             }
@@ -1215,7 +1221,9 @@ public class DatasetDataManage {
         BusiPerCheckDTO dto = new BusiPerCheckDTO();
         dto.setId(datasetGroupId);
         dto.setAuthEnum(AuthEnum.READ);
-        boolean checked = corePermissionManage.checkAuth(dto);
+        boolean checked = dashboardDataGuard != null && dashboardDataGuard.canReadFilterDataset(
+                    datasetGroupId, multFieldValuesRequest.getSceneId(), multFieldValuesRequest.getResourceTable())
+                    || corePermissionManage.checkAuth(dto);
         if (!checked) {
             DEException.throwException(Translator.get("i18n_no_dataset_permission"));
         }
@@ -1244,6 +1252,9 @@ public class DatasetDataManage {
             DatasetTableFieldDTO f = datasetTableFieldManage.selectById(id);
             if (f == null) {
                 DEException.throwException(Translator.get("i18n_no_field"));
+            }
+            if (!Objects.equals(datasetGroupId, f.getDatasetGroupId())) {
+                DEException.throwException("树形筛选字段必须属于同一数据集");
             }
             // 获取allFields
             fields.add(f);

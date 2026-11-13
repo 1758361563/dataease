@@ -15,6 +15,7 @@ import {
 import { useEmitt } from '@/hooks/web/useEmitt'
 import { cloneDeep, debounce, sortBy } from 'lodash-es'
 import { getFieldTree } from '@/api/dataset'
+import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import colorFunctions from 'less/lib/less/functions/color.js'
 import colorTree from 'less/lib/less/tree/color.js'
 import { colorStringToHex } from '@/utils/color'
@@ -354,7 +355,10 @@ function containsNodeById(source, params) {
 
 const getTreeOption = debounce(() => {
   loading.value = true
+  const { dvInfo } = dvMainStoreWithOut()
   getFieldTree({
+    sceneId: dvInfo.id,
+    resourceTable: dvInfo.resourceTable,
     fieldIds: props.config.treeFieldList.map(ele => ele.id),
     resultMode: config.value.resultMode || 0,
     filter: getCascadeFieldId()

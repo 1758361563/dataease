@@ -20,6 +20,8 @@ export interface DatasetOrFolder {
 }
 
 export interface EnumValue {
+  sceneId?: string | number
+  resourceTable?: string
   queryId: string
   displayId?: string
   sortId?: string

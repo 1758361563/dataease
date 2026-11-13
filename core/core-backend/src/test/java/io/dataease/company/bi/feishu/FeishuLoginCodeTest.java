@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class FeishuLoginCodeTest {
     private static int checks;
     public static void main(String[] args) throws Exception {
+        testOAuthProtocols();
         var jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:feishu_login;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""));
         for (String file : new String[]{"company_feishu_login_attempt", "company_feishu_recipient", "company_feishu_identity_map", "company_feishu_subscription_recipient", "company_feishu_app_config"})
             jdbc.execute(Files.readString(Path.of("core/core-backend/src/main/resources/db/company/"+file+".sql")));
@@ -80,6 +81,7 @@ public class FeishuLoginCodeTest {
         var service=new FeishuLoginService(settings,oauth,identities,users,issuer,jdbc);
         String verifier=FeishuLoginService.random();
         var attempt=service.start(verifier,"QR"); String state=attempt.get("state").toString();
+        check(attempt.get("authorizeUrl").toString().startsWith("https://passport.feishu.cn/suite/passport/oauth/authorize?"),"QR authorization endpoint");
         rejects(()->service.complete(state,FeishuLoginService.random(),"code"),"browser verifier mismatch");
         check(service.complete(state,verifier,"code")==expected,"successful OAuth login");
         rejects(()->service.complete(state,verifier,"code"),"state replay");
@@ -126,4 +128,50 @@ public class FeishuLoginCodeTest {
         try {action.run();} catch(io.dataease.exception.DEException ex){checks++;return;}
         throw new AssertionError(label);
     }
+    private static void testOAuthProtocols() {
+        var http = new ProtocolHttp();
+        var client = new FeishuOAuthClient(http);
+        http.responses.add("{\"access_token\":\"test-token\"}");
+        http.responses.add("{\"user_id\":\"employee\",\"tenant_key\":\"tenant\"}");
+        check(client.exchange("app", "secret", "code", "https://bi.example/callback", "QR").userId().equals("employee"), "QR flat user info");
+        check(http.requests.get(0).uri().toString().equals("https://passport.feishu.cn/suite/passport/oauth/token"), "QR matching token endpoint");
+        check(http.requests.get(0).headers().firstValue("Content-Type").orElse("").equals("application/x-www-form-urlencoded"), "QR form encoding");
+        check(http.requests.get(1).uri().getPath().equals("/suite/passport/oauth/userinfo"), "QR matching user info endpoint");
+        http.responses.add("{\"access_token\":\"test-token\"}");
+        http.responses.add("{\"code\":0,\"data\":{\"user_id\":\"employee\",\"tenant_key\":\"tenant\"}}");
+        check(client.exchange("app", "secret", "code", "https://bi.example/callback", "CLIENT").tenantKey().equals("tenant"), "client nested user info");
+        check(http.requests.get(2).uri().getPath().equals("/open-apis/authen/v2/oauth/token"), "client token endpoint retained");
+        check(http.requests.get(2).headers().firstValue("Content-Type").orElse("").equals("application/json"), "client JSON encoding retained");
+    }
+    private static class ProtocolHttp extends java.net.http.HttpClient {
+        final java.util.List<java.net.http.HttpRequest> requests = new java.util.ArrayList<>();
+        final java.util.Queue<String> responses = new java.util.ArrayDeque<>();
+        public java.util.Optional<java.net.CookieHandler> cookieHandler() { return java.util.Optional.empty(); }
+        public java.util.Optional<java.time.Duration> connectTimeout() { return java.util.Optional.empty(); }
+        public Redirect followRedirects() { return Redirect.NEVER; }
+        public java.util.Optional<java.net.ProxySelector> proxy() { return java.util.Optional.empty(); }
+        public javax.net.ssl.SSLContext sslContext() { return null; }
+        public javax.net.ssl.SSLParameters sslParameters() { return new javax.net.ssl.SSLParameters(); }
+        public java.util.Optional<java.net.Authenticator> authenticator() { return java.util.Optional.empty(); }
+        public Version version() { return Version.HTTP_1_1; }
+        public java.util.Optional<java.util.concurrent.Executor> executor() { return java.util.Optional.empty(); }
+        @SuppressWarnings("unchecked")
+        public <T> java.net.http.HttpResponse<T> send(java.net.http.HttpRequest request, java.net.http.HttpResponse.BodyHandler<T> handler) {
+            requests.add(request);
+            String body = responses.remove();
+            return new java.net.http.HttpResponse<T>() {
+                public int statusCode() { return 200; }
+                public java.net.http.HttpRequest request() { return request; }
+                public java.util.Optional<java.net.http.HttpResponse<T>> previousResponse() { return java.util.Optional.empty(); }
+                public java.net.http.HttpHeaders headers() { return java.net.http.HttpHeaders.of(Map.of(), (a,b) -> true); }
+                public T body() { return (T) body; }
+                public java.util.Optional<javax.net.ssl.SSLSession> sslSession() { return java.util.Optional.empty(); }
+                public java.net.URI uri() { return request.uri(); }
+                public Version version() { return Version.HTTP_1_1; }
+            };
+        }
+        public <T> java.util.concurrent.CompletableFuture<java.net.http.HttpResponse<T>> sendAsync(java.net.http.HttpRequest r, java.net.http.HttpResponse.BodyHandler<T> h) { throw new UnsupportedOperationException(); }
+        public <T> java.util.concurrent.CompletableFuture<java.net.http.HttpResponse<T>> sendAsync(java.net.http.HttpRequest r, java.net.http.HttpResponse.BodyHandler<T> h, java.net.http.HttpResponse.PushPromiseHandler<T> p) { throw new UnsupportedOperationException(); }
+    }
+
 }

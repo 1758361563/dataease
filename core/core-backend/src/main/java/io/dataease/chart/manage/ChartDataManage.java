@@ -72,6 +72,8 @@ public class ChartDataManage {
     @Resource
     private CorePermissionManage corePermissionManage;
     @Autowired(required = false)
+    private io.dataease.company.bi.permission.CompanyDashboardDataGuard dashboardDataGuard;
+    @Autowired(required = false)
     private PluginManageApi pluginManage;
 
     public static final String START_END_SEPARATOR = "_START_END_SPLIT";
@@ -125,7 +127,8 @@ public class ChartDataManage {
         BusiPerCheckDTO dto = new BusiPerCheckDTO();
         dto.setId(table.getId());
         dto.setAuthEnum(AuthEnum.READ);
-        boolean checked = corePermissionManage.checkAuth(dto);
+        boolean checked = dashboardDataGuard != null && dashboardDataGuard.canReadChartDataset(view)
+                || corePermissionManage.checkAuth(dto);
         if (!checked) {
             DEException.throwException(Translator.get("i18n_no_dataset_permission"));
         }

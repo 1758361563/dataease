@@ -5,14 +5,14 @@ import { CONFIG, SHOT_DIR, ensureDirs } from './config.mjs'
 import { recordServiceEvent } from './service-log.mjs'
 import { invalidateSession, withPage } from './session.mjs'
 
-function normalizeFilters(filters) {
+export function normalizeFilters(filters) {
   if (!filters) return []
   if (Array.isArray(filters)) {
     return filters
       .map(item => {
         if (!item) return null
         if (typeof item === 'string') return { name: item, value: item }
-        return { name: String(item.name || item.field || ''), value: String(item.value ?? '') }
+        return { id: item.id ? String(item.id) : undefined, name: String(item.name || item.field || ''), value: item.value ?? '' }
       })
       .filter(item => item && item.name)
   }
@@ -133,7 +133,7 @@ async function discoverQueryFields(page) {
   })
 }
 
-async function applyFiltersViaVue(page, filters) {
+export async function applyFiltersViaVue(page, filters) {
   return page.evaluate(filters => {
     const applied = []
     const roots = [...document.querySelectorAll('.v-query')]
@@ -147,13 +147,20 @@ async function applyFiltersViaVue(page, filters) {
           for (const filter of filters) {
             const field = propValue.find(item => {
               const name = item?.name || ''
-              return name.includes(filter.name) || filter.name.includes(name)
+              return filter.id ? String(item.id) === filter.id : name === filter.name
             })
             if (!field) continue
             field.defaultValueCheck = true
-            if (field.multiple || Number(field.displayType) === 7) {
-              field.selectValue = [filter.value]
-              field.defaultValue = [filter.value]
+            if (Number(field.displayType) === 22) {
+              if (!Array.isArray(filter.value) || filter.value.length !== 2) throw new Error('数字范围需要两个边界')
+              field.numValueStart = field.defaultNumValueStart = Number(filter.value[0])
+              field.numValueEnd = field.defaultNumValueEnd = Number(filter.value[1])
+            } else if (Number(field.displayType) === 8) {
+              field.conditionValueF = field.defaultConditionValueF = Array.isArray(filter.value) ? filter.value[0] : filter.value
+              field.conditionValueS = field.defaultConditionValueS = Array.isArray(filter.value) ? filter.value[1] : ''
+            } else if (field.multiple || Number(field.displayType) === 7) {
+              field.selectValue = Array.isArray(filter.value) ? filter.value : [filter.value]
+              field.defaultValue = field.selectValue
             } else {
               field.selectValue = filter.value
               field.defaultValue = filter.value

@@ -209,7 +209,7 @@ onMounted(load)
       <el-table-column prop="displayName" label="显示名" min-width="140" />
       <el-table-column label="飞书账号" min-width="150"
         ><template #default="{ row }">{{
-          row.feishu?.userId ? `${row.feishu.name || '飞书用户'}（${row.feishu.userId}）` : '未绑定'
+          row.feishu?.userId || '未绑定'
         }}</template></el-table-column
       >
       <el-table-column label="角色" width="160">

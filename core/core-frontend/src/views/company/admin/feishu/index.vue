@@ -2,6 +2,7 @@
 import { formatBeijingTime } from '@/utils/beijingTime'
 import request from '@/config/axios'
 import AdminHelp from '../AdminHelp.vue'
+import SubscriptionWizard from './SubscriptionWizard.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router_2'
 import { ElMessage } from 'element-plus-secondary'
@@ -85,6 +86,7 @@ const subForm = ref({
   name: '',
   dashboardId: '',
   chartId: '',
+  content: { version: 1, mode: 'CARDS', chartIds: [] as string[], dashboardName: '' },
   chartName: '',
   titleTemplate: '',
   bodyTemplate: '',
@@ -299,6 +301,12 @@ const resetSubForm = (preset?: { dashboardId?: string; chartId?: string; chartNa
     name: defaultSubName(chartName),
     dashboardId: preset?.dashboardId || '',
     chartId: preset?.chartId || '',
+    content: {
+      version: 1,
+      mode: preset?.chartId ? 'CARDS' : 'DASHBOARD',
+      chartIds: preset?.chartId ? [preset.chartId] : [],
+      dashboardName: ''
+    },
     chartName,
     titleTemplate: chartName ? `{{cardName}} {{bizDate}}` : '',
     bodyTemplate: '',
@@ -327,6 +335,14 @@ const openSubEdit = async (row: FeishuSubscription) => {
     name: detail.name,
     dashboardId: keepStringId(detail.dashboardId),
     chartId: keepStringId(detail.chartId),
+    content: {
+      dashboardName: '',
+      ...(detail.content || {
+        version: 1,
+        mode: 'CARDS',
+        chartIds: detail.chartId ? [keepStringId(detail.chartId)] : []
+      })
+    },
     chartName: detail.chartName || '',
     titleTemplate: detail.titleTemplate || '',
     bodyTemplate: detail.bodyTemplate || '',
@@ -340,9 +356,15 @@ const openSubEdit = async (row: FeishuSubscription) => {
   subDrawer.value = true
 }
 
+const subscriptionSaving = ref(false)
 const submitSubscription = async () => {
-  if (!subForm.value.name || !subForm.value.dashboardId || !subForm.value.chartId) {
-    ElMessage.warning('订阅名称、dashboardId、chartId 不能为空')
+  if (subscriptionSaving.value) return
+  if (
+    !subForm.value.name ||
+    !subForm.value.dashboardId ||
+    (subForm.value.content.mode === 'CARDS' && !subForm.value.content.chartIds.length)
+  ) {
+    ElMessage.warning('请填写订阅名称并选择订阅内容')
     return
   }
   if (!subForm.value.recipientIds.length) {
@@ -359,7 +381,8 @@ const submitSubscription = async () => {
   const body = {
     name: subForm.value.name,
     dashboardId: subForm.value.dashboardId,
-    chartId: subForm.value.chartId,
+    chartId: subForm.value.content.chartIds[0] || '',
+    content: subForm.value.content,
     chartName: subForm.value.chartName,
     titleTemplate: subForm.value.titleTemplate,
     bodyTemplate: subForm.value.bodyTemplate,
@@ -376,15 +399,20 @@ const submitSubscription = async () => {
     status: subForm.value.status === 'ENABLED' ? 'ENABLED' : 'DRAFT',
     recipientIds: subForm.value.recipientIds
   }
-  if (subForm.value.id) {
-    await updateFeishuSubscription(subForm.value.id, body)
-    ElMessage.success('订阅已保存')
-  } else {
-    await createFeishuSubscription(body)
-    ElMessage.success('订阅已创建')
+  subscriptionSaving.value = true
+  try {
+    if (subForm.value.id) {
+      await updateFeishuSubscription(subForm.value.id, body)
+      ElMessage.success('订阅已保存')
+    } else {
+      await createFeishuSubscription(body)
+      ElMessage.success('订阅已创建')
+    }
+    subDrawer.value = false
+    await loadSubscriptions()
+  } finally {
+    subscriptionSaving.value = false
   }
-  subDrawer.value = false
-  await loadSubscriptions()
 }
 
 const toggleSubscription = async (row: FeishuSubscription) => {
@@ -520,8 +548,9 @@ onMounted(async () => {
             <el-table-column label="关联卡片" min-width="240"
               ><template #default="{ row }"
                 ><div class="card-name">{{ row.chartName || '—' }}</div>
-                <span class="admin-id" :title="'仪表板 ID：' + row.dashboardId"
-                  >Dashboard · {{ row.dashboardId }}</span
+                <span class="admin-id" :title="'仪表板 ID：' + row.dashboardId">{{
+                  row.content?.dashboardName || '仪表板'
+                }}</span
                 ><span class="admin-id" :title="'图表 ID：' + row.chartId"
                   >Chart · {{ row.chartId }}</span
                 ></template
@@ -679,33 +708,21 @@ onMounted(async () => {
       </template>
     </el-drawer>
 
-    <el-drawer
-      class="company-admin-drawer"
+    <SubscriptionWizard
       v-model="subDrawer"
-      :title="subForm.id ? '编辑订阅' : '创建订阅'"
-      size="560px"
+      v-model:form="subForm"
+      :saving="subscriptionSaving"
+      @save="submitSubscription"
     >
       <el-form label-width="120px">
         <el-form-item label="订阅名称" required>
           <el-input v-model="subForm.name" />
-        </el-form-item>
-        <el-form-item label="dashboardId" required>
-          <el-input v-model="subForm.dashboardId" />
-        </el-form-item>
-        <el-form-item label="chartId" required>
-          <el-input v-model="subForm.chartId" />
-        </el-form-item>
-        <el-form-item label="卡片名称">
-          <el-input v-model="subForm.chartName" />
         </el-form-item>
         <el-form-item label="消息标题">
           <el-input v-model="subForm.titleTemplate" />
         </el-form-item>
         <el-form-item label="正文">
           <el-input v-model="subForm.bodyTemplate" type="textarea" :rows="3" />
-        </el-form-item>
-        <el-form-item label="固定筛选 JSON">
-          <el-input v-model="subForm.fixedFilterJson" type="textarea" :rows="4" />
         </el-form-item>
         <el-form-item label="收件人" required>
           <el-select v-model="subForm.recipientIds" multiple filterable style="width: 100%">
@@ -759,12 +776,7 @@ onMounted(async () => {
           <AdminHelp content="时区固定 Asia/Shanghai。同一计划时刻只生成一条计划执行记录。" />
         </el-form-item>
       </el-form>
-      <template #footer>
-        <el-button @click="subDrawer = false">取消</el-button>
-        <el-button type="primary" @click="submitSubscription">保存</el-button>
-      </template>
-    </el-drawer>
-
+    </SubscriptionWizard>
     <el-drawer class="company-admin-drawer" v-model="runDrawer" title="运行记录" size="640px">
       <p class="hint" v-if="polling">正在查询执行状态…</p>
       <GridTable :show-pagination="false" :table-data="runRows" class="admin-grid">

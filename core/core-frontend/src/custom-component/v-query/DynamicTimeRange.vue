@@ -3,9 +3,9 @@ import type { ManipulateType } from 'dayjs'
 import { toRefs, PropType, ref, onBeforeMount, watch, computed } from 'vue'
 import { Calendar } from '@element-plus/icons-vue'
 import { type DatePickType } from 'element-plus-secondary'
-import { getCustomTime } from './time-format'
-import { getCustomRange } from './time-format-dayjs'
-interface SelectConfig {
+import { resolveDefaultRange } from './default-date-range'
+import type { DefaultRangeConfig } from './default-date-range'
+interface SelectConfig extends DefaultRangeConfig {
   timeType: string
   timeGranularityMultiple: DatePickType
   defaultValue: [Date, Date]
@@ -51,36 +51,11 @@ const props = defineProps({
 const selectValue = ref<[Date, Date]>([new Date(), new Date()])
 const { config } = toRefs(props)
 
-const timeConfig = computed(() => {
-  const {
-    timeNum,
-    relativeToCurrentType,
-    timeGranularityMultiple,
-    around,
-    relativeToCurrentRange,
-    defaultValueCheck,
-    arbitraryTime,
-    timeGranularity,
-    timeNumRange,
-    relativeToCurrentTypeRange,
-    aroundRange,
-    arbitraryTimeRange
-  } = config.value
-  return {
-    timeNum,
-    relativeToCurrentType,
-    around,
-    relativeToCurrentRange,
-    timeGranularityMultiple,
-    defaultValueCheck,
-    arbitraryTime,
-    timeGranularity,
-    timeNumRange,
-    relativeToCurrentTypeRange,
-    aroundRange,
-    arbitraryTimeRange
-  }
-})
+const timeConfig = computed(() =>
+  Object.fromEntries(
+    Object.entries(config.value).filter(([key]) => !['defaultValue', 'selectValue'].includes(key))
+  )
+)
 
 watch(
   () => timeConfig.value,
@@ -108,50 +83,12 @@ watch(
 )
 
 const init = () => {
-  const {
-    timeNum,
-    relativeToCurrentType,
-    around,
-    defaultValueCheck,
-    arbitraryTime,
-    timeGranularity,
-    timeGranularityMultiple,
-    timeNumRange,
-    relativeToCurrentTypeRange,
-    aroundRange,
-    relativeToCurrentRange,
-    arbitraryTimeRange
-  } = timeConfig.value
-  if (!defaultValueCheck) {
+  if (!config.value.defaultValueCheck) {
     selectValue.value = [new Date(), new Date()]
     return
   }
-
-  if (relativeToCurrentRange !== 'custom') {
-    selectValue.value = getCustomRange(relativeToCurrentRange)
-    return
-  }
-
-  const startTime = getCustomTime(
-    timeNum,
-    relativeToCurrentType,
-    timeGranularity,
-    around,
-    arbitraryTime,
-    timeGranularityMultiple,
-    'start-config'
-  )
-  const endTime = getCustomTime(
-    timeNumRange,
-    relativeToCurrentTypeRange,
-    timeGranularity,
-    aroundRange,
-    arbitraryTimeRange,
-    timeGranularityMultiple,
-    'end-config'
-  )
-
-  selectValue.value = [startTime, endTime]
+  const range = resolveDefaultRange(config.value, 'config')
+  selectValue.value = range.every(date => Number.isFinite(+date)) ? range : undefined
 }
 
 onBeforeMount(() => {

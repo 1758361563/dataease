@@ -27,20 +27,29 @@ public class FeishuOAuthClient {
         body.put("grant_type", "authorization_code"); body.put("client_id", appId);
         body.put("client_secret", secret); body.put("code", code);
         if ("QR".equals(mode)) body.put("redirect_uri", redirect);
-        var token = call("https://open.feishu.cn/open-apis/authen/v2/oauth/token", body, null);
+        boolean qr = "QR".equals(mode);
+        var token = call(qr ? "https://passport.feishu.cn/suite/passport/oauth/token"
+                : "https://open.feishu.cn/open-apis/authen/v2/oauth/token", body, null, qr);
         String access = token.path("access_token").asText();
         if (access.isBlank()) CompanyAdminErrors.invalid("飞书授权已失效，请重新登录");
-        var user = call("https://open.feishu.cn/open-apis/authen/v1/user_info", null, access).path("data");
+        var response = call(qr ? "https://passport.feishu.cn/suite/passport/oauth/userinfo"
+                : "https://open.feishu.cn/open-apis/authen/v1/user_info", null, access, false);
+        var user = qr ? response : response.path("data");
         String uid = user.path("user_id").asText(), tenant = user.path("tenant_key").asText();
         if (uid.isBlank() || tenant.isBlank()) CompanyAdminErrors.invalid("飞书未返回企业或用户 ID，请检查获取用户 User ID 权限");
         return new Identity(uid, tenant);
     }
-    private JsonNode call(String url, Map<String, String> body, String token) {
+    private JsonNode call(String url, Map<String, String> body, String token, boolean form) {
         try {
             var request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20));
             if (token != null) request.header("Authorization", "Bearer " + token);
-            if (body != null) request.header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
+            if (body != null) {
+                String payload = form ? body.entrySet().stream()
+                        .map(entry -> FeishuLoginService.enc(entry.getKey()) + "=" + FeishuLoginService.enc(entry.getValue()))
+                        .collect(java.util.stream.Collectors.joining("&")) : json.writeValueAsString(body);
+                request.header("Content-Type", form ? "application/x-www-form-urlencoded" : "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(payload));
+            }
             var response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) throw new IllegalStateException();
             var data = json.readTree(response.body());

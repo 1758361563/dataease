@@ -26,7 +26,7 @@ import { storeToRefs } from 'pinia'
 import { enumValueObj } from '@/api/dataset'
 import CustomSortFilter from './CustomSortFilter.vue'
 import { addQueryCriteriaConfig } from './options'
-import { getCustomTime } from './time-format'
+import { resolveDefaultRange } from './default-date-range'
 import { dvMainStoreWithOut } from '@/store/modules/data-visualization/dvMain'
 import {
   getThisStart,
@@ -1479,47 +1479,14 @@ const validate = () => {
           return true
         }
       }
-      const {
-        timeNum,
-        relativeToCurrentType,
-        around,
-        relativeToCurrentRange,
-        timeGranularityMultiple,
-        arbitraryTime,
-        timeGranularity,
-        timeNumRange,
-        relativeToCurrentTypeRange,
-        aroundRange,
-        arbitraryTimeRange,
-        timeType
-      } = ele
-
-      let startTime =
-        timeType === 'dynamic'
-          ? getCustomTime(
-              timeNum,
-              relativeToCurrentType,
-              timeGranularity,
-              around,
-              arbitraryTime,
-              timeGranularityMultiple,
-              'start-config'
-            )
-          : new Date(ele.defaultValue[0])
-      let endTime =
-        timeType === 'dynamic'
-          ? getCustomTime(
-              timeNumRange,
-              relativeToCurrentTypeRange,
-              timeGranularity,
-              aroundRange,
-              arbitraryTimeRange,
-              timeGranularityMultiple,
-              'end-config'
-            )
-          : new Date(ele.defaultValue[1])
-      if (!!relativeToCurrentRange && relativeToCurrentRange !== 'custom') {
-        ;[startTime, endTime] = getCustomRange(relativeToCurrentRange)
+      const { timeGranularityMultiple } = ele
+      const [startTime, endTime] =
+        ele.timeType === 'dynamic'
+          ? resolveDefaultRange(ele, 'config')
+          : [new Date(ele.defaultValue[0]), new Date(ele.defaultValue[1])]
+      if (!Number.isFinite(+startTime) || !Number.isFinite(+endTime)) {
+        ElMessage.error('请补全默认时间范围的日期设置')
+        return true
       }
       if (+startTime > +endTime) {
         ElMessage.error(t('v_query.the_start_time'))

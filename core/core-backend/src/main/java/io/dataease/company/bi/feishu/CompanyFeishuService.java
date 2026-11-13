@@ -25,6 +25,9 @@ import java.util.function.LongSupplier;
 @ConditionalOnProperty(name = CompanyAuthSupport.ENABLED_PROPERTY, havingValue = "true", matchIfMissing = true)
 public class CompanyFeishuService {
 
+    @Autowired(required = false)
+    private FeishuSubscriptionContent subscriptionContent;
+
     private static final Set<String> RECEIVE_ID_TYPES = Set.of("user_id", "chat_id");
     private static final Set<String> RECIPIENT_TYPES = Set.of("PERSONAL", "CHAT");
     private static final Set<String> STATUSES = Set.of("ENABLED", "DISABLED");
@@ -234,7 +237,12 @@ public class CompanyFeishuService {
     public Map<String, Object> updateSubscription(Long id, Map<String, Object> body, long operatorId) {
         rejectSecretFields(body);
         CompanyFeishuRepository.Subscription existing = requireSubscription(id);
-        CompanyFeishuRepository.Subscription row = newSubscription(body, operatorId, false);
+        Map<String, Object> effectiveBody = new java.util.HashMap<>(body);
+        if (!body.containsKey("content") && existing.contentJson != null && java.util.Objects.equals(existing.dashboardId, body.get("dashboardId"))) {
+            try { effectiveBody.put("content", JSON.readTree(existing.contentJson)); }
+            catch (Exception e) { CompanyAdminErrors.invalid("订阅内容无法读取，请重新选择"); }
+        }
+        CompanyFeishuRepository.Subscription row = newSubscription(effectiveBody, operatorId, false);
         row.id = existing.id;
         row.createdAt = existing.createdAt;
         row.createdBy = existing.createdBy;
@@ -422,7 +430,13 @@ public class CompanyFeishuService {
         row.id = creating ? ids.getAsLong() : null;
         row.name = requiredText(body, "name", 128);
         row.dashboardId = requiredText(body, "dashboardId", 64);
-        row.chartId = requiredText(body, "chartId", 64);
+        row.chartId = optionalText(body.get("chartId"), 64);
+        if (subscriptionContent != null) {
+            Map<String, Object> content = subscriptionContent.normalize(row.dashboardId, body.get("content"), row.chartId);
+            row.contentJson = writeJson(content);
+            @SuppressWarnings("unchecked") List<String> charts = (List<String>) content.get("chartIds");
+            row.chartId = charts.isEmpty() ? "" : charts.getFirst();
+        } else if (StringUtils.isBlank(row.chartId)) CompanyAdminErrors.invalid("请选择卡片");
         row.chartName = optionalText(body.get("chartName"), 256);
         row.titleTemplate = optionalText(body.get("titleTemplate"), 256);
         row.bodyTemplate = optionalText(body.get("bodyTemplate"), 4000);
@@ -500,6 +514,8 @@ public class CompanyFeishuService {
         vo.put("name", row.name);
         vo.put("dashboardId", row.dashboardId);
         vo.put("chartId", row.chartId);
+        try { vo.put("content", row.contentJson == null ? null : JSON.readTree(row.contentJson)); }
+        catch (Exception e) { throw new IllegalStateException("Invalid subscription content", e); }
         vo.put("chartName", row.chartName);
         vo.put("status", row.status);
         vo.put("scheduleJson", row.scheduleJson);

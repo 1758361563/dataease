@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS company_feishu_subscription (
     name                 VARCHAR(128) NOT NULL,
     dashboard_id         VARCHAR(64)  NOT NULL,
     chart_id             VARCHAR(64)  NOT NULL,
+    content_json         TEXT         NULL,
     chart_name           VARCHAR(256) NULL,
     title_template       VARCHAR(256) NULL,
     body_template        TEXT         NULL,

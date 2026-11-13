@@ -106,6 +106,9 @@ public class CompanyBiSchemaInitializer implements ApplicationRunner {
                 stmt.execute(sql);
                 LogUtil.info("Applied company schema if missing: " + location);
             }
+            try (var ps = conn.prepareStatement("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='company_feishu_subscription' AND COLUMN_NAME='content_json'"); var rs = ps.executeQuery()) {
+                rs.next(); if (rs.getInt(1) == 0) stmt.execute("ALTER TABLE company_feishu_subscription ADD COLUMN content_json TEXT NULL");
+            }
             ensureFeishuExecutionMode(conn);
             ensureFeishuDeliveryLane(conn);
             ensureSheetManagement(conn);

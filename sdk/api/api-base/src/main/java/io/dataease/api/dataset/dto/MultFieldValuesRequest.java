@@ -9,6 +9,8 @@ import java.util.List;
 
 @Data
 public class MultFieldValuesRequest {
+    private Long sceneId;
+    private String resourceTable = "core";
     List<Long> fieldIds = new ArrayList<>();
     Long userId = null;
     private List<ChartExtFilterDTO> filter;// 级联查询条件，多个条件之间用and拼接到SQL

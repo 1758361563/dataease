@@ -54,6 +54,7 @@ export interface FeishuSubscription {
   name: string
   dashboardId: string
   chartId: string
+  content?: { version: number; mode: string; chartIds: string[]; dashboardName?: string }
   chartName?: string
   status: string
   scheduleJson?: string
@@ -69,6 +70,7 @@ export interface FeishuSubscriptionBody {
   name: string
   dashboardId: string
   chartId: string
+  content?: { version: number; mode: string; chartIds: string[]; dashboardName?: string }
   chartName?: string
   titleTemplate?: string
   bodyTemplate?: string

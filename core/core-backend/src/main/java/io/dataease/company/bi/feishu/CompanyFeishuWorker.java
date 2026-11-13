@@ -74,7 +74,7 @@ public class CompanyFeishuWorker {
                 input.write(JSON.writeValueAsString(Map.of("id", id, "method", method, "args", args)));
                 input.newLine(); input.flush();
             }
-            return result.get(120, TimeUnit.SECONDS);
+            return result.get("subscription.preview".equals(method) ? 600 : 120, TimeUnit.SECONDS);
         } catch (Exception e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             String detail = e instanceof ExecutionException && e.getCause() != null ? e.getCause().getMessage() : null;

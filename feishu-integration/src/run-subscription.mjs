@@ -1,3 +1,4 @@
+import { captureSubscription, buildSubscriptionMessage, contentDefinition, authorizeSubscription } from './subscription-content.mjs'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -8,7 +9,7 @@ import { etlHoldSummary, freshnessDecision } from './etl-status.mjs'
 import { parseSchedule } from './schedule.mjs'
 import { recordServiceEvent } from './service-log.mjs'
 import { closePool } from './db.mjs'
-import { getTenantAccessToken, sendImage, uploadImage } from './feishu.mjs'
+import { getTenantAccessToken, sendImage, sendMessage, uploadImage } from './feishu.mjs'
 import {
   claimDeliveryRun,
   getAppConfigByAppId,
@@ -97,14 +98,9 @@ function filtersFromSubscription(sub) {
   try {
     const parsed = JSON.parse(sub.fixed_filter_json)
     const items = Array.isArray(parsed?.items) ? parsed.items : []
-    return items
-      .map(item => ({
-        name: String(item.name || ''),
-        value: Array.isArray(item.value) ? String(item.value[0] ?? '') : String(item.value ?? '')
-      }))
-      .filter(item => item.name && item.value)
+    return items.filter(item => item && item.name)
   } catch {
-    return []
+    throw new Error('订阅筛选配置无法读取，请重新保存订阅')
   }
 }
 
@@ -177,7 +173,7 @@ function assertRunnable(sub, recipients, triggerType) {
   if (triggerType === 'SCHEDULED' && schedule.autoRun !== true) {
     throw new Error('scheduled trigger refused: subscription autoRun is disabled')
   }
-  if (!sub.dashboard_id || !sub.chart_id) {
+  if (!sub.dashboard_id || (!sub.chart_id && !sub.content_json)) {
     throw new Error('subscription missing dashboard_id or chart_id')
   }
   if (!recipients.length) throw new Error('subscription has no recipients')
@@ -419,6 +415,7 @@ export async function executeSubscription(opts) {
     startedAt: Number(run.started_at) || Date.now()
   })
 
+  let stage = 'screenshot'
   try {
     if (dryRun) {
       const note = [report.liveRefused, freshnessNote].filter(Boolean).join('; ')
@@ -432,6 +429,8 @@ export async function executeSubscription(opts) {
       report.finishedAt = stamp()
       return report
     }
+
+    await authorizeSubscription(sub.id)
 
     if (run.screenshot_status !== 'SUCCEEDED' || !run.png_ref) {
       if (options.failScreenshot) {
@@ -454,6 +453,18 @@ export async function executeSubscription(opts) {
       if (options.reusePng && fs.existsSync(options.reusePng)) {
         pngPath = options.reusePng
         captureMeta = { reused: options.reusePng, pngBytes: fs.statSync(pngPath).size }
+      } else if (sub.content_json) {
+        const bundle = await captureSubscription({ dashboardId: sub.dashboard_id, content: contentDefinition(sub),
+          filters: filtersFromSubscription(sub), reference: run.planned_at || run.created_at })
+        bundle.title = sub.title_template || sub.name
+        bundle.body = sub.body_template || ''
+        bundle.link = Number(sub.include_detail_link) === 1 && CONFIG.publicBaseUrl ? CONFIG.publicBaseUrl + '/#/panel/index?dvId=' + sub.dashboard_id : null
+        const values = { cardName: bundle.images.map(image => image.name).join('、'), bizDate: new Date(Number(run.planned_at) + 8 * 3600000).toISOString().slice(0, 10) }
+        for (const key of ['title', 'body']) bundle[key] = bundle[key].replace(/{{(cardName|bizDate)}}/g, (_, name) => values[name])
+        fs.mkdirSync(TMP_DIR, { recursive: true })
+        pngPath = path.join(TMP_DIR, 'bundle_' + run.id + '.json')
+        fs.writeFileSync(pngPath, JSON.stringify(bundle))
+        captureMeta = { images: bundle.images.map(({ chartId, name, status }) => ({ chartId, name, status })) }
       } else {
         const { captureCard } = await import('./capture.mjs')
         const shot = await captureCard({
@@ -470,7 +481,7 @@ export async function executeSubscription(opts) {
           durationMs: shot.meta.durationMs
         }
       }
-      const storedPng = path.join(TMP_DIR, `run_${run.id}.png`)
+      const storedPng = path.join(TMP_DIR, `run_${run.id}${pngPath.endsWith('.json') ? '.json' : '.png'}`)
       fs.mkdirSync(TMP_DIR, { recursive: true })
       if (path.resolve(pngPath) !== path.resolve(storedPng)) {
         fs.copyFileSync(pngPath, storedPng)
@@ -487,6 +498,7 @@ export async function executeSubscription(opts) {
       report.steps.screenshot = { result: 'REUSED', pngRef: run.png_ref }
     }
 
+    stage = 'upload'
     if (run.upload_status !== 'SUCCEEDED' || !run.image_key) {
       if (options.failUpload) {
         await updateDeliveryRun(run.id, {
@@ -511,7 +523,19 @@ export async function executeSubscription(opts) {
       if (!pngPath || !fs.existsSync(pngPath)) {
         throw new Error('png_ref missing after screenshot stage')
       }
-      const uploaded = await uploadImage({
+      let uploaded
+      if (pngPath.endsWith('.json')) {
+        const bundle = JSON.parse(fs.readFileSync(pngPath, 'utf8'))
+        for (const image of bundle.images) {
+          if (image.imageKey) continue
+          const result = await uploadImage({ token: auth.token, filePath: image.pngPath, filename: path.basename(image.pngPath) })
+          if (!result.ok || !result.imageKey) throw new Error(result.msg || '卡片图片上传失败')
+          image.imageKey = result.imageKey; image.status = 'UPLOADED'
+          fs.writeFileSync(pngPath + '.tmp', JSON.stringify(bundle))
+          fs.renameSync(pngPath + '.tmp', pngPath)
+        }
+        uploaded = { ok: true, imageKey: 'BUNDLE_V1' }
+      } else uploaded = await uploadImage({
         token: auth.token,
         filePath: pngPath,
         filename: `run_${run.id}.png`
@@ -551,6 +575,7 @@ export async function executeSubscription(opts) {
       report.steps.auth = { result: 'PASS', tokenRedacted: auth.meta.tokenRedacted, expire: auth.expire }
     }
 
+    stage = 'send'
     const pairs = await ensureTargets(run, recipients)
     const sendResults = []
     for (const { target, recipient } of pairs) {
@@ -582,7 +607,11 @@ export async function executeSubscription(opts) {
         })
         continue
       }
-      const sent = await sendImage({
+      const bundle = run.image_key === 'BUNDLE_V1' ? JSON.parse(fs.readFileSync(run.png_ref, 'utf8')) : null
+      const sent = bundle ? await sendMessage({
+        token, receiveIdType: recipient.receive_id_type, receiveId: recipient.feishu_id, msgType: 'post',
+        content: buildSubscriptionMessage({ title: bundle.title, body: bundle.body, images: bundle.images, link: bundle.link })
+      }) : await sendImage({
         token,
         receiveIdType: recipient.receive_id_type,
         receiveId: recipient.feishu_id,
@@ -644,6 +673,7 @@ export async function executeSubscription(opts) {
     await updateDeliveryRun(run.id, {
       status: 'FAILED',
       errorSummary: summary,
+      ...(stage === 'screenshot' ? { screenshotStatus: 'FAILED', screenshotError: summary } : stage === 'upload' ? { uploadStatus: 'FAILED', uploadError: summary } : {}),
       finishedAt: Date.now()
     }).catch(dbErr => {
       recordServiceEvent({ area: 'database', runId: run.id, message: dbErr.message })

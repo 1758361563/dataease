@@ -27,13 +27,11 @@ const contentShow = ref(true)
 const loading = ref(false)
 const axiosFinished = ref(true)
 const showFoot = ref(false)
-const showSlogan = ref(true)
 const loginLogoUrl = computed(
   () => appearanceStore.getNavigate || `${import.meta.env.BASE_URL}branding/company-logo.png`
 )
 const msg = ref(null)
 const loginImageUrl = ref(null)
-const slogan = ref(null)
 const footContent = ref(null)
 const loginErrorMsg = ref('')
 const xpackLoginHandler = ref()
@@ -175,12 +173,6 @@ const loadArrearance = () => {
   if (appearanceStore.getBg) {
     loginImageUrl.value = appearanceStore.getBg
   }
-  if (appearanceStore.getShowSlogan) {
-    showSlogan.value = appearanceStore.getShowSlogan === 'true'
-  }
-  if (appearanceStore.getSlogan) {
-    slogan.value = appearanceStore.getSlogan
-  }
   if (appearanceStore.getFoot) {
     showFoot.value = appearanceStore.getFoot === 'true'
     if (showFoot.value) {
@@ -282,9 +274,6 @@ onMounted(async () => {
             <div class="login-logo">
               <img v-if="axiosFinished" :src="loginLogoUrl" alt="" />
               <span>气味数据</span>
-            </div>
-            <div v-if="showSlogan" class="login-welcome">
-              {{ slogan || t('system.available_to_everyone') }}
             </div>
             <div class="login-form border-radius-12">
               <FeishuLogin @active="feishuActive = $event" />
@@ -440,18 +429,6 @@ onMounted(async () => {
     @media only screen and (max-width: 1280px) {
       margin: 20px auto 20px;
     }
-  }
-
-  .login-welcome {
-    text-align: center;
-    margin-top: 8px;
-    color: #646a73;
-    font-family: var(--de-custom_font, 'PingFang');
-    font-size: 14px;
-    font-style: normal;
-    font-weight: 400;
-    line-height: 20px;
-    word-wrap: break-word;
   }
 
   .demo-tips {

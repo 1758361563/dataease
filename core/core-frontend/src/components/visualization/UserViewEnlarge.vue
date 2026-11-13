@@ -7,13 +7,13 @@
     width="70vw"
     trigger="click"
     class="userViewEnlarge-class"
-    :class="{ 'chart-enlarge-mode': optType === 'enlarge' }"
+    :class="{ 'chart-enlarge-mode': optType === 'enlarge', 'toolbar-open': toolbarOpen }"
     :fullscreen="optType === 'enlarge' && enlargeFullscreen"
     :style="dialogStyle"
     @close="handleClose"
   >
     <template #header v-if="!isIframe">
-      <div class="header-title">
+      <div class="header-title" @mouseenter="toolbarOpen = true" @mouseleave="toolbarOpen = false">
         <div class="header-title-text" :title="viewInfo?.title">{{ viewInfo?.title }}</div>
         <div class="export-button">
           <el-select
@@ -116,6 +116,14 @@
         </div>
       </div>
     </template>
+    <button
+      v-if="optType === 'enlarge'"
+      class="enlarge-toolbar-handle"
+      aria-label="显示工具栏"
+      @mouseenter="toolbarOpen = true"
+      @mouseleave="toolbarOpen = false"
+      @click="toolbarOpen = !toolbarOpen"
+    />
     <div
       v-loading="downLoading"
       :element-loading-text="t('visualization.export_loading')"
@@ -208,6 +216,7 @@ import html2canvas from 'html2canvas'
 const downLoading = ref(false)
 const dvMainStore = dvMainStoreWithOut()
 const dialogShow = ref(false)
+const toolbarOpen = ref(false)
 const enlargeFullscreen = ref(true)
 const toggleEnlargeSize = async () => {
   enlargeFullscreen.value = !enlargeFullscreen.value
@@ -288,6 +297,11 @@ const customExport = computed(() => {
     canvasStyleData.value && optType.value === 'enlarge'
       ? getCanvasStyle(canvasStyleData.value, 'canvas-main')
       : {}
+  if (optType.value === 'enlarge') {
+    style.width = '100%'
+    style.height = '100%'
+    style.transform = 'none'
+  }
   if (downLoading.value) {
     const bashStyle = pixel.value.split(' * ')
     style['width'] = bashStyle[0] + 'px!important'
@@ -532,14 +546,46 @@ defineExpose({
       margin: 10dvh auto !important;
     }
     .ed-dialog__header {
-      flex-shrink: 0;
+      position: absolute;
+      top: 8px;
+      right: 16px;
+      left: 16px;
+      z-index: 20;
+      padding: 10px 16px;
+      background: var(--ed-dialog-bg-color, #fff);
+      border: 1px solid #e8ebf0;
+      border-radius: 12px;
+      box-shadow: 0 6px 24px rgb(0 0 0 / 10%);
+      opacity: 0;
+      transform: translateY(calc(-100% - 16px));
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    &.toolbar-open .ed-dialog__header,
+    .ed-dialog__header:focus-within,
+    .ed-dialog__header:hover {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .enlarge-toolbar-handle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      z-index: 21;
+      height: 10px;
+      padding: 0;
+      background: transparent;
+      border: 0;
+    }
+    .enlarge-toolbar-handle:focus-visible {
+      background: #e7ecfa;
     }
     .ed-dialog__body {
       flex: 1;
       min-height: 0;
       display: flex;
       flex-direction: column;
-      padding: 12px 20px 20px;
+      padding: 8px;
     }
     .enlarge-outer {
       flex: 1;

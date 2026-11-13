@@ -206,8 +206,8 @@ public class DashboardCalculationManage {
         } else if (request.getCalculationConfig() != null) {
             throw new IllegalArgumentException("正式查询不能覆盖仪表板计算定义");
         }
-        if (json == null || json.isBlank()) return new DashboardCalculationConfig();
         if (!snapshot) requireScope(sceneId, false, guard);
+        if (json == null || json.isBlank()) return new DashboardCalculationConfig();
         return parse(json);
     }
 

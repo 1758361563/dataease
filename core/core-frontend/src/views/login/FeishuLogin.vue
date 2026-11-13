@@ -86,6 +86,27 @@ async function complete(code: string, state: string) {
   user.setTime(Date.now())
   await router.replace({ path: safePath(saved.redirect) })
 }
+function qrRedirect(
+  event: MessageEvent,
+  qr: { matchOrigin: (origin: string) => boolean; matchData: (data: unknown) => boolean },
+  frame: HTMLIFrameElement | null | undefined,
+  authorizeUrl: string
+) {
+  if (
+    !['https://passport.feishu.cn', 'https://accounts.feishu.cn'].includes(event.origin) ||
+    !qr.matchOrigin(event.origin) ||
+    !qr.matchData(event.data) ||
+    !frame ||
+    event.source !== frame.contentWindow ||
+    typeof event.data?.tmp_code !== 'string' ||
+    !event.data.tmp_code ||
+    event.data.tmp_code.length > 2048
+  )
+    return null
+  const url = new URL(authorizeUrl)
+  url.searchParams.set('tmp_code', event.data.tmp_code)
+  return url.toString()
+}
 async function start() {
   cleanup()
   const current = generation
@@ -140,7 +161,7 @@ async function start() {
       if (current === generation) await complete(code, attempt.state)
     } else {
       await loadScript(
-        'https://sf3-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.2.js'
+        'https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/passport/qrcode/LarkSSOSDKWebQRCode-1.0.3.js'
       )
       if (current !== generation) return
       await nextTick()
@@ -149,19 +170,18 @@ async function start() {
         id: 'company-feishu-qr',
         goto: attempt.authorizeUrl,
         width: '280',
-        height: '280'
+        height: '280',
+        style: 'border:0;display:block;'
       })
       listener = (event: MessageEvent) => {
-        const frame = container.value?.querySelector('iframe')
-        if (
-          current !== generation ||
-          !qr.matchOrigin(event.origin) ||
-          !frame ||
-          event.source !== frame.contentWindow ||
-          typeof event.data !== 'string'
+        if (current !== generation) return
+        const redirect = qrRedirect(
+          event,
+          qr,
+          container.value?.querySelector('iframe'),
+          attempt.authorizeUrl
         )
-          return
-        window.location.assign(`${attempt.authorizeUrl}&tmp_code=${encodeURIComponent(event.data)}`)
+        if (redirect) window.location.assign(redirect)
       }
       window.addEventListener('message', listener)
     }

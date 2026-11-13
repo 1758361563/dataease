@@ -3,7 +3,7 @@ import type { ManipulateType } from 'dayjs'
 import { storeToRefs } from 'pinia'
 import dayjs from 'dayjs'
 import { getDynamicRange, getCustomTime } from '@/custom-component/v-query/time-format'
-import { getCustomRange } from '@/custom-component/v-query/time-format-dayjs'
+import { resolveDefaultRange } from '@/custom-component/v-query/default-date-range'
 const dvMainStore = dvMainStoreWithOut()
 const { componentData, canvasStyleData } = storeToRefs(dvMainStore)
 
@@ -405,42 +405,7 @@ export const searchQuery = (queryComponentList, filter, curComponentId, firstLoa
               item.defaultValue = new Date(selectValue[0])
               item.selectValue = new Date(selectValue[0])
             } else {
-              const {
-                timeNum,
-                relativeToCurrentType,
-                around,
-                relativeToCurrentRange,
-                arbitraryTime,
-                timeGranularity,
-                timeNumRange,
-                relativeToCurrentTypeRange,
-                aroundRange,
-                timeGranularityMultiple,
-                arbitraryTimeRange
-              } = item
-
-              let startTime = getCustomTime(
-                timeNum,
-                relativeToCurrentType,
-                timeGranularity,
-                around,
-                arbitraryTime,
-                timeGranularityMultiple,
-                'start-panel'
-              )
-              let endTime = getCustomTime(
-                timeNumRange,
-                relativeToCurrentTypeRange,
-                timeGranularity,
-                aroundRange,
-                arbitraryTimeRange,
-                timeGranularityMultiple,
-                'end-panel'
-              )
-
-              if (!!relativeToCurrentRange && relativeToCurrentRange !== 'custom') {
-                ;[startTime, endTime] = getCustomRange(relativeToCurrentRange)
-              }
+              const [startTime, endTime] = resolveDefaultRange(item)
               item.defaultValue = [startTime, endTime]
               item.selectValue = [startTime, endTime]
               selectValue = [startTime, endTime]

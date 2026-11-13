@@ -71,10 +71,10 @@ onBeforeUnmount(() => {
         v-for="item in options"
         :key="item.userId"
         :value="item.userId"
-        :label="`${item.name}（${item.userId}）`"
+        :label="item.userId"
         :disabled="!!item.boundUserId && item.boundUserId !== biUserId"
       >
-        <span>{{ item.name }}（{{ item.userId }}）</span>
+        <span>{{ item.userId }}</span>
         <span v-if="item.boundUserId" class="identity-detail">已绑定 {{ item.boundUsername }}</span>
         <span class="identity-detail">{{ item.departments.join(' / ') }}</span>
       </el-option>
