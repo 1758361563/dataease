@@ -29,7 +29,7 @@ export async function refreshManagedConnection() {
   }
   const loginRows = await query("SELECT config_json FROM company_integration_connection WHERE provider=? AND connection_key=?", ['FEISHU', 'login'])
   const loginConfig = loginRows.length ? (typeof loginRows[0].config_json === 'string' ? JSON.parse(loginRows[0].config_json) : loginRows[0].config_json) : {}
-  CONFIG.publicBaseUrl = String(loginConfig.baseUrl || '').replace(/\/$/, '')
+  CONFIG.publicBaseUrl = String(loginConfig.baseUrl || process.env.COMPANY_BI_PUBLIC_BASE_URL || '').replace(/\/$/, '')
   CONFIG.feishuAppId = config.appId || ''
   CONFIG.feishuAppSecret = secrets.appSecret || ''
   CONFIG.user = config.screenshotUser || ''

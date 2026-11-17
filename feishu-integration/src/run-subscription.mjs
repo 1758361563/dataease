@@ -1,4 +1,4 @@
-import { captureSubscription, buildSubscriptionMessage, contentDefinition, authorizeSubscription } from './subscription-content.mjs'
+import { captureSubscription, buildSubscriptionMessage, contentDefinition, authorizeSubscription, dashboardDetailLink } from './subscription-content.mjs'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -453,33 +453,18 @@ export async function executeSubscription(opts) {
       if (options.reusePng && fs.existsSync(options.reusePng)) {
         pngPath = options.reusePng
         captureMeta = { reused: options.reusePng, pngBytes: fs.statSync(pngPath).size }
-      } else if (sub.content_json) {
+      } else {
         const bundle = await captureSubscription({ dashboardId: sub.dashboard_id, content: contentDefinition(sub),
           filters: filtersFromSubscription(sub), reference: run.planned_at || run.created_at })
         bundle.title = sub.title_template || sub.name
         bundle.body = sub.body_template || ''
-        bundle.link = Number(sub.include_detail_link) === 1 && CONFIG.publicBaseUrl ? CONFIG.publicBaseUrl + '/#/panel/index?dvId=' + sub.dashboard_id : null
+        bundle.link = dashboardDetailLink(CONFIG.publicBaseUrl, sub.dashboard_id)
         const values = { cardName: bundle.images.map(image => image.name).join('、'), bizDate: new Date(Number(run.planned_at) + 8 * 3600000).toISOString().slice(0, 10) }
         for (const key of ['title', 'body']) bundle[key] = bundle[key].replace(/{{(cardName|bizDate)}}/g, (_, name) => values[name])
         fs.mkdirSync(TMP_DIR, { recursive: true })
         pngPath = path.join(TMP_DIR, 'bundle_' + run.id + '.json')
         fs.writeFileSync(pngPath, JSON.stringify(bundle))
         captureMeta = { images: bundle.images.map(({ chartId, name, status }) => ({ chartId, name, status })) }
-      } else {
-        const { captureCard } = await import('./capture.mjs')
-        const shot = await captureCard({
-          dashboardId: sub.dashboard_id,
-          chartId: sub.chart_id,
-          filters: filtersFromSubscription(sub),
-          taskId: `run-${run.id}`
-        })
-        pngPath = shot.pngPath
-        captureMeta = {
-          pngBytes: shot.meta.pngBytes,
-          pngHash: shot.meta.pngHash,
-          filterMode: shot.meta.filterMode,
-          durationMs: shot.meta.durationMs
-        }
       }
       const storedPng = path.join(TMP_DIR, `run_${run.id}${pngPath.endsWith('.json') ? '.json' : '.png'}`)
       fs.mkdirSync(TMP_DIR, { recursive: true })
@@ -609,8 +594,8 @@ export async function executeSubscription(opts) {
       }
       const bundle = run.image_key === 'BUNDLE_V1' ? JSON.parse(fs.readFileSync(run.png_ref, 'utf8')) : null
       const sent = bundle ? await sendMessage({
-        token, receiveIdType: recipient.receive_id_type, receiveId: recipient.feishu_id, msgType: 'post',
-        content: buildSubscriptionMessage({ title: bundle.title, body: bundle.body, images: bundle.images, link: bundle.link })
+        token, receiveIdType: recipient.receive_id_type, receiveId: recipient.feishu_id, msgType: 'interactive',
+        content: buildSubscriptionMessage({ title: bundle.title, body: bundle.body, images: bundle.images, link: dashboardDetailLink(CONFIG.publicBaseUrl, sub.dashboard_id) })
       }) : await sendImage({
         token,
         receiveIdType: recipient.receive_id_type,

@@ -1,5 +1,38 @@
 const FEISHU_API = 'https://open.feishu.cn/open-apis'
 
+export function feishuErrorMessage(err) {
+  const operation = err?.feishuOperation || '飞书请求'
+  if (err?.name === 'TimeoutError' || err?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT') {
+    return `${operation}超时，请检查 BI 执行器到 open.feishu.cn 的网络连接后重试`
+  }
+  if (err?.name === 'AbortError') return `${operation}已取消，请重试`
+  if (err?.name === 'TypeError' && err?.message === 'fetch failed') {
+    return `${operation}连接失败，请检查 BI 执行器的网络、DNS 和代理配置`
+  }
+  const code = err?.http ? err.code : err?.detail?.code
+  if (code != null && Number.isInteger(Number(code))) return `飞书接口调用失败，错误码 ${code}`
+  return null
+}
+
+// Only used for credential acquisition and read-only contact requests.
+export async function readFeishuJson(path, options, operation) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`${FEISHU_API}${path}`, {
+        ...options,
+        signal: AbortSignal.timeout(20000)
+      })
+      return await readJson(res)
+    } catch (err) {
+      err.feishuOperation = operation
+      const retryable = err.name === 'TimeoutError' ||
+        (err.name === 'TypeError' && err.message === 'fetch failed')
+      if (!retryable || attempt === 1) throw err
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
+  }
+}
+
 function redactToken(token) {
   if (!token) return '(empty)'
   return `${token.slice(0, 6)}…(len=${token.length})`
@@ -15,13 +48,11 @@ async function readJson(res) {
 }
 
 export async function getTenantAccessToken(appId, appSecret) {
-  const res = await fetch(`${FEISHU_API}/auth/v3/tenant_access_token/internal`, {
-    signal: AbortSignal.timeout(20000),
+  const { http, json } = await readFeishuJson('/auth/v3/tenant_access_token/internal', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ app_id: appId, app_secret: appSecret })
-  })
-  const { http, json } = await readJson(res)
+  }, '获取飞书应用凭证')
   const token = json.tenant_access_token
   if (!token) {
     const err = new Error(`tenant_access_token failed http=${http} code=${json.code} msg=${json.msg}`)

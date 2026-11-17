@@ -21,7 +21,7 @@ async function save() {
     form.value = (
       await request.post({ url: '/company/bi/feishu/login-settings', data: form.value })
     ).data
-    ElMessage.success('飞书登录配置已保存')
+    ElMessage.success('BI 访问地址与登录配置已保存')
   } finally {
     busy.value = false
   }
@@ -43,6 +43,11 @@ onMounted(load)
       <el-switch v-model="form.enabled" active-text="启用飞书登录" />
     </div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <el-alert
+      title="BI 访问地址也用于订阅消息底部的“查看详情”。请填写收件人能够访问的地址；无需启用飞书登录即可保存。"
+      type="info"
+      :closable="false"
+    />
     <el-form label-position="top">
       <el-form-item label="BI 访问地址"
         ><el-input v-model="form.baseUrl" placeholder="https://bi.example.com"

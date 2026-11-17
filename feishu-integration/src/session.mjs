@@ -25,6 +25,7 @@ async function ensureSession() {
     })
     context = await browser.newContext({
       viewport: CONFIG.viewport,
+      deviceScaleFactor: 2,
       locale: 'zh-CN'
     })
     const page = await context.newPage()

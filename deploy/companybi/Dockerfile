@@ -77,11 +77,16 @@ COPY feishu-integration/src/capture.mjs feishu-integration/src/config.mjs \
      feishu-integration/src/contact.mjs feishu-integration/src/db.mjs \
      feishu-integration/src/delivery-lane.mjs feishu-integration/src/etl-status.mjs \
      feishu-integration/src/execution-mode.mjs feishu-integration/src/feishu.mjs \
-     feishu-integration/src/run-subscription.mjs feishu-integration/src/schedule.mjs \
+     feishu-integration/src/run-subscription.mjs feishu-integration/src/subscription-content.mjs \
+     feishu-integration/src/schedule.mjs \
      feishu-integration/src/scheduler.mjs feishu-integration/src/service-log.mjs \
      feishu-integration/src/session.mjs feishu-integration/src/store.mjs \
      feishu-integration/src/managed-connection.mjs feishu-integration/src/managed-sheets.mjs \
+     feishu-integration/src/sheet-source.mjs feishu-integration/src/sheet-sync.mjs \
+     feishu-integration/src/sheets.mjs feishu-integration/src/sheet-snapshot.mjs \
      feishu-integration/src/embedded-worker.mjs ./src/
+COPY feishu-integration/scripts/check-runtime.mjs ./check-runtime.mjs
+RUN node --experimental-vm-modules --experimental-import-meta-resolve check-runtime.mjs src/embedded-worker.mjs
 
 # --------------------------------------------------------------------------
 # Stage 4: runtime (Java owns the internal executor lifecycle)

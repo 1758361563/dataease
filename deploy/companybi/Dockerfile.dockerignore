@@ -18,6 +18,9 @@ feishu-integration/*
 !feishu-integration/package.json
 !feishu-integration/package-lock.json
 !feishu-integration/src
+!feishu-integration/scripts
+feishu-integration/scripts/*
+!feishu-integration/scripts/check-runtime.mjs
 feishu-integration/src/*.test.mjs
 feishu-integration/src/*-test.mjs
 feishu-integration/src/*-smoke.mjs

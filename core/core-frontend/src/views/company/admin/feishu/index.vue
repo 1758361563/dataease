@@ -3,7 +3,7 @@ import { formatBeijingTime } from '@/utils/beijingTime'
 import request from '@/config/axios'
 import AdminHelp from '../AdminHelp.vue'
 import SubscriptionWizard from './SubscriptionWizard.vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router_2'
 import { ElMessage } from 'element-plus-secondary'
 import GridTable from '@/components/grid-table/src/GridTable.vue'
@@ -439,31 +439,51 @@ const openRuns = async (row: FeishuSubscription, focusRunId?: string) => {
   runDrawer.value = true
 }
 
+const runDetailElement = ref<HTMLElement>()
 const loadRunDetail = async (runId: string) => {
   activeRunId.value = keepStringId(runId)
   if (!currentRunSubId.value || !activeRunId.value) return
-  runDetail.value = await getFeishuRun(currentRunSubId.value, activeRunId.value)
+  try {
+    runDetail.value = await getFeishuRun(currentRunSubId.value, activeRunId.value)
+    await nextTick()
+    runDetailElement.value?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    runDetailElement.value?.focus({ preventScroll: true })
+  } catch {
+    ElMessage.error('读取运行详情失败，请重试')
+  }
 }
 
-const pollRun = async (subscriptionId: string, runId: string) => {
+let runPollVersion = 0
+const pollRun = async (subscriptionId: string, runId: string, version: number) => {
   polling.value = true
   try {
-    for (let i = 0; i < 40; i++) {
+    while (version === runPollVersion && runDrawer.value) {
       const detail = await getFeishuRun(subscriptionId, runId)
+      const rows = await listFeishuRuns(subscriptionId)
+      if (version !== runPollVersion || !runDrawer.value) return
       runDetail.value = detail
-      runRows.value = await listFeishuRuns(subscriptionId)
+      runRows.value = rows
       const done = ['SUCCEEDED', 'FAILED', 'SKIPPED', 'UNKNOWN'].includes(detail.status)
       if (done) {
         return detail
       }
-      await sleep(1500)
+      await sleep(3000)
     }
-    ElMessage.warning('仍在执行中，可稍后在运行记录里刷新')
-    return runDetail.value
+  } catch {
+    if (version === runPollVersion) ElMessage.error('运行状态刷新失败，请重新打开运行记录')
   } finally {
-    polling.value = false
+    if (version === runPollVersion) polling.value = false
   }
 }
+
+watch([runDrawer, currentRunSubId, activeRunId], ([visible, subscriptionId, runId]) => {
+  const version = ++runPollVersion
+  polling.value = false
+  if (visible && subscriptionId && runId) void pollRun(subscriptionId, runId, version)
+})
+onUnmounted(() => {
+  runPollVersion++
+})
 
 const sendSubscription = async (row: FeishuSubscription) => {
   if (row.status !== 'ENABLED') {
@@ -473,7 +493,6 @@ const sendSubscription = async (row: FeishuSubscription) => {
   const accepted = await runFeishuSubscription(keepStringId(row.id))
   ElMessage.info(acceptedRunNotice(accepted))
   await openRuns(row, keepStringId(accepted.runId || accepted.id))
-  await pollRun(keepStringId(row.id), keepStringId(accepted.runId || accepted.id))
 }
 
 const applyRouteQuery = async () => {
@@ -779,25 +798,15 @@ onMounted(async () => {
     </SubscriptionWizard>
     <el-drawer class="company-admin-drawer" v-model="runDrawer" title="运行记录" size="640px">
       <p class="hint" v-if="polling">正在查询执行状态…</p>
-      <GridTable :show-pagination="false" :table-data="runRows" class="admin-grid">
-        <el-table-column prop="runId" label="runId" min-width="160">
-          <template #default="{ row }">{{ row.runId || row.id }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="170">
-          <template #default="{ row }">{{ runOutcomeLabel(row) }}</template>
-        </el-table-column>
-        <el-table-column label="开始" min-width="160">
-          <template #default="{ row }">{{ formatTime(row.startedAt) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="100">
-          <template #default="{ row }">
-            <el-button text @click="loadRunDetail(row.runId || row.id)">展开</el-button>
-          </template>
-        </el-table-column>
-      </GridTable>
-      <div v-if="runDetail" class="run-detail">
+      <div v-if="runDetail" ref="runDetailElement" class="run-detail" tabindex="-1">
         <h4>run {{ runDetail.runId || runDetail.id }} · {{ runOutcomeLabel(runDetail) }}</h4>
-        <p class="hint">{{ runDetail.errorSummary || '无汇总错误' }}</p>
+        <el-alert
+          v-if="runDetail.errorSummary"
+          :title="runDetail.errorSummary"
+          type="error"
+          :closable="false"
+          show-icon
+        />
         <GridTable :show-pagination="false" :table-data="runDetail.targets || []">
           <el-table-column prop="displayName" label="收件人" min-width="140" />
           <el-table-column label="类型" width="80">
@@ -810,6 +819,22 @@ onMounted(async () => {
           <el-table-column prop="errorSummary" label="错误" min-width="160" />
         </GridTable>
       </div>
+      <GridTable :show-pagination="false" :table-data="runRows" class="admin-grid">
+        <el-table-column prop="runId" label="runId" min-width="160">
+          <template #default="{ row }">{{ row.runId || row.id }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="170">
+          <template #default="{ row }">{{ runOutcomeLabel(row) }}</template>
+        </el-table-column>
+        <el-table-column label="开始" min-width="160">
+          <template #default="{ row }">{{ formatTime(row.startedAt) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button text @click="loadRunDetail(row.runId || row.id)">查看详情</el-button>
+          </template>
+        </el-table-column>
+      </GridTable>
     </el-drawer>
   </div>
 </template>

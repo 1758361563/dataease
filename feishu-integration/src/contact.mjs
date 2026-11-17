@@ -1,7 +1,6 @@
-import { getTenantAccessToken } from './feishu.mjs'
+import { getTenantAccessToken, readFeishuJson } from './feishu.mjs'
 import { CONFIG } from './config.mjs'
 
-const FEISHU_API = 'https://open.feishu.cn/open-apis'
 const CACHE_TTL_MS = 10 * 60 * 1000
 const MAX_MATCHES = 20
 
@@ -41,14 +40,14 @@ export function publicEmployee(row) {
 }
 
 async function feishuGet(token, path) {
-  const res = await fetch(`${FEISHU_API}${path}`, {
-    signal: AbortSignal.timeout(20000),
+  const operation = path.includes('/departments/') ? '读取飞书部门列表' : '读取飞书部门成员'
+  const { http, json } = await readFeishuJson(path, {
     headers: { Authorization: `Bearer ${token}` }
-  })
-  const json = await res.json()
-  if (res.status !== 200 || json.code !== 0) {
-    const err = new Error(`feishu ${path} http=${res.status} code=${json.code} msg=${json.msg}`)
-    err.http = res.status
+  }, operation)
+  if (http !== 200 || json.code !== 0) {
+    const err = new Error(`feishu ${path.split('?')[0]} http=${http} code=${json.code} msg=${json.msg}`)
+    err.http = http
+    err.feishuOperation = operation
     err.code = json.code
     err.msg = json.msg
     err.status = 502

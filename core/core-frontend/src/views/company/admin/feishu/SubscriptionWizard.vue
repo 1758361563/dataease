@@ -169,9 +169,18 @@ async function preview() {
         filters: filters.value
       }
     })
+    if (!Array.isArray(res?.data?.images) || !res.data.images.length) {
+      throw new Error('预览服务未返回图片，请检查执行器诊断日志后重试')
+    }
     if (key === previewKey.value && visible.value) images.value = res.data.images
-  } catch {
-    error.value = '预览生成失败，请检查上方错误提示后重试'
+  } catch (cause: any) {
+    if (key !== previewKey.value || !visible.value) return
+    const detail = typeof cause === 'string' ? cause : cause?.response?.data?.msg || cause?.message
+    error.value = detail?.includes('timeout')
+      ? '预览请求超时，请稍后重试或减少卡片数量'
+      : detail === 'Network Error'
+      ? '无法连接预览服务，请检查本地后端是否运行'
+      : detail || '预览服务未返回有效结果，请重试并检查执行器日志'
   } finally {
     previewing.value = false
   }

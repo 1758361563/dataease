@@ -8,10 +8,11 @@ console.log = (...args) => process.stderr.write(format(...args) + '\n')
 console.info = console.log
 
 const { CONFIG } = await import('./config.mjs')
+const { recordServiceEvent } = await import('./service-log.mjs')
 const { closePool, getPool, query, metadataLockName } = await import('./db.mjs')
 const { refreshManagedConnection } = await import('./managed-connection.mjs')
 const { searchEmployees, resolveEmployee } = await import('./contact.mjs')
-const { getTenantAccessToken } = await import('./feishu.mjs')
+const { getTenantAccessToken, feishuErrorMessage } = await import('./feishu.mjs')
 const { startManualRun, executeSubscription } = await import('./run-subscription.mjs')
 const { schedulerTick } = await import('./scheduler.mjs')
 const { withSchedulerLock } = await import('./store.mjs')
@@ -37,7 +38,8 @@ function publicError(err) {
   // Avoid returning raw process/SQL diagnostics, tokens or request payloads to browsers.
   if (err?.missingScope) return `飞书通讯录权限不足：${err.missingScope}`
   if (err?.status === 404) return '通讯录中未找到该员工'
-  if (err?.code && Number.isInteger(Number(err.code))) return `飞书接口调用失败，错误码 ${err.code}`
+  const apiMessage = feishuErrorMessage(err)
+  if (apiMessage) return apiMessage
   return '飞书操作失败，请检查应用凭据、权限、数据库或截图账号配置'
 }
 async function withConfig(fn) {
@@ -131,7 +133,15 @@ try {
     }
     serialize(() => handle(request.method, request.args || {}))
       .then(result => write({ id: request.id, result }))
-      .catch(err => write({ id: request.id, error: publicError(err) }))
+      .catch(err => {
+        if (request.method === 'search' || request.method === 'resolve') {
+          try { recordServiceEvent({ area: 'feishu-contacts', message: `${err.feishuOperation || '人员查询'}: ${err.message}`, code: err.code || err.name }) } catch { /* Preserve the RPC response when logging fails. */ }
+        }
+        if (request.method === 'subscription.preview') {
+          try { recordServiceEvent({ area: 'subscription-preview', message: (err.previewStage || '准备预览') + ': ' + err.message, code: err.code || err.name }) } catch { /* Keep the RPC error available if logging fails. */ }
+        }
+        write({ id: request.id, error: request.method === 'subscription.preview' && err.publicMessage ? err.publicMessage : publicError(err) })
+      })
   })
   input.on('close', () => shutdown().finally(() => process.exit(0)))
   process.on('SIGTERM', () => shutdown().finally(() => process.exit(0)))

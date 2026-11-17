@@ -250,6 +250,7 @@ const restoreDrillState = (chart: ChartObj) => {
   chart.drillFilters = drillFilters
 }
 
+let subscriptionScreenshot = false
 const renderChart = (viewInfo: Chart, resetPageInfo: boolean) => {
   if (!viewInfo) {
     return
@@ -263,9 +264,10 @@ const renderChart = (viewInfo: Chart, resetPageInfo: boolean) => {
   } as ChartObj)
   restoreDrillState(actualChart)
 
-  recursionTransObj(customAttrTrans, actualChart.customAttr, scale.value, terminal.value)
-  recursionTransObj(customStyleTrans, actualChart.customStyle, scale.value, terminal.value)
-  normalizeTableReadability(actualChart, viewInfo, scale.value)
+  const renderScale = subscriptionScreenshot ? Math.max(1, scale.value) : scale.value
+  recursionTransObj(customAttrTrans, actualChart.customAttr, renderScale, terminal.value)
+  recursionTransObj(customStyleTrans, actualChart.customStyle, renderScale, terminal.value)
+  normalizeTableReadability(actualChart, viewInfo, renderScale)
 
   setupPage(actualChart, resetPageInfo)
   nextTick(() => debounceRender(resetPageInfo))
@@ -328,6 +330,7 @@ const mouseLeave = () => {
 let scrollTimer
 const initScroll = () => {
   scrollTimer && clearTimeout(scrollTimer)
+  if (subscriptionScreenshot) return
   scrollTimer = setTimeout(() => {
     // 首先回到最顶部，然后计算行高*行数作为top，最后判断：如果top<数据量*行高，继续滚动，否则回到顶部
     const customAttr = actualChart?.customAttr
@@ -711,7 +714,30 @@ const resizeAction = resizeColumn => {
   }
   emitter.emit('set-table-column-width', tableWidth)
 }
+const prepareSubscriptionScreenshot = async () => {
+  clearTimeout(timer)
+  clearTimeout(scrollTimer)
+  const firstPreparation = !subscriptionScreenshot
+  subscriptionScreenshot = true
+  // Reuse loaded data; never expand pagination or fetch more rows for a screenshot.
+  if (firstPreparation) renderChart(view.value, false)
+  await nextTick()
+  debounceRender.flush()
+  await nextTick()
+  await new Promise<void>(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+  )
+  myChart?.facet?.timer?.stop()
+  clearTimeout(scrollTimer)
+  const layout = myChart?.facet?.layoutResult
+  const rowsHeight =
+    myChart?.facet?.viewCellHeights?.getTotalHeight() || layout?.rowsHierarchy?.height || 0
+  const headerHeight = layout?.colsHierarchy?.height || 0
+  return { containerId, contentHeight: rowsHeight > 0 ? rowsHeight + headerHeight : 0 }
+}
+
 defineExpose({
+  prepareSubscriptionScreenshot,
   calcData,
   renderChart,
   renderChartFromDialog,
@@ -722,6 +748,12 @@ let timer
 const resize = (width, height) => {
   if (timer) {
     clearTimeout(timer)
+  }
+  if (subscriptionScreenshot && myChart?.facet) {
+    myChart.facet.timer?.stop()
+    myChart.changeSheetSize(width, height)
+    myChart.render()
+    return
   }
   if (showPosition.value === 'viewDialog' && actualChart) {
     // Rebuild width-dependent headers/frozen columns from cached data at the new viewport size.
