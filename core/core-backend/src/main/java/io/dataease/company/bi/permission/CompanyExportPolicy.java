@@ -14,7 +14,7 @@ public class CompanyExportPolicy {
     private final int readonlyExt;
 
     public CompanyExportPolicy(
-            @Value("${company.bi.export.normal:0}") int normalExt,
+            @Value("${company.bi.export.normal:10}") int normalExt,
             @Value("${company.bi.export.readonly:0}") int readonlyExt) {
         this.normalExt = normalize(normalExt);
         this.readonlyExt = normalize(readonlyExt);

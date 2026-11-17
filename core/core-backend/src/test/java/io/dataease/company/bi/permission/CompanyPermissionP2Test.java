@@ -170,6 +170,31 @@ class CompanyPermissionP2Test {
     }
 
     @Test
+    void p2NormalCardExcelExportOnly() {
+        CompanyExportPolicy cardExcel = new CompanyExportPolicy(10, 0);
+        PermissionDecisionService cardDecision = new PermissionDecisionService(
+                users,
+                new DatasetPermissionResolver(acl, groups),
+                new DashboardPermissionResolver(acl, groups),
+                new DashboardPermissionProjectionService(cardExcel),
+                cardExcel);
+        acl.grantDashboard(CompanySubjectType.USER, USER_U, DASHBOARD_X, CompanyRelationLevel.VISITOR);
+        acl.grantDashboard(CompanySubjectType.USER, USER_READONLY, DASHBOARD_X, CompanyRelationLevel.VISITOR);
+
+        assertTrue(cardDecision.canExportDashboard(USER_U, DASHBOARD_X, CompanyExportKind.EXCEL_VIEW));
+        assertFalse(cardDecision.canExportDashboard(USER_U, DASHBOARD_X, CompanyExportKind.IMAGE_PDF_TEMPLATE));
+        assertFalse(cardDecision.canExportDashboard(USER_U, DASHBOARD_X, CompanyExportKind.DETAIL));
+        assertFalse(cardDecision.canExportDashboard(USER_READONLY, DASHBOARD_X, CompanyExportKind.EXCEL_VIEW));
+
+        DashboardPermissionProjection normal = cardDecision.projectDashboard(USER_U, DASHBOARD_X);
+        assertEquals(6, normal.weight());
+        assertEquals(10, normal.ext());
+        DashboardPermissionProjection readonly = cardDecision.projectDashboard(USER_READONLY, DASHBOARD_X);
+        assertEquals(1, readonly.weight());
+        assertEquals(0, readonly.ext());
+    }
+
+    @Test
     void p2T12FindByIdReadonlyWeight1() {
         acl.grantDashboard(CompanySubjectType.USER, USER_READONLY, DASHBOARD_X, CompanyRelationLevel.VISITOR);
         DashboardPermissionProjection projection = decision.projectDashboard(USER_READONLY, DASHBOARD_X);

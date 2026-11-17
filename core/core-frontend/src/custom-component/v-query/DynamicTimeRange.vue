@@ -51,11 +51,39 @@ const props = defineProps({
 const selectValue = ref<[Date, Date]>([new Date(), new Date()])
 const { config } = toRefs(props)
 
-const timeConfig = computed(() =>
-  Object.fromEntries(
-    Object.entries(config.value).filter(([key]) => !['defaultValue', 'selectValue'].includes(key))
-  )
-)
+// 只读取时间规则字段：读到 defaultValue/selectValue 会和下方回写形成无限循环
+const timeConfig = computed(() => {
+  const {
+    timeNum,
+    relativeToCurrentType,
+    timeGranularityMultiple,
+    around,
+    relativeToCurrentRange,
+    defaultValueCheck,
+    arbitraryTime,
+    timeGranularity,
+    timeNumRange,
+    relativeToCurrentTypeRange,
+    aroundRange,
+    arbitraryTimeRange,
+    rangeEndpoints
+  } = config.value
+  return {
+    timeNum,
+    relativeToCurrentType,
+    timeGranularityMultiple,
+    around,
+    relativeToCurrentRange,
+    defaultValueCheck,
+    arbitraryTime,
+    timeGranularity,
+    timeNumRange,
+    relativeToCurrentTypeRange,
+    aroundRange,
+    arbitraryTimeRange,
+    rangeEndpoints
+  }
+})
 
 watch(
   () => timeConfig.value,
@@ -82,13 +110,22 @@ watch(
   }
 )
 
+const sameRange = (a?: Date[], b?: Date[]) =>
+  a === b || (!!a && !!b && a.length === b.length && a.every((date, i) => +date === +b[i]))
+
+const setSelectValue = (range?: [Date, Date]) => {
+  if (!sameRange(selectValue.value, range)) {
+    selectValue.value = range
+  }
+}
+
 const init = () => {
   if (!config.value.defaultValueCheck) {
-    selectValue.value = [new Date(), new Date()]
+    setSelectValue([new Date(), new Date()])
     return
   }
   const range = resolveDefaultRange(config.value, 'config')
-  selectValue.value = range.every(date => Number.isFinite(+date)) ? range : undefined
+  setSelectValue(range.every(date => Number.isFinite(+date)) ? range : undefined)
 }
 
 onBeforeMount(() => {
